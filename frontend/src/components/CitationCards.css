@@ -1,0 +1,149 @@
+.citation-card-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.citation-card {
+  background-color: #f1f8ff;
+  border-radius: 8px;
+  padding: 10px;
+  width: 260px;
+  min-height: 160px;
+  position: relative;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  font-size: 0.85rem;
+  overflow-y: auto;
+}
+
+.rotate-icon {
+  position: absolute;
+  top: 8px;
+  right: 100px;
+  color: grey;
+  cursor: pointer;
+  display: flex;
+  gap: 2px;
+}
+
+.rotate-icon .dot {
+  font-size: 10px;
+  color: #aaa;
+}
+
+.rotate-icon .active-dot {
+  font-size: 14px;
+  color: #555;
+}
+
+.card-content {
+  margin-top: 30px;
+}
+
+.content-text {
+  margin-top: 8px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.add-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  font-size: 2rem;
+  color: grey;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+}
+
+.form-control {
+  margin-bottom: 8px;
+  padding: 8px;
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.upload-placeholder {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: grey;
+  font-size: 0.8rem;
+}
+
+.add-icon {
+  font-size: 3rem;
+  color: grey;
+}
+
+@keyframes pulseColor {
+  0% { color: #4fa8ff; }
+  50% { color: #004aad; }
+  100% { color: #4fa8ff; }
+}
+
+.loading-text {
+  font-weight: bold;
+  animation: pulseColor 2s infinite;
+}
+
+.citation-card {
+  position: relative;
+}
+
+.rotate-icon {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+  display: flex;
+  gap: 2px;
+}
+
+.rotate-icon .dot {
+  font-size: 8px;
+  color: #ccc;
+}
+
+.rotate-icon .active-dot {
+  font-size: 10px;
+  color: #aaa;
+}
+
+
+.delete-icon {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 14px;
+  font-weight: 300;
+}
+
+.delete-icon:hover {
+  color: #555;
+}
