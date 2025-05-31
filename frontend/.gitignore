@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# From ChatGPT
+node_modules/
+build/
+dist/
+.next/
+out/
+.env
+.vscode/
+.idea/
+.DS_Store
