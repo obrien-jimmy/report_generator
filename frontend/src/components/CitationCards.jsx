@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from 'axios';
 import "./CitationCards.css";
 import { FaUpload, FaDatabase, FaRobot } from "react-icons/fa";
 
@@ -44,17 +45,27 @@ const CitationCards = ({ citations }) => {
     }));
   };
 
-  const submitForm = (e) => {
+  const submitForm = async (e) => {
     e.preventDefault();
-    const newCitation = {
-      apa: `${formData.author || "Unknown Author"} (${formData.year || "n.d."}). ${formData.title || "Untitled"}. ${formData.source || "Unknown Source"}.`,
-      categories: ["User-added"],
-      methodologyPoints: ["User-specified"],
-      description: "User-added citation. Specific details provided by the user.",
-    };
 
-    setAllCitations((prev) => [...prev, newCitation]);
-    setCardStates((prev) => [...prev, { side: 0, source: "LLM" }]);
+    try {
+      const res = await axios.post('http://localhost:8000/identify_citation', formData);
+
+      const identifiedCitation = res.data.citation;
+
+      const newCitation = {
+        apa: identifiedCitation.apa,
+        categories: identifiedCitation.categories,
+        methodologyPoints: identifiedCitation.methodologyPoints,
+        description: identifiedCitation.description,
+      };
+
+      setAllCitations((prev) => [...prev, newCitation]);
+      setCardStates((prev) => [...prev, { side: 0, source: "LLM" }]);
+    } catch (err) {
+      alert(err.message || "Failed to identify citation.");
+    }
+
     setFormData({ title: "", source: "", year: "", author: "" });
     setShowForm(false);
   };
@@ -125,7 +136,7 @@ const CitationCards = ({ citations }) => {
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h4>Add Citation</h4>
+            <h4>Search for Citation</h4>
             <form onSubmit={submitForm}>
               <input className="form-control" placeholder="Title" name="title" value={formData.title} onChange={handleFormChange}/>
               <input className="form-control" placeholder="Source/Publication" name="source" value={formData.source} onChange={handleFormChange}/>
@@ -141,4 +152,3 @@ const CitationCards = ({ citations }) => {
 };
 
 export default CitationCards;
-

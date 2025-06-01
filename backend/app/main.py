@@ -232,3 +232,56 @@ async def generate_works_cited(request: WorksCitedRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class CitationSearchRequest(BaseModel):
+    title: Optional[str] = ""
+    source: Optional[str] = ""
+    year: Optional[str] = ""
+    author: Optional[str] = ""
+
+class IdentifiedCitation(BaseModel):
+    apa: str
+    categories: List[str]
+    methodologyPoints: List[str]
+    description: str
+
+@app.post("/identify_citation")
+async def identify_citation(request: CitationSearchRequest):
+    prompt = f"""
+    You are an academic assistant tasked with precisely identifying and formatting scholarly citations.
+
+    Explicitly identify the correct APA citation and related information for the following details:
+    Title: "{request.title}"
+    Source/Publication: "{request.source}"
+    Year: "{request.year}"
+    Author: "{request.author}"
+
+    If some details are missing, explicitly find the most relevant scholarly work that closely matches the provided information.
+
+    Explicitly return a JSON object exactly matching this structure and format:
+
+    {{
+      "apa": "Author, A. A. (Year). Title of work. Publisher.",
+      "categories": ["Relevant categories"],
+      "methodologyPoints": ["Relevant methodology points"],
+      "description": "One sentence explicitly describing how this source is relevant."
+    }}
+
+    Provide ONLY the explicit JSON, no additional explanations.
+    """
+
+    try:
+        ai_response = invoke_bedrock(prompt)
+        ai_response_cleaned = re.sub(r'[\x00-\x1F\x7F]', '', ai_response).strip()
+
+        json_start = ai_response_cleaned.find('{')
+        json_end = ai_response_cleaned.rfind('}') + 1
+        if json_start == -1 or json_end == -1:
+            raise ValueError("No valid JSON found in the response.")
+
+        identified_citation_json = ai_response_cleaned[json_start:json_end]
+        identified_citation = json.loads(identified_citation_json)
+
+        return {"citation": identified_citation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
