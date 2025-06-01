@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import socratesIcon from './assets/socrates.png';
 import ThesisRefinement from './components/ThesisRefinement';
+import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineGenerator';
 
@@ -19,7 +20,7 @@ function App() {
   const [paperLength, setPaperLength] = useState(10);
   const [sourceCategories, setSourceCategories] = useState([]);
   const [methodology, setMethodology] = useState('');
-  const [showOutline, setShowOutline] = useState(false);
+  const [readyForOutline, setReadyForOutline] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -48,7 +49,7 @@ function App() {
   };
 
   const proceedToOutline = () => {
-    setShowOutline(true);
+    setReadyForOutline(true);
   };
 
   return (
@@ -64,95 +65,115 @@ function App() {
         />
       </div>
 
-      <ThesisRefinement
-        setFinalThesis={setFinalThesis}
-        setPaperLength={setPaperLength}
-        setSourceCategories={setSourceCategories}
-      />
+      {/* Thesis Refinement Section */}
+      <div className="card p-3 mb-4">
+        <ThesisRefinement onFinalize={setFinalThesis} />
+      </div>
 
-      <hr className="my-5" />
-
-      {finalThesis && sourceCategories.length > 0 && (
-        <>
-<MethodologyGenerator
-  finalThesis={finalThesis}
-  sourceCategories={sourceCategories}
-  setMethodology={setMethodology}
-  proceedToOutline={() => setReadyForOutline(true)}
-/>
-
-{readyForOutline && (
-  <OutlineGenerator
-    finalThesis={finalThesis}
-    methodology={methodology}
-    paperLength={paperLength}
-    sourceCategories={sourceCategories}
-  />
-)}
-
-        </>
+      {/* Source Categories Section (visible after thesis finalized) */}
+      {finalThesis && (
+        <div className="card p-3 mb-4">
+          <SourceCategories
+            finalThesis={finalThesis}
+            paperLength={paperLength}
+            setPaperLength={setPaperLength}
+            onCategoriesSelected={setSourceCategories}
+          />
+        </div>
       )}
 
-      <hr className="my-5" />
+      {/* Methodology Section (visible after source categories selected) */}
+      {sourceCategories.length > 0 && (
+        <div className="card p-3 mb-4">
+          <MethodologyGenerator
+            finalThesis={finalThesis}
+            sourceCategories={sourceCategories}
+            setMethodology={setMethodology}
+            proceedToOutline={proceedToOutline}
+          />
+        </div>
+      )}
 
-      <h3>AI Prompt Interaction</h3>
-      <textarea
-        className="form-control my-3"
-        rows={4}
-        placeholder="Enter your prompt here..."
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-      />
-
-      <button
-        className="btn btn-primary"
-        onClick={handleSubmit}
-        disabled={loading || !prompt}
-      >
-        {loading ? 'Generating...' : 'Generate AI Response'}
-      </button>
-
-      {response && (
-        <div className="mt-4 card p-3">
-          <h5>AI Response:</h5>
-          <p>{response}</p>
+      {/* Outline Section (visible after methodology finalized) */}
+      {readyForOutline && methodology && (
+        <div className="card p-3 mb-4">
+          <OutlineGenerator
+            finalThesis={finalThesis}
+            methodology={methodology}
+            paperLength={paperLength}
+            sourceCategories={sourceCategories}
+          />
         </div>
       )}
 
       <hr className="my-5" />
 
-      <h3>Query Amazon Bedrock Knowledge Base</h3>
-      <input
-        type="text"
-        className="form-control my-3"
-        placeholder="Enter your Knowledge Base query..."
-        value={kbQuery}
-        onChange={(e) => setKbQuery(e.target.value)}
-      />
+      {/* AI Prompt Interaction */}
+      <div className="card p-3 mb-4">
+        <h3>AI Prompt Interaction</h3>
+        <textarea
+          className="form-control my-3"
+          rows={4}
+          placeholder="Enter your prompt here..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          style={{ width: '100%', resize: 'vertical' }}
+        />
 
-      <button
-        className="btn btn-success"
-        onClick={handleKbQuery}
-        disabled={kbLoading || !kbQuery}
-      >
-        {kbLoading ? 'Loading Results...' : 'Query Knowledge Base'}
-      </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSubmit}
+          disabled={loading || !prompt}
+        >
+          {loading ? 'Generating...' : 'Generate AI Response'}
+        </button>
 
-      {kbError && <div className="alert alert-danger mt-2">Error: {kbError}</div>}
+        {response && (
+          <div className="mt-4">
+            <h5>AI Response:</h5>
+            <p>{response}</p>
+          </div>
+        )}
+      </div>
 
-      {kbResults.length > 0 && (
-        <div className="mt-4">
-          <h5>Knowledge Base Results:</h5>
-          <ul className="list-group">
-            {kbResults.map((result, idx) => (
-              <li key={idx} className="list-group-item">
-                <strong>Score: {result.score.toFixed(2)}</strong>
-                <p>{result.content.text}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <hr className="my-5" />
+
+      {/* Knowledge Base Interaction */}
+      <div className="card p-3">
+        <h3>Query Amazon Bedrock Knowledge Base</h3>
+        <input
+          type="text"
+          className="form-control my-3"
+          placeholder="Enter your Knowledge Base query..."
+          value={kbQuery}
+          onChange={(e) => setKbQuery(e.target.value)}
+          style={{ width: '100%' }}
+        />
+
+        <button
+          className="btn btn-success"
+          onClick={handleKbQuery}
+          disabled={kbLoading || !kbQuery}
+        >
+          {kbLoading ? 'Loading Results...' : 'Query Knowledge Base'}
+        </button>
+
+        {kbError && <div className="alert alert-danger mt-2">Error: {kbError}</div>}
+
+        {kbResults.length > 0 && (
+          <div className="mt-4">
+            <h5>Knowledge Base Results:</h5>
+            <ul className="list-group">
+              {kbResults.map((result, idx) => (
+                <li key={idx} className="list-group-item">
+                  <strong>Score: {result.score.toFixed(2)}</strong>
+                  <p>{result.content.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

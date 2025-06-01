@@ -5,7 +5,9 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const [methodologyText, setMethodologyText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isEditing, setIsEditing] = useState(false); // default isEditing to false after generation
+  const [isEditing, setIsEditing] = useState(false);
+  const [outlineActivated, setOutlineActivated] = useState(false);
+  const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
 
   useEffect(() => {
     const generateMethodology = async () => {
@@ -23,7 +25,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
 
         setMethodologyText(formattedMethodology);
         setMethodology(formattedMethodology);
-        setIsEditing(false); // explicitly saved state
+        setIsEditing(false);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -32,15 +34,36 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     };
 
     generateMethodology();
-  }, []);
+  }, [finalThesis, sourceCategories, setMethodology]);
 
   const handleSave = () => {
     setMethodology(methodologyText);
     setIsEditing(false);
+
+    if (outlineActivated) {
+      setOutlineNeedsRerun(true);
+    }
+  };
+
+  const handleEditClick = () => {
+    if (outlineActivated) {
+      alert("Warning: Editing the methodology at this point will NOT modify any research outputs already generated.");
+    }
+    setIsEditing(true);
+  };
+
+  const handleProceedToOutline = () => {
+    proceedToOutline();
+    setOutlineActivated(true);
+  };
+
+  const handleRerunOutline = () => {
+    proceedToOutline();
+    setOutlineNeedsRerun(false);
   };
 
   return (
-    <div className="my-5">
+    <div>
       <h3>Research Methodology</h3>
 
       {loading && <p>Generating Methodology...</p>}
@@ -59,18 +82,24 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
 
           <div className="mt-3">
             {isEditing ? (
-              <button className="btn btn-success" onClick={handleSave}>
+              <button className="btn btn-primary" onClick={handleSave}>
                 Save Methodology
               </button>
             ) : (
-              <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>
+              <button className="btn btn-secondary" onClick={handleEditClick}>
                 Edit Methodology
               </button>
             )}
 
-            {!isEditing && (
-              <button className="btn btn-primary ms-2" onClick={proceedToOutline}>
+            {!isEditing && !outlineActivated && (
+              <button className="btn btn-primary ms-2" onClick={handleProceedToOutline}>
                 Proceed to Outline
+              </button>
+            )}
+
+            {!isEditing && outlineActivated && outlineNeedsRerun && (
+              <button className="btn btn-primary ms-2" onClick={handleRerunOutline}>
+                Rerun Outline
               </button>
             )}
           </div>
