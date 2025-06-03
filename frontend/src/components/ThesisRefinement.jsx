@@ -13,7 +13,7 @@ const ThesisRefinement = ({ onFinalize }) => {
     setLoading(true);
     try {
       const res = await axios.post('http://localhost:8000/ai-response', {
-        prompt: `List 2-3 clarifying questions for: "${topic}".`,
+        prompt: `List 3-6 clarifying questions for: "${topic}".`,
       });
       const aiQuestions = res.data.response
         .split('\n')

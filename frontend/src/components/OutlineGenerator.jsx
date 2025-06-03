@@ -28,22 +28,37 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const generateOutline = async () => {
     setLoading(true);
     setError(null);
+
+    let safePaperLength;
+    
+    // Handle special string cases explicitly
+    if (paperLength === 'Maximum Detail') {
+      safePaperLength = -2;
+    } else if (paperLength === 'Adjusted Based on Thesis') {
+      safePaperLength = -1;
+    } else {
+      // Ensure it is parsed as integer
+      safePaperLength = parseInt(paperLength, 10);
+    }
+
     try {
       const res = await axios.post('http://localhost:8000/generate_outline', {
         final_thesis: finalThesis,
         methodology,
-        paper_length_pages: paperLength,
+        paper_length_pages: safePaperLength,
         source_categories: sourceCategories,
       });
+
       setOutline(res.data.outline);
       setHasGenerated(true);
       setIsEditing(false);
       setSaved(true);
     } catch (err) {
-      setError(err.message || 'Failed to generate outline.');
+      setError(err.response?.data?.detail || err.message || 'Failed to generate outline.');
     }
     setLoading(false);
   };
+
 
   const handleSave = () => {
     setIsEditing(false);

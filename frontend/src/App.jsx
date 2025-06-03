@@ -5,22 +5,26 @@ import ThesisRefinement from './components/ThesisRefinement';
 import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineGenerator';
+import PageLengthSelector from './components/PageLengthSelector';
 
 function App() {
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [kbQuery, setKbQuery] = useState('');
   const [kbResults, setKbResults] = useState([]);
   const [kbLoading, setKbLoading] = useState(false);
   const [kbError, setKbError] = useState(null);
 
   const [finalThesis, setFinalThesis] = useState('');
-  const [paperLength, setPaperLength] = useState(10);
+  const [paperLength, setPaperLength] = useState(null);
   const [sourceCategories, setSourceCategories] = useState([]);
   const [methodology, setMethodology] = useState('');
   const [readyForOutline, setReadyForOutline] = useState(false);
+  const [outlineVersion, setOutlineVersion] = useState(0);
+
+  const [pageLengthFinalized, setPageLengthFinalized] = useState(false);
+  const [categoriesFinalized, setCategoriesFinalized] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -48,21 +52,14 @@ function App() {
     setKbLoading(false);
   };
 
-  const proceedToOutline = () => {
-    setReadyForOutline(true);
-  };
+  const proceedToOutline = () => setReadyForOutline(true);
+  const resetOutline = () => setOutlineVersion(prev => prev + 1);
 
   return (
     <div className="container py-5">
       <div className="d-flex align-items-center mb-4">
         <h1>Socratic AI Assistant</h1>
-        <img
-          src={socratesIcon}
-          alt="Socrates Icon"
-          width={70}
-          height={70}
-          className="ms-3"
-        />
+        <img src={socratesIcon} alt="Socrates Icon" width={70} height={70} className="ms-3" />
       </div>
 
       {/* Thesis Refinement Section */}
@@ -70,26 +67,39 @@ function App() {
         <ThesisRefinement onFinalize={setFinalThesis} />
       </div>
 
-      {/* Source Categories Section (visible after thesis finalized) */}
+      {/* Page Length Selector (always visible after thesis is finalized) */}
       {finalThesis && (
+        <PageLengthSelector
+          onPageCountSelected={(length) => {
+            setPaperLength(length);
+            setPageLengthFinalized(true);
+          }}
+        />
+      )}
+
+      {/* Source Categories (visible once page length has been initially set) */}
+      {finalThesis && pageLengthFinalized && (
         <div className="card p-3 mb-4">
           <SourceCategories
             finalThesis={finalThesis}
-            paperLength={paperLength}
-            setPaperLength={setPaperLength}
-            onCategoriesSelected={setSourceCategories}
+            paperLength={paperLength || 0}
+            onCategoriesSelected={(categories) => {
+              setSourceCategories(categories);
+              setCategoriesFinalized(true);
+            }}
           />
         </div>
       )}
 
-      {/* Methodology Section (visible after source categories selected) */}
-      {sourceCategories.length > 0 && (
+      {/* Methodology Section (visible once source categories have been set) */}
+      {finalThesis && categoriesFinalized && (
         <div className="card p-3 mb-4">
           <MethodologyGenerator
             finalThesis={finalThesis}
             sourceCategories={sourceCategories}
             setMethodology={setMethodology}
             proceedToOutline={proceedToOutline}
+            resetOutline={resetOutline}
           />
         </div>
       )}
@@ -98,9 +108,10 @@ function App() {
       {readyForOutline && methodology && (
         <div className="card p-3 mb-4">
           <OutlineGenerator
+            key={outlineVersion}
             finalThesis={finalThesis}
             methodology={methodology}
-            paperLength={paperLength}
+            paperLength={paperLength || 0}
             sourceCategories={sourceCategories}
           />
         </div>
@@ -119,7 +130,6 @@ function App() {
           onChange={(e) => setPrompt(e.target.value)}
           style={{ width: '100%', resize: 'vertical' }}
         />
-
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
@@ -149,7 +159,6 @@ function App() {
           onChange={(e) => setKbQuery(e.target.value)}
           style={{ width: '100%' }}
         />
-
         <button
           className="btn btn-success"
           onClick={handleKbQuery}
