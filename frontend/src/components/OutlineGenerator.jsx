@@ -125,7 +125,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   };
 
   return (
-    <div className="container my-5">
+    <div className="container">
       <h3>Outline Generation</h3>
 
       {!hasGenerated && (
