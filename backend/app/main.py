@@ -442,3 +442,60 @@ async def generate_subsections(request: SubsectionsRequest):
         return subsections_json
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class QuestionsRequest(BaseModel):
+    final_thesis: str
+    methodology: str
+    section_title: str
+    section_context: str
+    subsection_title: str
+    subsection_context: str
+
+class QuestionsResponse(BaseModel):
+    questions: List[str]
+
+@app.post("/generate_questions", response_model=QuestionsResponse)
+async def generate_questions(request: QuestionsRequest):
+    prompt = f"""
+    Given the following details, explicitly generate ONLY a precise, thorough list of critical questions and information requirements needed to fully address the subsection described:
+
+    Thesis: "{request.final_thesis}"
+    Methodology: "{request.methodology}"
+    Section Title: "{request.section_title}"
+    Section Context: "{request.section_context}"
+    Subsection Title: "{request.subsection_title}"
+    Subsection Context: "{request.subsection_context}"
+
+    Explicitly respond in this JSON structure ONLY:
+
+    {{
+        "questions": [
+            "Question 1",
+            "Question 2"
+        ]
+    }}
+
+    Provide exactly enough questions to thoroughly address the subsection. No additional explanation.
+    """
+
+    try:
+        ai_response = invoke_bedrock(prompt)
+        cleaned_response = re.sub(r'[\x00-\x1F\x7F]', '', ai_response).strip()
+
+        json_start = cleaned_response.find('{')
+        json_end = cleaned_response.rfind('}') + 1
+
+        if json_start == -1 or json_end == -1:
+            raise ValueError("LLM response did not return valid JSON.")
+
+        response_json = json.loads(cleaned_response[json_start:json_end])
+
+        if "questions" not in response_json:
+            raise ValueError("Expected 'questions' key missing from response JSON.")
+
+        return response_json
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"JSON decode error: {str(e)}. Snippet: {cleaned_response[:200]}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

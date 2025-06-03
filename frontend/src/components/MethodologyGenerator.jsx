@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 
 const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline }) => {
   const [methodologyText, setMethodologyText] = useState('');
@@ -8,6 +9,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const [isEditing, setIsEditing] = useState(false);
   const [outlineActivated, setOutlineActivated] = useState(false);
   const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const generateMethodology = async () => {
@@ -55,6 +57,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const handleProceedToOutline = () => {
     proceedToOutline();
     setOutlineActivated(true);
+    setCollapsed(true);
   };
 
   const handleRerunOutline = () => {
@@ -62,14 +65,23 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     setOutlineNeedsRerun(false);
   };
 
+  const toggleCollapse = () => setCollapsed(prev => !prev);
+
   return (
-    <div>
+    <div >
+      <div
+        style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }}
+        onClick={toggleCollapse}
+      >
+        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      </div>
+
       <h3>Research Methodology</h3>
 
       {loading && <p>Generating Methodology...</p>}
       {error && <div className="alert alert-danger">Error: {error}</div>}
 
-      {!loading && !error && (
+      {!loading && !error && !collapsed && (
         <>
           <textarea
             className="form-control"
