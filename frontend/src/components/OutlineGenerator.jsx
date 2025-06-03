@@ -42,22 +42,56 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     }
 
     try {
-      const res = await axios.post('http://localhost:8000/generate_outline', {
+      const res = await axios.post('http://localhost:8000/generate_sections', {
         final_thesis: finalThesis,
         methodology,
         paper_length_pages: safePaperLength,
         source_categories: sourceCategories,
       });
 
-      setOutline(res.data.outline);
+      // Initialize outline with sections but empty subsections
+      setOutline(res.data.sections.map(sec => ({ ...sec, subsections: [] })));
+
       setHasGenerated(true);
       setIsEditing(false);
       setSaved(true);
+      
+    await generateSubsectionsSequentially(res.data.sections);
+
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to generate outline.');
     }
     setLoading(false);
   };
+
+  const generateSubsectionsSequentially = async (sections) => {
+  const safePaperLength =
+    paperLength === 'Maximum Detail' ? -2 :
+    paperLength === 'Adjusted Based on Thesis' ? -1 :
+    parseInt(paperLength, 10);
+
+  for (let section of sections) {
+    try {
+      const res = await axios.post('http://localhost:8000/generate_subsections', {
+        final_thesis: finalThesis,
+        methodology,
+        section_title: section.section_title,
+        section_context: section.section_context,
+        paper_length_pages: safePaperLength,
+        source_categories: sourceCategories,
+      });
+
+      setOutline(prevOutline => prevOutline.map(sec => {
+        if (sec.section_title === section.section_title) {
+          return { ...sec, subsections: res.data.subsections };
+        }
+        return sec;
+      }));
+    } catch (err) {
+      console.error(`Error generating subsections for section: ${section.section_title}`, err);
+    }
+  }
+};
 
 
   const handleSave = () => {
@@ -159,6 +193,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
             </>
           )}
 
+          {section.subsections.length === 0 && <p>Generating subsections...</p>}
           {section.subsections.map((sub, subIdx) => {
             const key = `${section.section_title}-${sub.subsection_title}`;
             return (

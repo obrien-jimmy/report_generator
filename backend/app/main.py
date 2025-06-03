@@ -351,3 +351,94 @@ Example Response:
         return {"refined_thesis": refined_thesis}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class SectionsRequest(BaseModel):
+    final_thesis: str
+    methodology: str
+    paper_length_pages: int
+    source_categories: List[str]
+
+class SectionOnly(BaseModel):
+    section_title: str
+    section_context: str
+
+class SectionsResponse(BaseModel):
+    sections: List[SectionOnly]
+
+@app.post("/generate_sections", response_model=SectionsResponse)
+async def generate_sections(request: SectionsRequest):
+    prompt = f"""
+    Explicitly provide ONLY high-level sections for an academic outline based on:
+
+    Thesis: "{request.final_thesis}"
+    Methodology: "{request.methodology}"
+    Paper length: {request.paper_length_pages if request.paper_length_pages > 0 else 'maximum detail'}
+    Source Categories: {', '.join(request.source_categories)}
+
+    Provide explicitly in the following JSON format:
+
+    {{
+        "sections": [
+            {{
+                "section_title": "Explicit Section Title",
+                "section_context": "Clear explanation relating explicitly to the thesis and methodology"
+            }}
+        ]
+    }}
+
+    Return ONLY valid JSON explicitly, no commentary or explanations.
+    """
+
+    try:
+        ai_response = invoke_bedrock(prompt)
+        ai_response_cleaned = re.sub(r'[\x00-\x1F\x7F]', '', ai_response).strip()
+        sections_json = json.loads(ai_response_cleaned)
+        return sections_json
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SubsectionsRequest(BaseModel):
+    final_thesis: str
+    methodology: str
+    section_title: str
+    section_context: str
+    paper_length_pages: int
+    source_categories: List[str]
+
+class SubsectionsResponse(BaseModel):
+    subsections: List[Subsection]
+
+@app.post("/generate_subsections", response_model=SubsectionsResponse)
+async def generate_subsections(request: SubsectionsRequest):
+    prompt = f"""
+    Explicitly provide subsections (and optionally sub-subsections) for the given section:
+
+    Thesis: "{request.final_thesis}"
+    Methodology: "{request.methodology}"
+    Section Title: "{request.section_title}"
+    Section Context: "{request.section_context}"
+    Paper length: {request.paper_length_pages if request.paper_length_pages > 0 else 'maximum detail'}
+    Source Categories: {', '.join(request.source_categories)}
+
+    Provide explicitly in the following JSON format:
+
+    {{
+        "subsections": [
+            {{
+                "subsection_title": "Explicit Subsection Title",
+                "subsection_context": "Clear explanation relating explicitly to the parent section, thesis, and methodology"
+            }}
+        ]
+    }}
+
+    Return ONLY valid JSON explicitly, no commentary or explanations.
+    """
+
+    try:
+        ai_response = invoke_bedrock(prompt)
+        ai_response_cleaned = re.sub(r'[\x00-\x1F\x7F]', '', ai_response).strip()
+        subsections_json = json.loads(ai_response_cleaned)
+        return subsections_json
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
