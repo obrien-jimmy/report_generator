@@ -70,13 +70,13 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   return (
     <div >
       <div
-        style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }}
+        style={{ position: 'absolute', top: 10, right: 26, cursor: 'pointer', color: '#aaa' }}
         onClick={toggleCollapse}
       >
         {collapsed ? <FaChevronRight /> : <FaChevronDown />}
       </div>
 
-      <h3>Research Methodology</h3>
+      <h3>Methodology Considerations</h3>
 
       {loading && <p>Generating Methodology...</p>}
       {error && <div className="alert alert-danger">Error: {error}</div>}
