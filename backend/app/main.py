@@ -175,6 +175,7 @@ class WorksCitedRequest(BaseModel):
     subsection_title: str
     subsection_context: str
     source_categories: List[str]
+    citation_count: int = 4
 
 class RecommendedSource(BaseModel):
     apa: str
@@ -201,6 +202,7 @@ async def generate_works_cited(request: WorksCitedRequest):
     Subsection Context: "{request.subsection_context}"
 
     Source Categories: {', '.join(request.source_categories)}
+    Number of Citations Requested: {request.citation_count}
 
     Explicitly return a JSON array exactly matching the following structure:
 
@@ -217,6 +219,7 @@ async def generate_works_cited(request: WorksCitedRequest):
     - Each APA citation must follow the format: "Author, A. A. (Year). Title of work. Publisher."
     - Only use categories from the provided Source Categories list, exactly as given.
     - Clearly include the associated methodology point(s) with explicit numbering (e.g., "National Security Assessment (3)").
+    - Provide exactly {request.citation_count} citation(s).
     - Provide ONLY valid JSON explicitly, without any additional commentary or explanation.
     """
 
