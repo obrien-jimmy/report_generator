@@ -1,12 +1,48 @@
-# React + Vite
+# SocraticAI Development
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the React frontend built with Vite. The FastAPI backend lives in `../backend`.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Python 3.9+
+- Node.js (v16+ recommended)
+- AWS credentials configured so `boto3` can access Bedrock and OpenSearch
 
-## Expanding the ESLint configuration
+## Running the Backend
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Navigate to the backend directory:
+   ```bash
+   cd ../backend
+   ```
+2. Create and activate a virtual environment (one is provided but can be recreated):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install fastapi uvicorn boto3 opensearch-py python-dotenv
+   ```
+3. Add a `.env` file in `backend` with the following variables:
+   ```
+   AWS_REGION=<your-aws-region>
+   OPENSEARCH_ENDPOINT=<your-opensearch-endpoint>
+   ```
+4. Start the API server:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+   The backend will be accessible at `http://localhost:8000`.
+
+## Running the Frontend
+
+1. Switch to the frontend directory:
+   ```bash
+   cd ../frontend
+   ```
+2. Install npm dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   The React app runs on `http://localhost:5173` and communicates with the backend at `http://localhost:8000`.
