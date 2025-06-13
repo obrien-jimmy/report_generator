@@ -120,6 +120,15 @@ const handleCollapseExpandAll = () => {
   );
 };
 
+  const updateSection = (idx, field, value) => {
+    setOutline(prev =>
+      prev.map((sec, sIdx) =>
+        sIdx === idx ? { ...sec, [field]: value } : sec
+      )
+    );
+    setSaved(false);
+  };
+
   const handleSave = () => {
     setIsEditing(false);
     setSaved(true);
