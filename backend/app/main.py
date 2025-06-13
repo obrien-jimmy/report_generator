@@ -168,6 +168,8 @@ async def generate_outline(request: OutlineRequest):
 
 
 class WorksCitedRequest(BaseModel):
+    """Request payload for generating a works cited list."""
+
     final_thesis: str
     methodology: str
     section_title: str
@@ -175,7 +177,9 @@ class WorksCitedRequest(BaseModel):
     subsection_title: str
     subsection_context: str
     source_categories: List[str]
-    citation_count: int = 4
+    citation_count: int = Field(
+        4, description="Number of citation entries to generate"
+    )
 
 class RecommendedSource(BaseModel):
     apa: str
