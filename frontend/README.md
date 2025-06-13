@@ -46,3 +46,20 @@ This directory contains the React frontend built with Vite. The FastAPI backend 
    npm run dev
    ```
    The React app runs on `http://localhost:5173` and communicates with the backend at `http://localhost:8000`.
+
+## Running Tests
+
+1. Ensure the backend virtual environment is active:
+   ```bash
+   cd ../backend
+   source venv/bin/activate
+   ```
+2. Install the test dependencies:
+   ```bash
+   pip install pytest
+   ```
+3. From the project root, execute:
+   ```bash
+   pytest
+   ```
+   All tests live in the `tests/` directory and should run without contacting AWS.
