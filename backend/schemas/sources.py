@@ -24,6 +24,20 @@ class WorksCitedRequest(BaseModel):
 class WorksCitedResponse(BaseModel):
     recommended_sources: List[RecommendedSource]
 
+class QuestionCitationRequest(BaseModel):
+    final_thesis: str
+    methodology: str
+    section_title: str
+    section_context: str
+    subsection_title: str
+    subsection_context: str
+    question: str
+    source_categories: List[str]
+    citation_count: int = Field(3, description="Number of citation entries to generate")
+
+class QuestionCitationResponse(BaseModel):
+    recommended_sources: List[RecommendedSource]
+
 class CitationSearchRequest(BaseModel):
     title: Optional[str] = ""
     source: Optional[str] = ""

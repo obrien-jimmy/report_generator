@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from schemas.sources import (
     SourceRecommendationRequest, WorksCitedRequest, WorksCitedResponse,
-    CitationSearchRequest
+    CitationSearchRequest, QuestionCitationRequest, QuestionCitationResponse
 )
 from services.bedrock_service import invoke_bedrock
 import json
@@ -129,5 +129,65 @@ async def identify_citation(request: CitationSearchRequest):
         identified_citation = json.loads(identified_citation_json)
 
         return {"citation": identified_citation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate_question_citations", response_model=QuestionCitationResponse)
+async def generate_question_citations(request: QuestionCitationRequest):
+    prompt = f"""
+    You are an academic researcher skilled in identifying ideal sources to answer specific research questions.
+
+    Thesis: "{request.final_thesis}"
+    Research Methodology: "{request.methodology}"
+    Section Title: "{request.section_title}"
+    Section Context: "{request.section_context}"
+    Subsection Title: "{request.subsection_title}"
+    Subsection Context: "{request.subsection_context}"
+    Specific Question: "{request.question}"
+    Source Categories: {', '.join(request.source_categories)}
+
+    Generate citations that specifically help answer the question "{request.question}" within the context of:
+    1. The subsection: {request.subsection_title}
+    2. The larger section: {request.section_title}
+    3. The overall methodology approach
+    4. Supporting the main thesis
+
+    Explicitly return a JSON array exactly matching the following structure:
+
+    [
+    {{
+        "apa": "Author, A. A. (Year). Title of work. Publisher.",
+        "categories": ["Explicit relevant category name(s) from the provided list"],
+        "methodologyPoints": ["Explicit Methodology Section Title"],
+        "description": "Explicitly state in one concise sentence how this source specifically helps answer the question '{request.question}' within the subsection context."
+    }}
+    ]
+
+    Rules:
+    - Each APA citation must follow standard format
+    - Only use categories from the provided Source Categories list
+    - Include methodology points that this source addresses
+    - Provide exactly {request.citation_count} citation(s)
+    - Focus specifically on answering the question within the academic context
+    - Provide ONLY valid JSON, no additional commentary
+    """
+
+    try:
+        response = invoke_bedrock(prompt)
+        response_cleaned = re.sub(r'[\x00-\x1F\x7F]', '', response).strip()
+
+        json_start = response_cleaned.find('[')
+        json_end = response_cleaned.rfind(']') + 1
+        if json_start == -1 or json_end == -1:
+            raise ValueError("No valid JSON array found in response.")
+
+        sources_json = response_cleaned[json_start:json_end]
+        recommended_sources = json.loads(sources_json)
+        return {"recommended_sources": recommended_sources}
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"JSON decode error: {str(e)}. Snippet: {response_cleaned[:500]}"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
