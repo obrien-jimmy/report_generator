@@ -8,10 +8,16 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
   const [loading, setLoading] = useState(false);
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [error, setError] = useState(null); // Add error state
 
   useEffect(() => {
     const recommendSources = async () => {
       setLoading(true);
+      setError(null); // Clear previous errors
+      
+      // Add delay to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       try {
         const res = await axios.post('http://localhost:8000/recommend_sources', {
           final_thesis: finalThesis,
@@ -20,13 +26,28 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
 
         const cats = res.data.recommended_categories.map((name) => ({ name, selected: true }));
         setCategories(cats);
-      } catch {
-        alert('Failed to recommend sources.');
+      } catch (err) {
+        console.error('Source recommendation error:', err);
+        const errorMsg = err.response?.data?.detail || err.message || 'Failed to recommend sources.';
+        setError(errorMsg);
+        
+        // Set some default categories if the API fails
+        const defaultCategories = [
+          'Academic Journal Articles',
+          'Government Reports',
+          'Books and Monographs',
+          'News Articles',
+          'Expert Interviews'
+        ];
+        const cats = defaultCategories.map((name) => ({ name, selected: true }));
+        setCategories(cats);
       }
       setLoading(false);
     };
 
-    recommendSources();
+    if (finalThesis && paperLength !== null) {
+      recommendSources();
+    }
   }, [finalThesis, paperLength]);
 
   const toggleCategory = (index) => {
@@ -75,23 +96,28 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
         <>
           {loading ? (
             <p>Loading recommended sources...</p>
-          ) : (
-            categories.map((cat, idx) => (
-              <div key={idx} className="form-check">
-                {!finalized && (
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    checked={cat.selected}
-                    onChange={() => toggleCategory(idx)}
-                  />
-                )}
-                <label className="form-check-label">
-                  {cat.name}
-                </label>
-              </div>
-            ))
-          )}
+          ) : error ? (
+            <div className="alert alert-warning">
+              <p>{error}</p>
+              <p><small>Default categories have been loaded. You can modify them below.</small></p>
+            </div>
+          ) : null}
+          
+          {categories.map((cat, idx) => (
+            <div key={idx} className="form-check">
+              {!finalized && (
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={cat.selected}
+                  onChange={() => toggleCategory(idx)}
+                />
+              )}
+              <label className="form-check-label">
+                {cat.name}
+              </label>
+            </div>
+          ))}
 
           {!finalized && (
             <>
