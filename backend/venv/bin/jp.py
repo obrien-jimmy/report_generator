@@ -1,4 +1,4 @@
-#!/Users/jimmyobrien/Desktop/code/socrates/backend/venv/bin/python3
+#!/Users/jimmy_mac/Desktop/code/SocraticAI/backend/venv/bin/python3
 
 import sys
 import json

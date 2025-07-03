@@ -7,7 +7,8 @@ load_dotenv()
 
 bedrock = boto3.client(
     service_name='bedrock-runtime',
-    region_name=os.getenv("AWS_REGION")
+    # region_name=os.getenv("AWS_REGION")
+    region_name='us-east-1'  # Explicitly set to us-east-1 for compatibility with Bedrock
 )
 
 def invoke_bedrock(prompt, model_id="anthropic.claude-3-5-sonnet-20240620-v1:0"):

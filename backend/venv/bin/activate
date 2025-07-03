@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/jimmyobrien/Desktop/code/socrates/backend/venv"
+VIRTUAL_ENV="/Users/jimmy_mac/Desktop/code/SocraticAI/backend/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
