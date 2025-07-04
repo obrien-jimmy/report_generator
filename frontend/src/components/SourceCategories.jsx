@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
+import { FaChevronRight, FaChevronDown, FaSyncAlt } from 'react-icons/fa';
 
 const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) => {
   const [categories, setCategories] = useState([]);
@@ -9,59 +9,79 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  useEffect(() => {
-    const recommendSources = async () => {
-      setLoading(true);
-      setError(null);
-      
-      // Add delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      try {
-        const res = await axios.post('http://localhost:8000/recommend_sources', {
-          final_thesis: finalThesis,
-          paper_length_pages: paperLength,
-        });
+  const recommendSources = async () => {
+    setLoading(true);
+    setError(null);
+    
+    // Add delay to prevent rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    try {
+      const res = await axios.post('http://localhost:8000/recommend_sources', {
+        final_thesis: finalThesis,
+        paper_length_pages: paperLength,
+      });
 
-        // Parse numbered categories and clean them
-        const cats = res.data.recommended_categories.map((name, index) => {
-          // Remove existing numbering (e.g., "1. ", "2. ", etc.) if present
-          const cleanName = name.replace(/^\d+\.\s*/, '').trim();
-          return { 
-            name: cleanName, 
-            selected: true,
-            number: index + 1
-          };
-        });
-        setCategories(cats);
-      } catch (err) {
-        console.error('Source recommendation error:', err);
-        const errorMsg = err.response?.data?.detail || err.message || 'Failed to recommend sources.';
-        setError(errorMsg);
-        
-        // Set some default categories if the API fails
-        const defaultCategories = [
-          'Academic Journal Articles',
-          'Government Reports',
-          'Books and Monographs',
-          'News Articles',
-          'Expert Interviews'
-        ];
-        const cats = defaultCategories.map((name, index) => ({ 
-          name, 
+      // Parse numbered categories and clean them
+      const cats = res.data.recommended_categories.map((name, index) => {
+        // Remove existing numbering (e.g., "1. ", "2. ", etc.) if present
+        const cleanName = name.replace(/^\d+\.\s*/, '').trim();
+        return { 
+          name: cleanName, 
           selected: true,
           number: index + 1
-        }));
-        setCategories(cats);
-      }
-      setLoading(false);
-    };
-
-    if (finalThesis && paperLength !== null) {
-      recommendSources();
+        };
+      });
+      setCategories(cats);
+    } catch (err) {
+      console.error('Source recommendation error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to recommend sources.';
+      setError(errorMsg);
+      
+      // Set some default categories if the API fails
+      const defaultCategories = [
+        'Academic Journal Articles',
+        'Government Reports',
+        'Books and Monographs',
+        'News Articles',
+        'Expert Interviews'
+      ];
+      const cats = defaultCategories.map((name, index) => ({ 
+        name, 
+        selected: true,
+        number: index + 1
+      }));
+      setCategories(cats);
     }
-  }, [finalThesis, paperLength]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    // Only run once when component first mounts with valid data
+    if (finalThesis && paperLength !== null && !hasInitialized) {
+      recommendSources();
+      setHasInitialized(true);
+    }
+  }, [finalThesis, paperLength, hasInitialized]);
+
+  const handleRegenerate = () => {
+    if (finalized) {
+      const confirmRegenerate = window.confirm(
+        "This will reset all source categories and any customizations. Are you sure you want to regenerate?"
+      );
+      if (!confirmRegenerate) return;
+      
+      setFinalized(false);
+      setCollapsed(false);
+    }
+    
+    // Clear existing categories and regenerate
+    setCategories([]);
+    setCustomCategory('');
+    recommendSources();
+  };
 
   const toggleCategory = (index) => {
     if (!finalized) {
@@ -114,11 +134,23 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
 
   return (
     <div className="position-relative">
-      <div
-        style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
-        onClick={toggleCollapse}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      <div className="d-flex" style={{ position: 'absolute', top: -5, right: 10 }}>
+        <FaSyncAlt 
+          style={{ 
+            cursor: 'pointer', 
+            color: '#aaa', 
+            marginRight: '8px',
+            fontSize: '0.9em'
+          }}
+          onClick={handleRegenerate}
+          title="Regenerate source categories"
+        />
+        <div
+          style={{ cursor: 'pointer', color: '#aaa' }}
+          onClick={toggleCollapse}
+        >
+          {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+        </div>
       </div>
 
       <h3>
@@ -169,7 +201,6 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
                 className={`form-check-label ${finalized && !cat.selected ? 'text-muted' : ''}`}
                 style={{ 
                   cursor: finalized ? 'default' : 'pointer'
-                  // Removed fontWeight styling - no more bold for selected items
                 }}
                 onClick={() => !finalized && toggleCategory(idx)}
               >

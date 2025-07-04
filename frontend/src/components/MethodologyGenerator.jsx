@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaChevronRight, FaChevronDown, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
+import { FaChevronRight, FaChevronDown, FaEdit, FaSave, FaTimes, FaSyncAlt } from 'react-icons/fa';
 
-const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGenerated }) => {
+const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline }) => {
   const [methodologyPoints, setMethodologyPoints] = useState([]);
   const [customPoint, setCustomPoint] = useState('');
   const [loading, setLoading] = useState(false);
@@ -11,67 +11,91 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGene
   const [error, setError] = useState(null);
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [outlineActivated, setOutlineActivated] = useState(false);
+  const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  useEffect(() => {
-    const generateMethodology = async () => {
-      setLoading(true);
-      setError(null);
-      
-      // Add delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      try {
-        const res = await axios.post('http://localhost:8000/generate_methodology', {
-          final_thesis: finalThesis,
-          source_categories: sourceCategories,
+  const generateMethodology = async () => {
+    setLoading(true);
+    setError(null);
+    
+    // Add delay to prevent rate limiting
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    try {
+      const res = await axios.post('http://localhost:8000/generate_methodology', {
+        final_thesis: finalThesis,
+        source_categories: sourceCategories,
+      });
+
+      // Parse methodology text into numbered points
+      const methodologyText = res.data.methodology;
+      const points = methodologyText
+        .split(/\n+/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map((point, index) => {
+          // Remove existing numbering if present
+          const cleanPoint = point.replace(/^\d+\.\s*/, '').replace(/^[-•]\s*/, '').trim();
+          return {
+            text: cleanPoint,
+            selected: true,
+            number: index + 1,
+            isOriginal: true
+          };
         });
 
-        // Parse methodology text into numbered points
-        const methodologyText = res.data.methodology;
-        const points = methodologyText
-          .split(/\n+/)
-          .map(line => line.trim())
-          .filter(line => line.length > 0)
-          .map((point, index) => {
-            // Remove existing numbering if present
-            const cleanPoint = point.replace(/^\d+\.\s*/, '').replace(/^[-•]\s*/, '').trim();
-            return {
-              text: cleanPoint,
-              selected: true,
-              number: index + 1,
-              isOriginal: true
-            };
-          });
-
-        setMethodologyPoints(points);
-      } catch (err) {
-        console.error('Methodology generation error:', err);
-        const errorMsg = err.response?.data?.detail || err.message || 'Failed to generate methodology.';
-        setError(errorMsg);
-        
-        // Set some default methodology points if the API fails
-        const defaultPoints = [
-          'Conduct comprehensive literature review of relevant academic sources',
-          'Analyze primary source documents and government reports',
-          'Apply comparative analysis methodology across different source categories',
-          'Synthesize findings to support thesis arguments',
-          'Ensure proper citation and documentation of all sources'
-        ];
-        const points = defaultPoints.map((point, index) => ({
-          text: point,
-          selected: true,
-          number: index + 1,
-          isOriginal: true
-        }));
-        setMethodologyPoints(points);
-      }
-      setLoading(false);
-    };
-
-    if (finalThesis && sourceCategories && sourceCategories.length > 0) {
-      generateMethodology();
+      setMethodologyPoints(points);
+    } catch (err) {
+      console.error('Methodology generation error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to generate methodology.';
+      setError(errorMsg);
+      
+      // Set some default methodology points if the API fails
+      const defaultPoints = [
+        'Conduct comprehensive literature review of relevant academic sources',
+        'Analyze primary source documents and government reports',
+        'Apply comparative analysis methodology across different source categories',
+        'Synthesize findings to support thesis arguments',
+        'Ensure proper citation and documentation of all sources'
+      ];
+      const points = defaultPoints.map((point, index) => ({
+        text: point,
+        selected: true,
+        number: index + 1,
+        isOriginal: true
+      }));
+      setMethodologyPoints(points);
     }
-  }, [finalThesis, sourceCategories]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    // Only run once when component first mounts with valid data
+    if (finalThesis && sourceCategories && sourceCategories.length > 0 && !hasInitialized) {
+      generateMethodology();
+      setHasInitialized(true);
+    }
+  }, [finalThesis, sourceCategories, hasInitialized]);
+
+  const handleRegenerate = () => {
+    if (finalized) {
+      const confirmRegenerate = window.confirm(
+        "This will reset all methodology considerations and any customizations. Are you sure you want to regenerate?"
+      );
+      if (!confirmRegenerate) return;
+      
+      setFinalized(false);
+      setCollapsed(false);
+    }
+    
+    // Clear existing points and regenerate
+    setMethodologyPoints([]);
+    setCustomPoint('');
+    setEditingIndex(null);
+    setEditingText('');
+    generateMethodology();
+  };
 
   const togglePoint = (index) => {
     if (!finalized) {
@@ -134,7 +158,13 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGene
     const methodologyText = selectedPoints.join('\n\n');
     setFinalized(true);
     setCollapsed(true);  // Auto-collapse after finalizing
-    onMethodologyGenerated(methodologyText);
+    setMethodology(methodologyText);
+    
+    // Automatically proceed to outline
+    if (proceedToOutline) {
+      proceedToOutline();
+      setOutlineActivated(true);
+    }
   };
 
   const handleEditMethodology = () => {
@@ -143,6 +173,25 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGene
     }
     setFinalized(false);
     setCollapsed(false);
+    
+    if (outlineActivated) {
+      setOutlineNeedsRerun(true);
+    }
+  };
+
+  const handleProceedToOutline = () => {
+    if (proceedToOutline) {
+      proceedToOutline();
+      setOutlineActivated(true);
+      setCollapsed(true);
+    }
+  };
+
+  const handleRerunOutline = () => {
+    if (proceedToOutline) {
+      proceedToOutline();
+      setOutlineNeedsRerun(false);
+    }
   };
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
@@ -152,11 +201,23 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGene
 
   return (
     <div className="position-relative">
-      <div
-        style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
-        onClick={toggleCollapse}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      <div className="d-flex" style={{ position: 'absolute', top: -5, right: 10 }}>
+        <FaSyncAlt 
+          style={{ 
+            cursor: 'pointer', 
+            color: '#aaa', 
+            marginRight: '8px',
+            fontSize: '0.9em'
+          }}
+          onClick={handleRegenerate}
+          title="Regenerate methodology considerations"
+        />
+        <div
+          style={{ cursor: 'pointer', color: '#aaa' }}
+          onClick={toggleCollapse}
+        >
+          {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+        </div>
       </div>
 
       <h3>
@@ -313,12 +374,33 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, onMethodologyGene
                   <div><small>{totalCount - selectedCount} considerations have been excluded.</small></div>
                 )}
               </div>
-              <button
-                className="btn btn-secondary"
-                onClick={handleEditMethodology}
-              >
-                Edit Methodology
-              </button>
+              
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleEditMethodology}
+                >
+                  Edit Methodology
+                </button>
+
+                {!outlineActivated && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleProceedToOutline}
+                  >
+                    Proceed to Outline
+                  </button>
+                )}
+
+                {outlineActivated && outlineNeedsRerun && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleRerunOutline}
+                  >
+                    Rerun Outline
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </>

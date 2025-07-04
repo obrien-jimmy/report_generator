@@ -72,6 +72,29 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     setLoading(false);
   };
 
+  const handleRegenerate = () => {
+    const confirmRegenerate = window.confirm(
+      "This will regenerate the entire outline and clear all questions and citations. Are you sure you want to continue?"
+    );
+    if (!confirmRegenerate) return;
+    
+    // Clear all existing data
+    setOutline([]);
+    setQuestions({});
+    setQuestionCitations({});
+    setLoadingCitations({});
+    setCollapsedSections({});
+    setCollapsedSubsections({});
+    setCollapsedQuestions({});
+    setAllCollapsed(false);
+    setHasGenerated(false);
+    setIsEditing(false);
+    setSaved(false);
+    
+    // Regenerate the outline
+    generateOutline();
+  };
+
   const generateSubsectionsSequentially = async (sections) => {
     const safePaperLength =
       paperLength === 'Maximum Detail' ? -2 :
@@ -319,13 +342,24 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     <div className="container position-relative">
       <h3>Outline Generation</h3>
 
-      <button
-        className="btn btn-sm btn-outline-secondary position-absolute"
-        style={{ top: '10px', right: '10px' }}
-        onClick={handleCollapseExpandAll}
-      >
-        {allCollapsed ? 'Expand All' : 'Collapse All'}
-      </button>
+      <div className="d-flex" style={{ position: 'absolute', top: '10px', right: '10px' }}>
+        <FaSyncAlt 
+          style={{ 
+            cursor: 'pointer', 
+            color: '#aaa', 
+            marginRight: '8px',
+            fontSize: '0.9em'
+          }}
+          onClick={handleRegenerate}
+          title="Regenerate entire outline"
+        />
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={handleCollapseExpandAll}
+        >
+          {allCollapsed ? 'Expand All' : 'Collapse All'}
+        </button>
+      </div>
 
       {!hasGenerated && (
         <button className="btn btn-primary my-3" onClick={generateOutline} disabled={loading}>

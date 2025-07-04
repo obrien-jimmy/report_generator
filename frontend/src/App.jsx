@@ -6,6 +6,7 @@ import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineGenerator';
 import PageLengthSelector from './components/PageLengthSelector';
+import PaperTypeSelector from './components/PaperTypeSelector';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -25,6 +26,8 @@ function App() {
 
   const [pageLengthFinalized, setPageLengthFinalized] = useState(false);
   const [categoriesFinalized, setCategoriesFinalized] = useState(false);
+  const [selectedPaperType, setSelectedPaperType] = useState(null);
+  const [showThesisRefinement, setShowThesisRefinement] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -54,6 +57,10 @@ function App() {
 
   const proceedToOutline = () => setReadyForOutline(true);
   const resetOutline = () => setOutlineVersion(prev => prev + 1);
+  const handlePaperTypeSelected = (paperType) => {
+    setSelectedPaperType(paperType);
+    setShowThesisRefinement(true);
+  };
 
   return (
     <div className="container py-5">
@@ -62,10 +69,17 @@ function App() {
         <img src={socratesIcon} alt="Socrates Icon" width={70} height={70} className="ms-3" />
       </div>
 
-      {/* Thesis Refinement Section */}
+      {/* Paper Type Selector */}
       <div className="card p-3 mb-4">
-        <ThesisRefinement onFinalize={setFinalThesis} />
+        <PaperTypeSelector onPaperTypeSelected={handlePaperTypeSelected} />
       </div>
+
+      {/* Thesis Refinement Section */}
+      {showThesisRefinement && (
+        <div className="card p-3 mb-4">
+          <ThesisRefinement onFinalize={setFinalThesis} />
+        </div>
+      )}
 
       {/* Page Length Selector (always visible after thesis is finalized) */}
       {finalThesis && (
