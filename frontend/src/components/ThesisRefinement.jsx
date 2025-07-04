@@ -1,172 +1,293 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { FaChevronRight, FaChevronDown, FaQuestionCircle } from 'react-icons/fa';
 
-const ThesisRefinement = ({ onFinalize }) => {
-  const [topic, setTopic] = useState('');
-  const [questions, setQuestions] = useState([]);
-  const [responses, setResponses] = useState({});
+const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
+  const [initialThesis, setInitialThesis] = useState('');
+  const [refinedThesis, setRefinedThesis] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isFinalized, setIsFinalized] = useState(false);
-  const [hasFinalizedOnce, setHasFinalizedOnce] = useState(false);
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.post('http://localhost:8000/ai-response', {
-        prompt: `List 3-6 clarifying questions for: "${topic}".`,
-      });
-      const aiQuestions = res.data.response
-        .split('\n')
-        .filter((line) => /^\d+\./.test(line))
-        .map((line) => line.replace(/^\d+\.\s*/, '').trim());
-
-      setQuestions(aiQuestions);
-      setResponses({});
-    } catch {
-      alert('Failed to fetch questions.');
-    }
-    setLoading(false);
-  };
+  const [error, setError] = useState(null);
+  const [finalized, setFinalized] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  
+  // Probing questions state
+  const [showProbingQuestions, setShowProbingQuestions] = useState(false);
+  const [probingQuestions, setProbingQuestions] = useState([]);
+  const [probingAnswers, setProbingAnswers] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [processingAnswers, setProcessingAnswers] = useState(false);
 
   const handleRefineThesis = async () => {
+    if (!initialThesis.trim()) {
+      alert('Please enter a thesis statement to refine.');
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+    
     try {
-      const res = await axios.post('http://localhost:8000/refine_thesis', {
-        current_topic: topic,
-        user_responses: questions.map((_, idx) => responses[idx] || ''),
+      const res = await axios.post('http://localhost:8000/auto_refine_thesis', {
+        thesis: initialThesis,
+        paper_type: selectedPaperType?.name || 'General Paper',
+        paper_purpose: selectedPaperType?.purpose || 'To present information and analysis',
+        paper_tone: selectedPaperType?.tone || 'Academic, objective',
+        paper_structure: selectedPaperType?.structure || 'Introduction → Body → Conclusion'
       });
 
-      setTopic(res.data.refined_thesis);
-      setQuestions([]);
-      setResponses({});
-    } catch {
-      alert('Failed to refine thesis.');
+      setRefinedThesis(res.data.refined_thesis);
+    } catch (err) {
+      console.error('Thesis refinement error:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to refine thesis.');
     }
     setLoading(false);
   };
 
-  const handleAutoRefineThesis = async () => {
-    setLoading(true);
+  const handleGenerateProbingQuestions = async () => {
+    if (!initialThesis.trim()) {
+      alert('Please enter a thesis statement first.');
+      return;
+    }
+
+    setLoadingQuestions(true);
+    setError(null);
+    
     try {
-      const res = await axios.post('http://localhost:8000/auto_refine_thesis', {
-        thesis: topic,
+      const res = await axios.post('http://localhost:8000/generate_probing_questions', {
+        thesis: initialThesis,
+        paper_type: selectedPaperType?.name || 'General Paper',
+        paper_purpose: selectedPaperType?.purpose || 'To present information and analysis',
+        paper_tone: selectedPaperType?.tone || 'Academic, objective'
       });
 
-      setTopic(res.data.refined_thesis);
-      setQuestions([]);
-      setResponses({});
-    } catch {
-      alert('Failed to auto-refine thesis.');
+      setProbingQuestions(res.data.questions);
+      setProbingAnswers(new Array(res.data.questions.length).fill(''));
+      setShowProbingQuestions(true);
+    } catch (err) {
+      console.error('Probing questions error:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to generate probing questions.');
     }
-    setLoading(false);
+    setLoadingQuestions(false);
+  };
+
+  const handleAnswerChange = (index, value) => {
+    const newAnswers = [...probingAnswers];
+    newAnswers[index] = value;
+    setProbingAnswers(newAnswers);
+  };
+
+  const handleSubmitAnswers = async () => {
+    setProcessingAnswers(true);
+    setError(null);
+    
+    try {
+      const res = await axios.post('http://localhost:8000/answer_probing_questions', {
+        thesis: initialThesis,
+        questions: probingQuestions,
+        answers: probingAnswers,
+        paper_type: selectedPaperType?.name || 'General Paper',
+        paper_purpose: selectedPaperType?.purpose || 'To present information and analysis',
+        paper_tone: selectedPaperType?.tone || 'Academic, objective'
+      });
+
+      setRefinedThesis(res.data.refined_thesis);
+      setShowProbingQuestions(false);
+    } catch (err) {
+      console.error('Answer processing error:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to process answers.');
+    }
+    setProcessingAnswers(false);
+  };
+
+  const handleCancelProbing = () => {
+    setShowProbingQuestions(false);
+    setProbingQuestions([]);
+    setProbingAnswers([]);
   };
 
   const handleFinalize = () => {
-    if (topic.trim()) {
-      setIsFinalized(true);
-      if (!hasFinalizedOnce) {
-        onFinalize(topic);
-        setHasFinalizedOnce(true);
-      }
-    } else {
-      alert("Please enter a thesis before finalizing.");
+    if (!refinedThesis.trim()) {
+      alert('Please refine your thesis before finalizing.');
+      return;
     }
+    
+    setFinalized(true);
+    setCollapsed(true);
+    onFinalize(refinedThesis);
   };
 
-  const handleEditThesis = () => {
-    alert("Any changes made now won't modify existing research outputs below.");
-    setIsFinalized(false);
+  const handleEdit = () => {
+    if (finalized) {
+      alert("Warning: Editing the thesis at this point will NOT modify any research outputs already generated unless subsequent sections are rerun.");
+    }
+    setFinalized(false);
+    setCollapsed(false);
   };
 
-  const handleCancelQuestions = () => {
-    setQuestions([]);
-    setResponses({});
-  };
+  const toggleCollapse = () => setCollapsed(prev => !prev);
+
+  const answeredQuestionsCount = probingAnswers.filter(answer => answer.trim()).length;
 
   return (
-    <div className="w-100">
-      <h3>Thesis Refinement</h3>
+    <div className="position-relative">
+      <div
+        style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
+        onClick={toggleCollapse}
+      >
+        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      </div>
 
-      {isFinalized ? (
-        <div className="mt-3">
-          <p>
-            <strong>Final Thesis:</strong> {topic}
-          </p>
-        </div>
-      ) : (
-        <textarea
-          className="form-control"
-          placeholder="Enter your thesis/topic"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-        />
-      )}
+      <h3>
+        Thesis Refinement
+        {finalized && (
+          <small className="text-muted ms-2">(Finalized)</small>
+        )}
+      </h3>
 
-      {!isFinalized && questions.length === 0 && (
-        <div className="mt-3">
-          <button
-            className="btn btn-secondary"
-            onClick={fetchQuestions}
-            disabled={loading || !topic}
-          >
-            {loading ? 'Generating...' : 'Thesis Refinement Questions'}
-          </button>
-          <button
-            className="btn btn-secondary ms-2"
-            onClick={handleAutoRefineThesis}
-            disabled={loading || !topic}
-          >
-            {loading ? 'Refining...' : 'Auto-Refine Thesis'}
-          </button>
-          <button
-            className="btn btn-primary ms-2"
-            onClick={handleFinalize}
-          >
-            Finalize Thesis
-          </button>
-        </div>
-      )}
-
-      {!isFinalized && questions.length > 0 && (
+      {!collapsed && (
         <>
-          {questions.map((q, idx) => (
-            <div key={idx} className="mt-3">
-              <strong>{q}</strong>
-              <textarea
-                className="form-control mt-2"
-                value={responses[idx] || ''}
-                onChange={(e) => setResponses({ ...responses, [idx]: e.target.value })}
-              />
+          {selectedPaperType && (
+            <div className="alert alert-info mb-3">
+              <strong>Paper Type:</strong> {selectedPaperType.name}
+              <br />
+              <small><strong>Purpose:</strong> {selectedPaperType.purpose}</small>
+              <br />
+              <small><strong>Tone:</strong> {selectedPaperType.tone}</small>
             </div>
-          ))}
-          <div className="mt-3">
-            <button
-              className="btn btn-secondary me-2"
-              onClick={handleCancelQuestions}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleRefineThesis}
-              disabled={loading}
-            >
-              {loading ? 'Refining...' : 'Refine Thesis'}
-            </button>
-          </div>
-        </>
-      )}
+          )}
 
-      {isFinalized && (
-        <div className="mt-3">
-          <button
-            className="btn btn-secondary"
-            onClick={handleEditThesis}
-          >
-            Edit Thesis
-          </button>
-        </div>
+          {!finalized ? (
+            <>
+              <div className="mb-3">
+                <label htmlFor="initialThesis" className="form-label">
+                  Enter your initial thesis or topic:
+                </label>
+                <textarea
+                  id="initialThesis"
+                  className="form-control"
+                  rows={3}
+                  placeholder={`Enter your ${selectedPaperType?.name.toLowerCase() || 'paper'} thesis or main topic here...`}
+                  value={initialThesis}
+                  onChange={(e) => setInitialThesis(e.target.value)}
+                />
+              </div>
+
+              {error && (
+                <div className="alert alert-danger">
+                  <p>{error}</p>
+                </div>
+              )}
+
+              {/* Probing Questions Section */}
+              {showProbingQuestions && (
+                <div className="card p-3 mb-3">
+                  <h5><FaQuestionCircle className="me-2" />Probing Questions</h5>
+                  <p className="text-muted mb-3">
+                    Answer any questions that help clarify your thesis. You can skip questions that don't apply.
+                  </p>
+                  
+                  {probingQuestions.map((question, index) => (
+                    <div key={index} className="mb-3">
+                      <label className="form-label">
+                        <strong>Question {index + 1}:</strong> {question}
+                      </label>
+                      <textarea
+                        className="form-control"
+                        rows={2}
+                        placeholder="Your answer (optional)..."
+                        value={probingAnswers[index]}
+                        onChange={(e) => handleAnswerChange(index, e.target.value)}
+                      />
+                    </div>
+                  ))}
+
+                  <div className="d-flex gap-2 mt-3">
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSubmitAnswers}
+                      disabled={processingAnswers}
+                    >
+                      {processingAnswers ? 'Processing...' : `Submit Answers (${answeredQuestionsCount} answered)`}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleCancelProbing}
+                      disabled={processingAnswers}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {refinedThesis && (
+                <div className="card p-3 mb-3">
+                  <h5>Refined Thesis:</h5>
+                  <div className="mb-3">
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      value={refinedThesis}
+                      onChange={(e) => setRefinedThesis(e.target.value)}
+                      placeholder="Your refined thesis will appear here..."
+                    />
+                  </div>
+                  <small className="text-muted">
+                    This thesis has been refined to align with the {selectedPaperType?.name} format and purpose.
+                    You can edit it above if needed.
+                  </small>
+                </div>
+              )}
+
+              <div className="mt-3 d-flex gap-2">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleRefineThesis}
+                  disabled={loading || !initialThesis.trim()}
+                >
+                  {loading ? 'Refining...' : `Auto-Refine for ${selectedPaperType?.name || 'Paper'}`}
+                </button>
+
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={handleGenerateProbingQuestions}
+                  disabled={loadingQuestions || !initialThesis.trim() || showProbingQuestions}
+                >
+                  <FaQuestionCircle className="me-1" />
+                  {loadingQuestions ? 'Generating...' : 'Ask Probing Questions'}
+                </button>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={handleFinalize}
+                  disabled={!refinedThesis.trim()}
+                >
+                  Finalize Thesis
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="mt-3">
+              <div className="alert alert-success">
+                <strong>Finalized Thesis:</strong>
+                <div className="mt-2">
+                  {refinedThesis}
+                </div>
+                <div className="mt-2">
+                  <small className="text-muted">
+                    Optimized for: {selectedPaperType?.name}
+                  </small>
+                </div>
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={handleEdit}
+              >
+                Edit Thesis
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

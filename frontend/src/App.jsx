@@ -77,7 +77,10 @@ function App() {
       {/* Thesis Refinement Section */}
       {showThesisRefinement && (
         <div className="card p-3 mb-4">
-          <ThesisRefinement onFinalize={setFinalThesis} />
+          <ThesisRefinement 
+            onFinalize={setFinalThesis} 
+            selectedPaperType={selectedPaperType}
+          />
         </div>
       )}
 
