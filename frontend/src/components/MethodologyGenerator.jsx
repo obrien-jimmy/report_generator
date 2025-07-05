@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaChevronRight, FaChevronDown, FaEdit, FaSave, FaTimes, FaSyncAlt, FaInfoCircle } from 'react-icons/fa';
+import { FaEdit, FaSave, FaTimes, FaInfoCircle, FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
 
 const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount, shouldAutoLoad, onLoadComplete }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
   const [selectedSubMethodology, setSelectedSubMethodology] = useState('');
   const [generatedMethodologies, setGeneratedMethodologies] = useState([]);
+  const [methodologySets, setMethodologySets] = useState([]);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [selectedMethodologyIndex, setSelectedMethodologyIndex] = useState(null);
+  const [selectedSetIndex, setSelectedSetIndex] = useState(null);
   const [customMethodology, setCustomMethodology] = useState('');
+  const [customApproach, setCustomApproach] = useState('');
+  const [customSourceFocus, setCustomSourceFocus] = useState('');
+  const [customStructureAlignment, setCustomStructureAlignment] = useState('');
   const [selectedMethodologyDetails, setSelectedMethodologyDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [finalized, setFinalized] = useState(false);
@@ -18,6 +24,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const [outlineActivated, setOutlineActivated] = useState(false);
   const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
   const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
+  const [isCustomMethodology, setIsCustomMethodology] = useState(false);
 
   const loadMethodologyOptions = async () => {
     if (hasLoadedOptions) return;
@@ -51,13 +58,19 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     setSelectedMethodology(methodologyId);
     setSelectedSubMethodology('');
     setGeneratedMethodologies([]);
+    setMethodologySets([]);
+    setCurrentSetIndex(0);
     setSelectedMethodologyIndex(null);
+    setSelectedSetIndex(null);
   };
 
   const handleSubMethodologySelect = (subMethodologyId) => {
     setSelectedSubMethodology(subMethodologyId);
     setGeneratedMethodologies([]);
+    setMethodologySets([]);
+    setCurrentSetIndex(0);
     setSelectedMethodologyIndex(null);
+    setSelectedSetIndex(null);
   };
 
   const generateMethodologyOptions = async () => {
@@ -98,8 +111,23 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
       };
 
       const res = await axios.post('http://localhost:8000/generate_methodology_options', requestData);
-      setGeneratedMethodologies(res.data.methodologies);
+      
+      // If this is the first set, initialize arrays
+      if (methodologySets.length === 0) {
+        setMethodologySets([res.data.methodologies]);
+        setGeneratedMethodologies(res.data.methodologies);
+        setCurrentSetIndex(0);
+      } else {
+        // Add new set to existing sets
+        const newSets = [...methodologySets, res.data.methodologies];
+        setMethodologySets(newSets);
+        setGeneratedMethodologies(res.data.methodologies);
+        setCurrentSetIndex(newSets.length - 1);
+      }
+      
       setShowMethodologySelection(false);
+      setSelectedMethodologyIndex(null);
+      setSelectedSetIndex(null);
     } catch (err) {
       console.error('Methodology generation error:', err);
       setError(err.response?.data?.detail || err.message || 'Failed to generate methodology options.');
@@ -109,14 +137,67 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
 
   const handleMethodologyChoice = (index) => {
     setSelectedMethodologyIndex(index);
+    setSelectedSetIndex(currentSetIndex);
+    setIsCustomMethodology(false);
     const selectedMethod = generatedMethodologies[index];
     setCustomMethodology(selectedMethod.description);
+    setCustomApproach(selectedMethod.approach);
+    setCustomSourceFocus(selectedMethod.source_focus);
+    setCustomStructureAlignment(selectedMethod.structure_alignment);
     setSelectedMethodologyDetails(selectedMethod);
   };
 
-  const handleFinalizeMethodology = () => {
+  const handleCustomMethodologyChoice = () => {
+    setIsCustomMethodology(true);
+    setSelectedMethodologyIndex(null);
+    setSelectedSetIndex(null);
+    setCustomMethodology('');
+    setCustomApproach('');
+    setCustomSourceFocus('');
+    setCustomStructureAlignment('');
+    setSelectedMethodologyDetails(null);
+  };
+
+  const handleSetNavigation = (direction) => {
+    if (direction === 'prev' && currentSetIndex > 0) {
+      const newIndex = currentSetIndex - 1;
+      setCurrentSetIndex(newIndex);
+      setGeneratedMethodologies(methodologySets[newIndex]);
+      setSelectedMethodologyIndex(null);
+      setSelectedSetIndex(null);
+    } else if (direction === 'next' && currentSetIndex < methodologySets.length - 1) {
+      const newIndex = currentSetIndex + 1;
+      setCurrentSetIndex(newIndex);
+      setGeneratedMethodologies(methodologySets[newIndex]);
+      setSelectedMethodologyIndex(null);
+      setSelectedSetIndex(null);
+    }
+  };
+
+  const validateMethodologyFields = () => {
+    const errors = [];
+    
     if (!customMethodology.trim()) {
-      alert('Please select or customize a methodology before finalizing.');
+      errors.push('Description is required');
+    }
+    if (!customApproach.trim()) {
+      errors.push('Approach is required');
+    }
+    if (!customSourceFocus.trim()) {
+      errors.push('Source Focus is required');
+    }
+    if (!customStructureAlignment.trim()) {
+      errors.push('Structure Alignment is required');
+    }
+    
+    return errors;
+  };
+
+  const handleFinalizeMethodology = () => {
+    const validationErrors = validateMethodologyFields();
+    
+    if (validationErrors.length > 0) {
+      alert('Please fill in all required fields:\n' + validationErrors.join('\n'));
       return;
     }
     
@@ -125,9 +206,13 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     
     const fullMethodology = {
       description: customMethodology,
+      approach: customApproach,
+      source_focus: customSourceFocus,
+      structure_alignment: customStructureAlignment,
       details: selectedMethodologyDetails,
       methodologyType: getSelectedMethodologyInfo()?.name || selectedMethodology,
-      subMethodology: selectedSubMethodology
+      subMethodology: selectedSubMethodology,
+      isCustom: isCustomMethodology
     };
     
     setMethodology(fullMethodology);
@@ -162,18 +247,32 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     }
     
     setGeneratedMethodologies([]);
+    setMethodologySets([]);
+    setCurrentSetIndex(0);
     setSelectedMethodologyIndex(null);
+    setSelectedSetIndex(null);
     setCustomMethodology('');
+    setCustomApproach('');
+    setCustomSourceFocus('');
+    setCustomStructureAlignment('');
     setSelectedMethodologyDetails(null);
     setShowMethodologySelection(true);
+    setIsCustomMethodology(false);
   };
 
   const handleBackToSelection = () => {
     setGeneratedMethodologies([]);
+    setMethodologySets([]);
+    setCurrentSetIndex(0);
     setSelectedMethodologyIndex(null);
+    setSelectedSetIndex(null);
     setCustomMethodology('');
+    setCustomApproach('');
+    setCustomSourceFocus('');
+    setCustomStructureAlignment('');
     setSelectedMethodologyDetails(null);
     setShowMethodologySelection(true);
+    setIsCustomMethodology(false);
   };
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
@@ -191,23 +290,20 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
 
   return (
     <div className="mb-4 position-relative w-100">
-      <div className="d-flex" style={{ position: 'absolute', top: -5, right: 10 }}>
-        <FaSyncAlt 
-          style={{ 
-            cursor: 'pointer', 
-            color: '#aaa', 
-            marginRight: '8px',
-            fontSize: '0.9em'
-          }}
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary me-2"
           onClick={handleRegenerate}
           title="Regenerate methodology"
-        />
-        <div
-          style={{ cursor: 'pointer', color: '#aaa' }}
+        >
+          Refresh
+        </button>
+        <button
+          className="btn btn-sm btn-outline-secondary"
           onClick={toggleCollapse}
         >
-          {collapsed ? <FaChevronRight /> : <FaChevronDown />}
-        </div>
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
       </div>
 
       <h3>
@@ -346,7 +442,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
           )}
 
           {/* Generated Methodology Options */}
-          {generatedMethodologies.length > 0 && !finalized && (
+          {methodologySets.length > 0 && !finalized && (
             <div className="mb-4">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5>Select Your Methodology Approach</h5>
@@ -366,11 +462,46 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                 </div>
               )}
 
+              {/* Set Navigation and Controls */}
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="d-flex align-items-center">
+                  <button
+                    className="btn btn-sm btn-outline-secondary me-2"
+                    onClick={() => handleSetNavigation('prev')}
+                    disabled={currentSetIndex === 0}
+                  >
+                    <FaChevronLeft />
+                  </button>
+                  <span className="me-2">
+                    Set {currentSetIndex + 1} of {methodologySets.length}
+                  </span>
+                  <button
+                    className="btn btn-sm btn-outline-secondary me-3"
+                    onClick={() => handleSetNavigation('next')}
+                    disabled={currentSetIndex === methodologySets.length - 1}
+                  >
+                    <FaChevronRight />
+                  </button>
+                </div>
+                
+                <div className="d-flex gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={generateMethodologyOptions}
+                    disabled={loading}
+                  >
+                    <FaPlus className="me-1" />
+                    {loading ? 'Generating...' : 'Generate New Set'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Methodology Options Grid */}
               <div className="row">
                 {generatedMethodologies.map((methodology, index) => (
                   <div key={index} className="col-12 mb-3">
                     <div 
-                      className={`card h-100 ${selectedMethodologyIndex === index ? 'border-primary' : ''}`}
+                      className={`card h-100 ${selectedMethodologyIndex === index && selectedSetIndex === currentSetIndex ? 'border-primary' : ''}`}
                       style={{ cursor: 'pointer' }}
                       onClick={() => handleMethodologyChoice(index)}
                     >
@@ -379,7 +510,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                           <input
                             type="radio"
                             name="generatedMethodology"
-                            checked={selectedMethodologyIndex === index}
+                            checked={selectedMethodologyIndex === index && selectedSetIndex === currentSetIndex}
                             onChange={() => handleMethodologyChoice(index)}
                             className="me-2 mt-1"
                           />
@@ -407,19 +538,106 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                     </div>
                   </div>
                 ))}
+                
+                {/* Custom Methodology Option */}
+                <div className="col-12 mb-3">
+                  <div 
+                    className={`card h-100 ${isCustomMethodology ? 'border-primary' : 'border-secondary'}`}
+                    style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+                    onClick={handleCustomMethodologyChoice}
+                  >
+                    <div className="card-body text-center">
+                      <div className="d-flex align-items-center justify-content-center">
+                        <input
+                          type="radio"
+                          name="generatedMethodology"
+                          checked={isCustomMethodology}
+                          onChange={handleCustomMethodologyChoice}
+                          className="me-2"
+                        />
+                        <div>
+                          <h6 className="card-title mb-2">
+                            <FaPlus className="me-2" />
+                            Create Custom Methodology
+                          </h6>
+                          <p className="card-text text-muted">
+                            Design your own methodology with custom approach, source focus, and structure alignment
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Custom Methodology Text Area */}
-              {selectedMethodologyIndex !== null && (
+              {/* Custom Methodology Fields */}
+              {(selectedMethodologyIndex !== null || isCustomMethodology) && (
                 <div className="mb-3">
-                  <label className="form-label">Customize your methodology (optional):</label>
-                  <textarea
-                    className="form-control"
-                    rows={6}
-                    value={customMethodology}
-                    onChange={(e) => setCustomMethodology(e.target.value)}
-                    placeholder="Edit the methodology description as needed..."
-                  />
+                  <h6 className="form-label">
+                    {isCustomMethodology ? 'Create Custom Methodology' : 'Customize Your Methodology'} 
+                    <span className="text-danger">*</span>
+                  </h6>
+                  <p className="text-muted small">All fields are required. Edit the methodology to match your research needs.</p>
+                  
+                  {/* Description */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Description <span className="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      value={customMethodology}
+                      onChange={(e) => setCustomMethodology(e.target.value)}
+                      placeholder="Describe your methodology approach..."
+                      required
+                    />
+                  </div>
+
+                  {/* Approach */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Approach <span className="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={customApproach}
+                      onChange={(e) => setCustomApproach(e.target.value)}
+                      placeholder="Describe your research approach..."
+                      required
+                    />
+                  </div>
+
+                  {/* Source Focus */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Source Focus <span className="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={customSourceFocus}
+                      onChange={(e) => setCustomSourceFocus(e.target.value)}
+                      placeholder="Describe your source focus..."
+                      required
+                    />
+                  </div>
+
+                  {/* Structure Alignment */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Structure Alignment <span className="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={customStructureAlignment}
+                      onChange={(e) => setCustomStructureAlignment(e.target.value)}
+                      placeholder="Describe how this methodology aligns with your paper structure..."
+                      required
+                    />
+                  </div>
                 </div>
               )}
 
@@ -428,7 +646,7 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                 <button
                   className="btn btn-primary"
                   onClick={handleFinalizeMethodology}
-                  disabled={selectedMethodologyIndex === null}
+                  disabled={selectedMethodologyIndex === null && !isCustomMethodology}
                 >
                   Save Methodology
                 </button>
@@ -441,32 +659,34 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
             <div className="mt-3">
               <div className="alert alert-success">
                 <strong>Finalized Methodology:</strong>
+                {isCustomMethodology && <span className="badge bg-info ms-2">Custom</span>}
                 <div className="mt-2" style={{ whiteSpace: 'pre-wrap' }}>
                   {customMethodology}
                 </div>
                 
-                {selectedMethodologyDetails && (
-                  <div className="mt-3">
-                    <h6><strong>Methodology Details:</strong></h6>
-                    <div className="row">
-                      <div className="col-md-4">
-                        <small className="text-muted">
-                          <strong>Approach:</strong> {selectedMethodologyDetails.approach}
-                        </small>
-                      </div>
-                      <div className="col-md-4">
-                        <small className="text-muted">
-                          <strong>Source Focus:</strong> {selectedMethodologyDetails.source_focus}
-                        </small>
-                      </div>
-                      <div className="col-md-4">
-                        <small className="text-muted">
-                          <strong>Structure Alignment:</strong> {selectedMethodologyDetails.structure_alignment}
-                        </small>
-                      </div>
+                <div className="mt-3">
+                  <h6><strong>Methodology Details:</strong></h6>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <small className="text-muted">
+                        <strong>Approach:</strong><br/>
+                        {customApproach}
+                      </small>
+                    </div>
+                    <div className="col-md-4">
+                      <small className="text-muted">
+                        <strong>Source Focus:</strong><br/>
+                        {customSourceFocus}
+                      </small>
+                    </div>
+                    <div className="col-md-4">
+                      <small className="text-muted">
+                        <strong>Structure Alignment:</strong><br/>
+                        {customStructureAlignment}
+                      </small>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
               
               <div className="d-flex gap-2">

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 
 const PageLengthSelector = ({ onPageCountSelected }) => {
   const [pageCount, setPageCount] = useState('Adjusted Based on Thesis');
@@ -32,11 +31,13 @@ const PageLengthSelector = ({ onPageCountSelected }) => {
 
   return (
     <div className="card p-3 mb-4 position-relative w-100">
-      <div
-        style={{ position: 'absolute', top: 10, right: 26, cursor: 'pointer', color: '#aaa' }}
-        onClick={toggleCollapse}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      <div className="d-flex" style={{ position: 'absolute', top: 14, right: 14 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={toggleCollapse}
+        >
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
       </div>
 
       <h3>Select Paper Length</h3>

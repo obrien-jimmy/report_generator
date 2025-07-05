@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 
 const PaperTypeSelector = ({ onPaperTypeSelected }) => {
   const [selectedType, setSelectedType] = useState('');
@@ -183,11 +182,13 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
 
   return (
     <div className="mb-4 position-relative w-100">
-      <div
-        style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
-        onClick={toggleCollapse}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={toggleCollapse}
+        >
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
       </div>
 
       <h3>

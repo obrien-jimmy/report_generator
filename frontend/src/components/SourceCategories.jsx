@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaChevronRight, FaChevronDown, FaSyncAlt } from 'react-icons/fa';
 
 const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shouldAutoLoad, onLoadComplete }) => {
   const [categories, setCategories] = useState([]);
@@ -142,23 +141,20 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
 
   return (
     <div className="mb-4 position-relative w-100">
-      <div className="d-flex" style={{ position: 'absolute', top: -5, right: 10 }}>
-        <FaSyncAlt 
-          style={{ 
-            cursor: 'pointer', 
-            color: '#aaa', 
-            marginRight: '8px',
-            fontSize: '0.9em'
-          }}
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary me-2"
           onClick={handleRegenerate}
           title="Regenerate source categories"
-        />
-        <div
-          style={{ cursor: 'pointer', color: '#aaa' }}
+        >
+          Refresh
+        </button>
+        <button
+          className="btn btn-sm btn-outline-secondary"
           onClick={toggleCollapse}
         >
-          {collapsed ? <FaChevronRight /> : <FaChevronDown />}
-        </div>
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
       </div>
 
       <h3>

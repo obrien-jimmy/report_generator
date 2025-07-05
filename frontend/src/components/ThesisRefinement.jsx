@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { FaChevronRight, FaChevronDown, FaQuestionCircle } from 'react-icons/fa';
+import { FaQuestionCircle } from 'react-icons/fa';
 
 const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
   const [initialThesis, setInitialThesis] = useState('');
@@ -130,11 +130,13 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
 
   return (
     <div className="mb-4 position-relative w-100">
-      <div
-        style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
-        onClick={toggleCollapse}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronDown />}
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={toggleCollapse}
+        >
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
       </div>
 
       <h3>

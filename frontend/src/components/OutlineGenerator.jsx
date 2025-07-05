@@ -14,6 +14,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [collapsedSubsections, setCollapsedSubsections] = useState({});
   const [collapsedQuestions, setCollapsedQuestions] = useState({});
   const [allCollapsed, setAllCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   const [questions, setQuestions] = useState({});
   const [questionCitations, setQuestionCitations] = useState({});
@@ -88,6 +89,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     // Regenerate the outline
     generateOutline();
   };
+
+  const toggleCollapse = () => setCollapsed(prev => !prev);
 
   const generateSubsectionsSequentially = async (sections) => {
     const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
@@ -332,177 +335,184 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const hasQuestions = Object.values(questions).some(q => Array.isArray(q) && q.length > 0);
 
   return (
-    <div className="mb-4 position-relative w-100">
-      <div className="d-flex" style={{ position: 'absolute', top: 10, right: 10 }}>
-        <FaSyncAlt 
-          style={{ 
-            cursor: 'pointer', 
-            color: '#aaa', 
-            marginRight: '8px',
-            fontSize: '0.9em'
-          }}
+    <div className="p-3 mb-4 position-relative w-100">
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary me-2"
           onClick={handleRegenerate}
           title="Regenerate entire outline"
-        />
+        >
+          Refresh
+        </button>
         <button
-          className="btn btn-sm btn-outline-secondary"
+          className="btn btn-sm btn-outline-secondary me-2"
           onClick={handleCollapseExpandAll}
         >
           {allCollapsed ? 'Expand All' : 'Collapse All'}
+        </button>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={toggleCollapse}
+        >
+          {collapsed ? 'Expand' : 'Collapse'}
         </button>
       </div>
 
       <h3>Outline Generation</h3>
 
-      {!hasGenerated && (
-        <button className="btn btn-primary my-3" onClick={generateOutline} disabled={loading}>
-          {loading ? 'Generating Outline...' : 'Generate Outline'}
-        </button>
-      )}
-
-      {error && <div className="alert alert-danger">{error}</div>}
-
-      {outline.map((section, sIdx) => (
-        <div key={sIdx} className="card p-4 my-3 position-relative">
-          <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
-              onClick={() => toggleSectionCollapse(sIdx)}>
-            {collapsedSections[sIdx] ? <FaChevronRight /> : <FaChevronDown />}
-          </div>
-
-          {!isEditing ? (
-            <>
-              <h4>{section.section_title}</h4>
-              <p><strong>Context:</strong> {section.section_context}</p>
-            </>
-          ) : (
-            <>
-              <input
-                className="form-control mb-2"
-                value={section.section_title}
-                onChange={e => updateSection(sIdx, 'section_title', e.target.value)}
-              />
-              <textarea
-                className="form-control mb-3"
-                rows={3}
-                value={section.section_context}
-                onChange={e => updateSection(sIdx, 'section_context', e.target.value)}
-              />
-            </>
+      {!collapsed && (
+        <>
+          {!hasGenerated && (
+            <button className="btn btn-primary my-3" onClick={generateOutline} disabled={loading}>
+              {loading ? 'Generating Outline...' : 'Generate Outline'}
+            </button>
           )}
 
-          {!collapsedSections[sIdx] && (
-            <>
-              {section.subsections.length === 0 && <p>Generating subsections...</p>}
+          {error && <div className="alert alert-danger">{error}</div>}
 
-              {section.subsections.map((sub, subIdx) => {
-                const questionKey = `${section.section_title}-${sub.subsection_title}`;
-                const collapseKey = `${sIdx}-${subIdx}`;
-                const questionsArray = questions[questionKey];
+          {outline.map((section, sIdx) => (
+            <div key={sIdx} className="card p-4 my-3 position-relative">
+              <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
+                  onClick={() => toggleSectionCollapse(sIdx)}>
+                {collapsedSections[sIdx] ? <FaChevronRight /> : <FaChevronDown />}
+              </div>
 
-                return (
-                  <div key={subIdx} className="card p-3 my-2 position-relative">
-                    <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
-                        onClick={() => toggleSubsectionCollapse(sIdx, subIdx)}>
-                      {collapsedSubsections[collapseKey] ? <FaChevronRight /> : <FaChevronDown />}
-                    </div>
+              {!isEditing ? (
+                <>
+                  <h4>{section.section_title}</h4>
+                  <p><strong>Context:</strong> {section.section_context}</p>
+                </>
+              ) : (
+                <>
+                  <input
+                    className="form-control mb-2"
+                    value={section.section_title}
+                    onChange={e => updateSection(sIdx, 'section_title', e.target.value)}
+                  />
+                  <textarea
+                    className="form-control mb-3"
+                    rows={3}
+                    value={section.section_context}
+                    onChange={e => updateSection(sIdx, 'section_context', e.target.value)}
+                  />
+                </>
+              )}
 
-                    <h5>{sub.subsection_title}</h5>
-                    <p><strong>Context:</strong> {sub.subsection_context}</p>
+              {!collapsedSections[sIdx] && (
+                <>
+                  {section.subsections.length === 0 && <p>Generating subsections...</p>}
 
-                    {!collapsedSubsections[collapseKey] && questionsArray && (
-                      <div className="mt-3">
-                        <strong>Research Questions:</strong>
-                        {questionsArray === 'loading' ? (
-                          <p>Generating questions...</p>
-                        ) : (
-                          <div className="mt-2">
-                            {questionsArray.map((question, qIdx) => {
-                              const questionCollapseKey = `${sIdx}-${subIdx}-${qIdx}`;
-                              const citationKey = `${section.section_title}-${sub.subsection_title}-${question}`;
-                              const isQuestionCollapsed = collapsedQuestions[questionCollapseKey];
+                  {section.subsections.map((sub, subIdx) => {
+                    const questionKey = `${section.section_title}-${sub.subsection_title}`;
+                    const collapseKey = `${sIdx}-${subIdx}`;
+                    const questionsArray = questions[questionKey];
 
-                              return (
-                                <div key={qIdx} className="card p-2 mb-2">
-                                  <div 
-                                    className="d-flex justify-content-between align-items-center cursor-pointer"
-                                    onClick={() => toggleQuestionCollapse(sIdx, subIdx, qIdx)}
-                                  >
-                                    <span><strong>Q{qIdx + 1}:</strong> {question}</span>
-                                    {isQuestionCollapsed ? <FaChevronRight /> : <FaChevronDown />}
-                                  </div>
+                    return (
+                      <div key={subIdx} className="card p-3 my-2 position-relative">
+                        <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
+                            onClick={() => toggleSubsectionCollapse(sIdx, subIdx)}>
+                          {collapsedSubsections[collapseKey] ? <FaChevronRight /> : <FaChevronDown />}
+                        </div>
 
-                                  {!isQuestionCollapsed && (
-                                    <div className="mt-2">
-                                      {questionCitations[citationKey] && (
-                                        <div>
-                                          <strong>Supporting Sources:</strong>
-                                          {questionCitations[citationKey] === 'loading' || loadingCitations[citationKey] ? (
-                                            <p className="loading-text">Generating citations...</p>
-                                          ) : (
-                                            <CitationCards citations={questionCitations[citationKey]} />
-                                          )}
-                                        </div>
-                                      )}
+                        <h5>{sub.subsection_title}</h5>
+                        <p><strong>Context:</strong> {sub.subsection_context}</p>
 
-                                      {saved && (
+                        {!collapsedSubsections[collapseKey] && questionsArray && (
+                          <div className="mt-3">
+                            <strong>Research Questions:</strong>
+                            {questionsArray === 'loading' ? (
+                              <p>Generating questions...</p>
+                            ) : (
+                              <div className="mt-2">
+                                {questionsArray.map((question, qIdx) => {
+                                  const questionCollapseKey = `${sIdx}-${subIdx}-${qIdx}`;
+                                  const citationKey = `${section.section_title}-${sub.subsection_title}-${question}`;
+                                  const isQuestionCollapsed = collapsedQuestions[questionCollapseKey];
+
+                                  return (
+                                    <div key={qIdx} className="card p-2 mb-2">
+                                      <div 
+                                        className="d-flex justify-content-between align-items-center cursor-pointer"
+                                        onClick={() => toggleQuestionCollapse(sIdx, subIdx, qIdx)}
+                                      >
+                                        <span><strong>Q{qIdx + 1}:</strong> {question}</span>
+                                        {isQuestionCollapsed ? <FaChevronRight /> : <FaChevronDown />}
+                                      </div>
+
+                                      {!isQuestionCollapsed && (
                                         <div className="mt-2">
-                                          <button
-                                            className="btn btn-sm btn-outline-primary me-2"
-                                            onClick={() => handleQuestionCitationClick(section, sub, question, false)}
-                                          >
-                                            <FaSyncAlt /> Generate Citations
-                                          </button>
-                                          {questionCitations[citationKey] && Array.isArray(questionCitations[citationKey]) && (
-                                            <button
-                                              className="btn btn-sm btn-outline-secondary"
-                                              onClick={() => handleQuestionCitationClick(section, sub, question, true)}
-                                            >
-                                              <FaPlusCircle /> Add More Citations
-                                            </button>
+                                          {questionCitations[citationKey] && (
+                                            <div>
+                                              <strong>Supporting Sources:</strong>
+                                              {questionCitations[citationKey] === 'loading' || loadingCitations[citationKey] ? (
+                                                <p className="loading-text">Generating citations...</p>
+                                              ) : (
+                                                <CitationCards citations={questionCitations[citationKey]} />
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {saved && (
+                                            <div className="mt-2">
+                                              <button
+                                                className="btn btn-sm btn-outline-primary me-2"
+                                                onClick={() => handleQuestionCitationClick(section, sub, question, false)}
+                                              >
+                                                <FaSyncAlt /> Generate Citations
+                                              </button>
+                                              {questionCitations[citationKey] && Array.isArray(questionCitations[citationKey]) && (
+                                                <button
+                                                  className="btn btn-sm btn-outline-secondary"
+                                                  onClick={() => handleQuestionCitationClick(section, sub, question, true)}
+                                                >
+                                                  <FaPlusCircle /> Add More Citations
+                                                </button>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       )}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-      ))}
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          ))}
 
-      <div className="mt-3">
-        {isEditing ? (
-          <button className="btn btn-success" onClick={handleSave}>Save Outline</button>
-        ) : (
-          <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>Edit Outline</button>
-        )}
-
-        {saved && !isEditing && (
-          <>
-            <button className="btn btn-primary ms-2" onClick={generateQuestionsSequentially}>
-              Generate Questions
-            </button>
-            {hasQuestions && (
-              <button 
-                className="btn btn-primary ms-2" 
-                onClick={generateAllCitationsSequentially}
-                disabled={generatingAllCitations}
-              >
-                {generatingAllCitations ? 'Generating Citations...' : 'Generate Citations'}
-              </button>
+          <div className="mt-3">
+            {isEditing ? (
+              <button className="btn btn-success" onClick={handleSave}>Save Outline</button>
+            ) : (
+              <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>Edit Outline</button>
             )}
-          </>
-        )}
-      </div>
+
+            {saved && !isEditing && (
+              <>
+                <button className="btn btn-primary ms-2" onClick={generateQuestionsSequentially}>
+                  Generate Questions
+                </button>
+                {hasQuestions && (
+                  <button 
+                    className="btn btn-primary ms-2" 
+                    onClick={generateAllCitationsSequentially}
+                    disabled={generatingAllCitations}
+                  >
+                    {generatingAllCitations ? 'Generating Citations...' : 'Generate Citations'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Context Input Modal */}
       {showContextModal && (
