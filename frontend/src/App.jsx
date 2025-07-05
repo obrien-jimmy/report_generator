@@ -27,6 +27,10 @@ function App() {
   const [pageLengthFinalized, setPageLengthFinalized] = useState(false);
   const [categoriesFinalized, setCategoriesFinalized] = useState(false);
   const [selectedPaperType, setSelectedPaperType] = useState(null);
+  
+  // Add loading trigger states
+  const [shouldLoadSourceCategories, setShouldLoadSourceCategories] = useState(false);
+  const [shouldLoadMethodology, setShouldLoadMethodology] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -54,6 +58,24 @@ function App() {
     setKbLoading(false);
   };
 
+  const handlePageLengthSelected = (length, shouldTriggerLoad = false) => {
+    setPaperLength(length);
+    setPageLengthFinalized(true);
+    // Only trigger source categories loading if explicitly requested
+    if (shouldTriggerLoad) {
+      setShouldLoadSourceCategories(true);
+    }
+  };
+
+  const handleCategoriesSelected = (categories, shouldTriggerLoad = false) => {
+    setSourceCategories(categories);
+    setCategoriesFinalized(true);
+    // Only trigger methodology loading if explicitly requested
+    if (shouldTriggerLoad) {
+      setShouldLoadMethodology(true);
+    }
+  };
+
   const proceedToOutline = () => setReadyForOutline(true);
   const resetOutline = () => setOutlineVersion(prev => prev + 1);
 
@@ -79,31 +101,27 @@ function App() {
         </div>
       )}
 
-      {/* Page Length Selector (always visible after thesis is finalized) */}
+      {/* Page Length Selector */}
       {finalThesis && (
         <PageLengthSelector
-          onPageCountSelected={(length) => {
-            setPaperLength(length);
-            setPageLengthFinalized(true);
-          }}
+          onPageCountSelected={handlePageLengthSelected}
         />
       )}
 
-      {/* Source Categories (visible once page length has been initially set) */}
+      {/* Source Categories */}
       {finalThesis && pageLengthFinalized && (
         <div className="card p-3 mb-4">
           <SourceCategories
             finalThesis={finalThesis}
             paperLength={paperLength || 0}
-            onCategoriesSelected={(categories) => {
-              setSourceCategories(categories);
-              setCategoriesFinalized(true);
-            }}
+            onCategoriesSelected={handleCategoriesSelected}
+            shouldAutoLoad={shouldLoadSourceCategories}
+            onLoadComplete={() => setShouldLoadSourceCategories(false)}
           />
         </div>
       )}
 
-      {/* Methodology Section (visible once source categories have been set) */}
+      {/* Methodology Section */}
       {finalThesis && categoriesFinalized && (
         <div className="card p-3 mb-4">
           <MethodologyGenerator
@@ -114,11 +132,13 @@ function App() {
             resetOutline={resetOutline}
             selectedPaperType={selectedPaperType}
             pageCount={paperLength}
+            shouldAutoLoad={shouldLoadMethodology}
+            onLoadComplete={() => setShouldLoadMethodology(false)}
           />
         </div>
       )}
 
-      {/* Outline Section (visible after methodology finalized) */}
+      {/* Outline Section */}
       {readyForOutline && methodology && (
         <div className="card p-3 mb-4">
           <OutlineGenerator

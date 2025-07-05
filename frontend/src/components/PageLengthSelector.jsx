@@ -13,10 +13,11 @@ const PageLengthSelector = ({ onPageCountSelected }) => {
       "Adjusted Based on Thesis": -1,
     }[pageCount] || parseInt(pageCount, 10);
 
-    onPageCountSelected(pageLengthValue);
+    // Pass both the value and a flag to trigger source categories loading
+    onPageCountSelected(pageLengthValue, true); // Second parameter triggers loading
     setIsFinalized(true);
     setHasFinalizedOnce(true);
-    setCollapsed(true); // Auto-collapse after finalizing
+    setCollapsed(true);
   };
 
   const handleEdit = () => {
@@ -63,7 +64,7 @@ const PageLengthSelector = ({ onPageCountSelected }) => {
               </button>
             ) : (
               <button className="btn btn-primary" onClick={handleSubmit}>
-                {hasFinalizedOnce ? 'Rerun Source Categories' : 'Submit Page Length'}
+                {hasFinalizedOnce ? 'Rerun Source Categories' : 'Proceed to Source Categories'}
               </button>
             )}
           </div>

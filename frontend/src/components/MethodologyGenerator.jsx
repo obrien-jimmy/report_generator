@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaChevronRight, FaChevronDown, FaEdit, FaSave, FaTimes, FaSyncAlt, FaInfoCircle } from 'react-icons/fa';
 
-const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount }) => {
+const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount, shouldAutoLoad, onLoadComplete }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
   const [selectedSubMethodology, setSelectedSubMethodology] = useState('');
@@ -17,21 +17,35 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const [showMethodologySelection, setShowMethodologySelection] = useState(true);
   const [outlineActivated, setOutlineActivated] = useState(false);
   const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
+  const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
 
-  // Load methodology options on component mount
-  useEffect(() => {
-    const loadMethodologyOptions = async () => {
-      try {
-        const res = await axios.get('http://localhost:8000/methodology_options');
-        setMethodologyOptions(res.data.methodologies);
-      } catch (err) {
-        console.error('Error loading methodology options:', err);
-        setError('Failed to load methodology options');
-      }
-    };
+  const loadMethodologyOptions = async () => {
+    if (hasLoadedOptions) return;
     
-    loadMethodologyOptions();
-  }, []);
+    try {
+      const res = await axios.get('http://localhost:8000/methodology_options');
+      setMethodologyOptions(res.data.methodologies);
+      setHasLoadedOptions(true);
+    } catch (err) {
+      console.error('Error loading methodology options:', err);
+      setError('Failed to load methodology options');
+    }
+  };
+
+  // Only load when explicitly triggered
+  useEffect(() => {
+    if (shouldAutoLoad && !hasLoadedOptions) {
+      loadMethodologyOptions().then(() => {
+        if (onLoadComplete) onLoadComplete();
+      });
+    }
+  }, [shouldAutoLoad, hasLoadedOptions, onLoadComplete]);
+
+  const handleManualLoad = () => {
+    if (!hasLoadedOptions) {
+      loadMethodologyOptions();
+    }
+  };
 
   const handleMethodologySelect = (methodologyId) => {
     setSelectedMethodology(methodologyId);
@@ -47,15 +61,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   };
 
   const generateMethodologyOptions = async () => {
-    // Debug logging
-    console.log('Debug - generateMethodologyOptions called with:');
-    console.log('selectedMethodology:', selectedMethodology);
-    console.log('finalThesis:', finalThesis);
-    console.log('sourceCategories:', sourceCategories);
-    console.log('selectedPaperType:', selectedPaperType);
-    console.log('pageCount:', pageCount);
-
-    // More specific error checking
     if (!selectedMethodology) {
       alert('Please select a methodology type first.');
       return;
@@ -92,16 +97,11 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
         page_count: pageCount || 10
       };
 
-      console.log('Sending request with data:', requestData);
-
       const res = await axios.post('http://localhost:8000/generate_methodology_options', requestData);
-
-      console.log('Response received:', res.data);
       setGeneratedMethodologies(res.data.methodologies);
       setShowMethodologySelection(false);
     } catch (err) {
       console.error('Methodology generation error:', err);
-      console.error('Error response:', err.response?.data);
       setError(err.response?.data?.detail || err.message || 'Failed to generate methodology options.');
     }
     setLoading(false);
@@ -123,7 +123,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     setFinalized(true);
     setCollapsed(true);
     
-    // Create comprehensive methodology object with all details
     const fullMethodology = {
       description: customMethodology,
       details: selectedMethodologyDetails,
@@ -226,28 +225,42 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
             </div>
           )}
 
+          {/* Show manual load button if methodology options haven't been loaded yet */}
+          {!hasLoadedOptions && (
+            <div className="mb-3">
+              <button
+                className="btn btn-primary"
+                onClick={handleManualLoad}
+              >
+                Load Methodology Options
+              </button>
+            </div>
+          )}
+
           {/* Carried Forward Information Summary */}
-          <div className="alert alert-info mb-3">
-            <h6><strong>Carried Forward Information:</strong></h6>
-            <div className="row">
-              <div className="col-md-6">
-                <small>
-                  <strong>Selected Methodology:</strong> {getSelectedMethodologyInfo()?.name || selectedMethodology || 'None'}<br/>
-                  <strong>Final Thesis:</strong> {finalThesis || 'Not set'}<br/>
-                  <strong>Source Categories:</strong> {sourceCategories?.length || 0} selected
-                </small>
-              </div>
-              <div className="col-md-6">
-                <small>
-                  <strong>Selected Paper Type:</strong> {selectedPaperType?.name || 'None'}<br/>
-                  <strong>Page Count:</strong> {pageCount || 'Not set'}
-                </small>
+          {hasLoadedOptions && (
+            <div className="alert alert-info mb-3">
+              <h6><strong>Carried Forward Information:</strong></h6>
+              <div className="row">
+                <div className="col-md-6">
+                  <small>
+                    <strong>Selected Methodology:</strong> {getSelectedMethodologyInfo()?.name || selectedMethodology || 'None'}<br/>
+                    <strong>Final Thesis:</strong> {finalThesis || 'Not set'}<br/>
+                    <strong>Source Categories:</strong> {sourceCategories?.length || 0} selected
+                  </small>
+                </div>
+                <div className="col-md-6">
+                  <small>
+                    <strong>Selected Paper Type:</strong> {selectedPaperType?.name || 'None'}<br/>
+                    <strong>Page Count:</strong> {pageCount || 'Not set'}
+                  </small>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Methodology Selection Phase */}
-          {showMethodologySelection && !finalized && (
+          {showMethodologySelection && !finalized && hasLoadedOptions && (
             <div className="mb-4">
               <h5>Select Research Methodology</h5>
               

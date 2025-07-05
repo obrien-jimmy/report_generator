@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaChevronRight, FaChevronDown, FaSyncAlt } from 'react-icons/fa';
 
-const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) => {
+const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shouldAutoLoad, onLoadComplete }) => {
   const [categories, setCategories] = useState([]);
   const [customCategory, setCustomCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState(null);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const recommendSources = async () => {
     setLoading(true);
@@ -24,9 +24,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
         paper_length_pages: paperLength,
       });
 
-      // Parse numbered categories and clean them
       const cats = res.data.recommended_categories.map((name, index) => {
-        // Remove existing numbering (e.g., "1. ", "2. ", etc.) if present
         const cleanName = name.replace(/^\d+\.\s*/, '').trim();
         return { 
           name: cleanName, 
@@ -35,12 +33,12 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
         };
       });
       setCategories(cats);
+      setHasLoaded(true);
     } catch (err) {
       console.error('Source recommendation error:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to recommend sources.';
       setError(errorMsg);
       
-      // Set some default categories if the API fails
       const defaultCategories = [
         'Academic Journal Articles',
         'Government Reports',
@@ -54,17 +52,27 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
         number: index + 1
       }));
       setCategories(cats);
+      setHasLoaded(true);
     }
     setLoading(false);
   };
 
+  // Only load when explicitly triggered
   useEffect(() => {
-    // Only run once when component first mounts with valid data
-    if (finalThesis && paperLength !== null && !hasInitialized) {
-      recommendSources();
-      setHasInitialized(true);
+    if (shouldAutoLoad && finalThesis && paperLength !== null && !hasLoaded && !loading) {
+      recommendSources().then(() => {
+        if (onLoadComplete) onLoadComplete();
+      });
     }
-  }, [finalThesis, paperLength, hasInitialized]);
+  }, [shouldAutoLoad, finalThesis, paperLength, hasLoaded, loading, onLoadComplete]);
+
+  const handleManualLoad = () => {
+    if (!finalThesis || paperLength === null) {
+      alert('Please ensure thesis and paper length are set before generating categories.');
+      return;
+    }
+    recommendSources();
+  };
 
   const handleRegenerate = () => {
     if (finalized) {
@@ -77,9 +85,9 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
       setCollapsed(false);
     }
     
-    // Clear existing categories and regenerate
     setCategories([]);
     setCustomCategory('');
+    setHasLoaded(false);
     recommendSources();
   };
 
@@ -106,7 +114,6 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
   };
 
   const handleFinalizeCategories = () => {
-    // Only pass selected categories to the parent component (without numbers)
     const selectedCategories = categories.filter(cat => cat.selected).map(cat => cat.name);
     
     if (selectedCategories.length === 0) {
@@ -115,8 +122,9 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
     }
     
     setFinalized(true);
-    setCollapsed(true);  // Auto-collapse after finalizing
-    onCategoriesSelected(selectedCategories);
+    setCollapsed(true);
+    // Pass both categories and trigger flag
+    onCategoriesSelected(selectedCategories, true);
   };
 
   const handleEditCategories = () => {
@@ -164,14 +172,32 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
 
       {!collapsed && (
         <>
-          {loading ? (
-            <p>Loading recommended sources...</p>
-          ) : error ? (
+          {/* Show manual load button if not loaded yet */}
+          {!hasLoaded && !loading && (
+            <div className="mb-3">
+              <button
+                className="btn btn-primary"
+                onClick={handleManualLoad}
+                disabled={!finalThesis || paperLength === null}
+              >
+                Generate Source Categories
+              </button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="d-flex align-items-center mb-3">
+              <div className="spinner-border spinner-border-sm me-2" role="status" />
+              <span>Loading recommended sources...</span>
+            </div>
+          )}
+          
+          {error && (
             <div className="alert alert-warning">
               <p>{error}</p>
               <p><small>Default categories have been loaded. You can modify them below.</small></p>
             </div>
-          ) : null}
+          )}
           
           {categories.map((cat, idx) => (
             <div 
@@ -213,7 +239,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
             </div>
           ))}
 
-          {!finalized && (
+          {!finalized && hasLoaded && (
             <>
               <input
                 className="form-control mt-2"
