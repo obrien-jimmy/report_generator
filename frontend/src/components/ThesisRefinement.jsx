@@ -113,6 +113,7 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
     
     setFinalized(true);
     setCollapsed(true);
+    // Pass the thesis to trigger the next section
     onFinalize(refinedThesis);
   };
 
@@ -264,7 +265,7 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
                   onClick={handleFinalize}
                   disabled={!refinedThesis.trim()}
                 >
-                  Finalize Thesis
+                  Proceed to Source Categories
                 </button>
               </div>
             </>

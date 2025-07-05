@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaEdit, FaSave, FaTimes, FaInfoCircle, FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
 
-const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount, shouldAutoLoad, onLoadComplete }) => {
+const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
   const [selectedSubMethodology, setSelectedSubMethodology] = useState('');
@@ -39,14 +39,12 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     }
   };
 
-  // Only load when explicitly triggered
+  // Auto-load when component is first mounted
   useEffect(() => {
-    if (shouldAutoLoad && !hasLoadedOptions) {
-      loadMethodologyOptions().then(() => {
-        if (onLoadComplete) onLoadComplete();
-      });
+    if (!hasLoadedOptions) {
+      loadMethodologyOptions();
     }
-  }, [shouldAutoLoad, hasLoadedOptions, onLoadComplete]);
+  }, [hasLoadedOptions]);
 
   const handleManualLoad = () => {
     if (!hasLoadedOptions) {
@@ -288,6 +286,13 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
     return mainMethodology;
   };
 
+  const getPageCountDisplay = () => {
+    if (pageCount === -1) {
+      return 'Adjusted based on scope';
+    }
+    return pageCount || 'Not set';
+  };
+
   return (
     <div className="mb-4 position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
@@ -340,15 +345,15 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
               <div className="row">
                 <div className="col-md-6">
                   <small>
-                    <strong>Selected Methodology:</strong> {getSelectedMethodologyInfo()?.name || selectedMethodology || 'None'}<br/>
-                    <strong>Final Thesis:</strong> {finalThesis || 'Not set'}<br/>
-                    <strong>Source Categories:</strong> {sourceCategories?.length || 0} selected
+                    <strong>Final Thesis:</strong> {finalThesis || 'Not set'}
                   </small>
                 </div>
                 <div className="col-md-6">
                   <small>
+                    <strong>Source Categories:</strong> {sourceCategories?.length || 0} selected<br/>
                     <strong>Selected Paper Type:</strong> {selectedPaperType?.name || 'None'}<br/>
-                    <strong>Page Count:</strong> {pageCount || 'Not set'}
+                    <strong>Paper Structure:</strong> {selectedPaperType?.structure || 'Not set'}<br/>
+                    <strong>Page Count:</strong> {getPageCountDisplay()}
                   </small>
                 </div>
               </div>
@@ -546,20 +551,17 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                     style={{ cursor: 'pointer', borderStyle: 'dashed' }}
                     onClick={handleCustomMethodologyChoice}
                   >
-                    <div className="card-body text-center">
-                      <div className="d-flex align-items-center justify-content-center">
+                    <div className="card-body">
+                      <div className="d-flex align-items-start">
                         <input
                           type="radio"
                           name="generatedMethodology"
                           checked={isCustomMethodology}
                           onChange={handleCustomMethodologyChoice}
-                          className="me-2"
+                          className="me-2 mt-1"
                         />
-                        <div>
-                          <h6 className="card-title mb-2">
-                            <FaPlus className="me-2" />
-                            Create Custom Methodology
-                          </h6>
+                        <div className="flex-grow-1">
+                          <h6 className="card-title">Create Custom Methodology</h6>
                           <p className="card-text text-muted">
                             Design your own methodology with custom approach, source focus, and structure alignment
                           </p>

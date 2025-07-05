@@ -5,7 +5,6 @@ import ThesisRefinement from './components/ThesisRefinement';
 import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineGenerator';
-import PageLengthSelector from './components/PageLengthSelector';
 import PaperTypeSelector from './components/PaperTypeSelector';
 
 function App() {
@@ -24,13 +23,10 @@ function App() {
   const [readyForOutline, setReadyForOutline] = useState(false);
   const [outlineVersion, setOutlineVersion] = useState(0);
 
-  const [pageLengthFinalized, setPageLengthFinalized] = useState(false);
+  const [thesisFinalized, setThesisFinalized] = useState(false);
   const [categoriesFinalized, setCategoriesFinalized] = useState(false);
   const [selectedPaperType, setSelectedPaperType] = useState(null);
-  
-  // Add loading trigger states
-  const [shouldLoadSourceCategories, setShouldLoadSourceCategories] = useState(false);
-  const [shouldLoadMethodology, setShouldLoadMethodology] = useState(false);
+  const [sourceCategoriesActivated, setSourceCategoriesActivated] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -58,22 +54,20 @@ function App() {
     setKbLoading(false);
   };
 
-  const handlePageLengthSelected = (length, shouldTriggerLoad = false) => {
-    setPaperLength(length);
-    setPageLengthFinalized(true);
-    // Only trigger source categories loading if explicitly requested
-    if (shouldTriggerLoad) {
-      setShouldLoadSourceCategories(true);
-    }
+  const handlePaperTypeSelected = (paperType, pageLength) => {
+    setSelectedPaperType(paperType);
+    setPaperLength(pageLength);
   };
 
-  const handleCategoriesSelected = (categories, shouldTriggerLoad = false) => {
+  const handleThesisFinalized = (thesis) => {
+    setFinalThesis(thesis);
+    setThesisFinalized(true);
+    setSourceCategoriesActivated(true);
+  };
+
+  const handleCategoriesSelected = (categories) => {
     setSourceCategories(categories);
     setCategoriesFinalized(true);
-    // Only trigger methodology loading if explicitly requested
-    if (shouldTriggerLoad) {
-      setShouldLoadMethodology(true);
-    }
   };
 
   const proceedToOutline = () => setReadyForOutline(true);
@@ -86,37 +80,28 @@ function App() {
         <img src={socratesIcon} alt="Socrates Icon" width={70} height={70} className="ms-3" />
       </div>
 
-      {/* Paper Type Selector */}
+      {/* Paper Type & Length Selector */}
       <div className="card p-3 mb-4">
-        <PaperTypeSelector onPaperTypeSelected={setSelectedPaperType} />
+        <PaperTypeSelector onPaperTypeSelected={handlePaperTypeSelected} />
       </div>
 
       {/* Thesis Refinement Section */}
-      {selectedPaperType && (
+      {selectedPaperType && paperLength !== null && (
         <div className="card p-3 mb-4">
           <ThesisRefinement 
-            onFinalize={setFinalThesis} 
+            onFinalize={handleThesisFinalized} 
             selectedPaperType={selectedPaperType}
           />
         </div>
       )}
 
-      {/* Page Length Selector */}
-      {finalThesis && (
-        <PageLengthSelector
-          onPageCountSelected={handlePageLengthSelected}
-        />
-      )}
-
       {/* Source Categories */}
-      {finalThesis && pageLengthFinalized && (
+      {sourceCategoriesActivated && finalThesis && thesisFinalized && (
         <div className="card p-3 mb-4">
           <SourceCategories
             finalThesis={finalThesis}
             paperLength={paperLength || 0}
             onCategoriesSelected={handleCategoriesSelected}
-            shouldAutoLoad={shouldLoadSourceCategories}
-            onLoadComplete={() => setShouldLoadSourceCategories(false)}
           />
         </div>
       )}
@@ -132,8 +117,6 @@ function App() {
             resetOutline={resetOutline}
             selectedPaperType={selectedPaperType}
             pageCount={paperLength}
-            shouldAutoLoad={shouldLoadMethodology}
-            onLoadComplete={() => setShouldLoadMethodology(false)}
           />
         </div>
       )}

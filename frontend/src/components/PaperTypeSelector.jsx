@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 const PaperTypeSelector = ({ onPaperTypeSelected }) => {
   const [selectedType, setSelectedType] = useState('');
+  const [pageCount, setPageCount] = useState('');
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -156,6 +157,14 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
     setSelectedType(e.target.value);
   };
 
+  const handlePageCountChange = (e) => {
+    const value = e.target.value;
+    // Allow only numbers or empty string
+    if (value === '' || /^\d+$/.test(value)) {
+      setPageCount(value);
+    }
+  };
+
   const handleProceedToThesis = () => {
     if (!selectedType) {
       alert("Please select a paper type before proceeding.");
@@ -163,14 +172,18 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
     }
     
     const selectedPaper = paperTypes.find(type => type.id === selectedType);
+    
+    // Convert page count to the required format
+    const pageLengthValue = pageCount === '' ? -1 : parseInt(pageCount, 10);
+    
     setFinalized(true);
     setCollapsed(true);
-    onPaperTypeSelected(selectedPaper);
+    onPaperTypeSelected(selectedPaper, pageLengthValue);
   };
 
   const handleEditPaperType = () => {
     if (finalized) {
-      alert("Warning: Changing the paper type at this point will NOT modify any research outputs already generated unless subsequent sections are rerun.");
+      alert("Warning: Changing the paper type or page length at this point will NOT modify any research outputs already generated unless subsequent sections are rerun.");
     }
     setFinalized(false);
     setCollapsed(false);
@@ -181,7 +194,7 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
   const selectedPaper = paperTypes.find(type => type.id === selectedType);
 
   return (
-    <div className="mb-4 position-relative w-100">
+    <div className="position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
         <button
           className="btn btn-sm btn-outline-secondary"
@@ -192,10 +205,10 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
       </div>
 
       <h3>
-        Paper Type Selection
+        Paper Type & Length Selection
         {finalized && selectedPaper && (
           <small className="text-muted ms-2">
-            ({selectedPaper.name})
+            ({selectedPaper.name}{pageCount ? `, ${pageCount} pages` : ', Auto-adjusted'})
           </small>
         )}
       </h3>
@@ -223,6 +236,23 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
                 </select>
               </div>
 
+              <div className="mb-3">
+                <label htmlFor="pageCountInput" className="form-label">
+                  Paper Length (pages):
+                </label>
+                <input
+                  id="pageCountInput"
+                  type="text"
+                  className="form-control"
+                  value={pageCount}
+                  onChange={handlePageCountChange}
+                  placeholder="Leave blank to auto-adjust based on thesis scope"
+                />
+                <div className="form-text">
+                  Enter the desired number of pages, or leave blank to automatically adjust the length based on your thesis scope.
+                </div>
+              </div>
+
               {selectedPaper && (
                 <div className="card p-3 mb-3">
                   <h5>{selectedPaper.name}</h5>
@@ -246,13 +276,15 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
                 onClick={handleProceedToThesis}
                 disabled={!selectedType}
               >
-                Proceed to Thesis
+                Proceed to Thesis Refinement
               </button>
             </>
           ) : (
             <div className="mt-3">
               <div className="alert alert-info">
                 <strong>Selected Paper Type:</strong> {selectedPaper.name}
+                <br />
+                <strong>Paper Length:</strong> {pageCount ? `${pageCount} pages` : 'Auto-adjusted based on thesis scope'}
                 <div className="mt-2">
                   <small><strong>Purpose:</strong> {selectedPaper.purpose}</small>
                 </div>
@@ -264,7 +296,7 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
                 className="btn btn-secondary"
                 onClick={handleEditPaperType}
               >
-                Edit Paper Type
+                Edit Paper Type & Length
               </button>
             </div>
           )}

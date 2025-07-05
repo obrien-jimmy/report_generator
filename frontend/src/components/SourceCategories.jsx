@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shouldAutoLoad, onLoadComplete }) => {
+const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) => {
   const [categories, setCategories] = useState([]);
   const [customCategory, setCustomCategory] = useState('');
   const [loading, setLoading] = useState(false);
@@ -9,8 +9,14 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingRef = useRef(false); // Prevent double loading
 
   const recommendSources = async () => {
+    // Prevent multiple simultaneous loads
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    
     setLoading(true);
     setError(null);
     
@@ -54,22 +60,98 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
       setHasLoaded(true);
     }
     setLoading(false);
+    loadingRef.current = false;
   };
 
-  // Only load when explicitly triggered
-  useEffect(() => {
-    if (shouldAutoLoad && finalThesis && paperLength !== null && !hasLoaded && !loading) {
-      recommendSources().then(() => {
-        if (onLoadComplete) onLoadComplete();
+  const generateMoreSources = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    
+    setLoadingMore(true);
+    setError(null);
+    
+    // Add delay to prevent rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    try {
+      const existingCategories = categories.map(cat => cat.name);
+      
+      const res = await axios.post('http://localhost:8000/recommend_sources', {
+        final_thesis: finalThesis,
+        paper_length_pages: paperLength,
+        exclude_categories: existingCategories, // Pass existing categories to avoid duplicates
       });
+
+      const newCats = res.data.recommended_categories.map((name, index) => {
+        const cleanName = name.replace(/^\d+\.\s*/, '').trim();
+        return { 
+          name: cleanName, 
+          selected: true,
+          number: categories.length + index + 1
+        };
+      });
+
+      // Filter out any duplicates that might still exist
+      const uniqueNewCats = newCats.filter(newCat => 
+        !categories.some(existingCat => existingCat.name.toLowerCase() === newCat.name.toLowerCase())
+      );
+
+      // Renumber the new categories
+      const numberedNewCats = uniqueNewCats.map((cat, index) => ({
+        ...cat,
+        number: categories.length + index + 1
+      }));
+
+      setCategories(prev => [...prev, ...numberedNewCats]);
+    } catch (err) {
+      console.error('Additional source recommendation error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to generate additional sources.';
+      setError(errorMsg);
+      
+      // Add some default additional categories if API fails
+      const additionalDefaults = [
+        'Case Studies',
+        'Statistical Data',
+        'Industry Reports',
+        'Conference Papers',
+        'White Papers'
+      ];
+      
+      const newCats = additionalDefaults
+        .filter(name => !categories.some(cat => cat.name.toLowerCase() === name.toLowerCase()))
+        .map((name, index) => ({ 
+          name, 
+          selected: true,
+          number: categories.length + index + 1
+        }));
+      
+      setCategories(prev => [...prev, ...newCats]);
     }
-  }, [shouldAutoLoad, finalThesis, paperLength, hasLoaded, loading, onLoadComplete]);
+    setLoadingMore(false);
+    loadingRef.current = false;
+  };
+
+  // Auto-load when component is first mounted - ONLY loading mechanism
+  useEffect(() => {
+    if (finalThesis && paperLength !== null && !hasLoaded && !loading) {
+      recommendSources();
+    }
+  }, []); // Empty dependency array - only run once on mount
+
+  // Separate effect to handle prop changes after initial load
+  useEffect(() => {
+    if (hasLoaded && finalThesis && paperLength !== null) {
+      // Props changed after initial load - reset if needed
+      // This won't auto-reload, user needs to manually refresh
+    }
+  }, [finalThesis, paperLength, hasLoaded]);
 
   const handleManualLoad = () => {
     if (!finalThesis || paperLength === null) {
       alert('Please ensure thesis and paper length are set before generating categories.');
       return;
     }
+    // Call directly instead of relying on useEffect
     recommendSources();
   };
 
@@ -84,10 +166,25 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
       setCollapsed(false);
     }
     
+    // Reset state and call directly
     setCategories([]);
     setCustomCategory('');
     setHasLoaded(false);
     recommendSources();
+  };
+
+  const handleAddMore = () => {
+    if (!finalThesis || paperLength === null) {
+      alert('Please ensure thesis and paper length are set before generating additional categories.');
+      return;
+    }
+    
+    if (finalized) {
+      alert('Cannot add more categories after finalizing. Please edit the categories first.');
+      return;
+    }
+    
+    generateMoreSources();
   };
 
   const toggleCategory = (index) => {
@@ -122,7 +219,6 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
     
     setFinalized(true);
     setCollapsed(true);
-    // Pass both categories and trigger flag
     onCategoriesSelected(selectedCategories, true);
   };
 
@@ -143,6 +239,14 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
     <div className="mb-4 position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
         <button
+          className="btn btn-sm btn-outline-primary me-2"
+          onClick={handleAddMore}
+          disabled={!hasLoaded || finalized || loadingMore}
+          title="Generate additional source categories"
+        >
+          {loadingMore ? 'Adding...' : 'Add More'}
+        </button>
+        <button
           className="btn btn-sm btn-outline-secondary me-2"
           onClick={handleRegenerate}
           title="Regenerate source categories"
@@ -155,6 +259,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
         >
           {collapsed ? 'Expand' : 'Collapse'}
         </button>
+        
       </div>
 
       <h3>
@@ -181,10 +286,12 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, shou
             </div>
           )}
 
-          {loading && (
+          {(loading || loadingMore) && (
             <div className="d-flex align-items-center mb-3">
               <div className="spinner-border spinner-border-sm me-2" role="status" />
-              <span>Loading recommended sources...</span>
+              <span>
+                {loading ? 'Loading recommended sources...' : 'Generating additional sources...'}
+              </span>
             </div>
           )}
           
