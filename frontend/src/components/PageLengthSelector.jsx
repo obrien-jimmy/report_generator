@@ -30,7 +30,7 @@ const PageLengthSelector = ({ onPageCountSelected }) => {
   const toggleCollapse = () => setCollapsed(prev => !prev);
 
   return (
-    <div className="card p-3 mb-4 position-relative">
+    <div className="card p-3 mb-4 position-relative w-100">
       <div
         style={{ position: 'absolute', top: 10, right: 26, cursor: 'pointer', color: '#aaa' }}
         onClick={toggleCollapse}

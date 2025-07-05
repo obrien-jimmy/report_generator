@@ -182,7 +182,7 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
   const selectedPaper = paperTypes.find(type => type.id === selectedType);
 
   return (
-    <div className="position-relative">
+    <div className="mb-4 position-relative w-100">
       <div
         style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
         onClick={toggleCollapse}

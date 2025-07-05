@@ -1,0 +1,35 @@
+.component-container {
+  width: 100%;
+  min-width: 0; /* Allows components to shrink when window is constrained */
+}
+
+.component-card {
+  width: 100%;
+  min-height: 150px; /* Ensures minimum height even with minimal content */
+  box-sizing: border-box;
+}
+
+.methodology-card {
+  transition: all 0.2s ease;
+  min-height: 100px; /* Ensures consistent card heights */
+}
+
+.methodology-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.methodology-card.border-primary {
+  background-color: #f8f9ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .component-card {
+    min-height: 100px;
+  }
+  
+  .methodology-card {
+    min-height: 80px;
+  }
+}

@@ -133,7 +133,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
   const totalCount = categories.length;
 
   return (
-    <div className="position-relative">
+    <div className="mb-4 position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: -5, right: 10 }}>
         <FaSyncAlt 
           style={{ 

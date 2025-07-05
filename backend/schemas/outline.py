@@ -1,26 +1,73 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 
-class Subsection(BaseModel):
+class OutlineSubsection(BaseModel):
     subsection_title: str
     subsection_context: str
 
-class Section(BaseModel):
+class OutlineSection(BaseModel):
     section_title: str
     section_context: str
-    subsections: List[Subsection]
+    subsections: List[OutlineSubsection] = []
 
-class SectionOnly(BaseModel):
-    section_title: str
-    section_context: str
+class OutlineGenerationRequest(BaseModel):
+    prompt: str
 
-class MethodologyRequest(BaseModel):
+class OutlineGenerationResponse(BaseModel):
+    outline: List[OutlineSection]
+
+class SectionGenerationRequest(BaseModel):
     final_thesis: str
+    methodology: Dict[str, Any]  # Can handle both string and object formats
+    paper_length_pages: int
     source_categories: List[str]
 
-class MethodologyResponse(BaseModel):
-    methodology: str
+class SectionGenerationResponse(BaseModel):
+    sections: List[OutlineSection]
 
+class SubsectionGenerationRequest(BaseModel):
+    final_thesis: str
+    methodology: Dict[str, Any]
+    section_title: str
+    section_context: str
+    paper_length_pages: int
+    source_categories: List[str]
+
+class SubsectionGenerationResponse(BaseModel):
+    subsections: List[OutlineSubsection]
+
+class QuestionGenerationRequest(BaseModel):
+    final_thesis: str
+    methodology: Dict[str, Any]
+    section_title: str
+    section_context: str
+    subsection_title: str
+    subsection_context: str
+
+class QuestionGenerationResponse(BaseModel):
+    questions: List[str]
+
+class CitationGenerationRequest(BaseModel):
+    final_thesis: str
+    methodology: Dict[str, Any]
+    section_title: str
+    section_context: str
+    subsection_title: str
+    subsection_context: str
+    question: str
+    source_categories: List[str]
+    citation_count: int = 3
+
+class RecommendedSource(BaseModel):
+    apa: str
+    categories: List[str]
+    methodologyPoints: List[str]
+    description: str
+
+class CitationGenerationResponse(BaseModel):
+    recommended_sources: List[RecommendedSource]
+
+# Additional schemas needed by structure.py
 class OutlineRequest(BaseModel):
     final_thesis: str
     methodology: str
@@ -28,7 +75,7 @@ class OutlineRequest(BaseModel):
     source_categories: List[str]
 
 class OutlineResponse(BaseModel):
-    outline: List[Section]
+    outline: List[OutlineSection]
 
 class SectionsRequest(BaseModel):
     final_thesis: str
@@ -37,7 +84,7 @@ class SectionsRequest(BaseModel):
     source_categories: List[str]
 
 class SectionsResponse(BaseModel):
-    sections: List[SectionOnly]
+    sections: List[OutlineSection]
 
 class SubsectionsRequest(BaseModel):
     final_thesis: str
@@ -48,7 +95,7 @@ class SubsectionsRequest(BaseModel):
     source_categories: List[str]
 
 class SubsectionsResponse(BaseModel):
-    subsections: List[Subsection]
+    subsections: List[OutlineSubsection]
 
 class QuestionsRequest(BaseModel):
     final_thesis: str
@@ -60,3 +107,6 @@ class QuestionsRequest(BaseModel):
 
 class QuestionsResponse(BaseModel):
     questions: List[str]
+
+# Fix forward references
+OutlineSection.model_rebuild()

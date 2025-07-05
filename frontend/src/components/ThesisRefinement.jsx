@@ -129,7 +129,7 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
   const answeredQuestionsCount = probingAnswers.filter(answer => answer.trim()).length;
 
   return (
-    <div className="position-relative">
+    <div className="mb-4 position-relative w-100">
       <div
         style={{ position: 'absolute', top: -5, right: 10, cursor: 'pointer', color: '#aaa' }}
         onClick={toggleCollapse}

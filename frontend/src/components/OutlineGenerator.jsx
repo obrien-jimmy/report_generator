@@ -40,18 +40,12 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const generateOutline = async () => {
     setLoading(true);
     setError(null);
-
-    let safePaperLength;
     
-    if (paperLength === 'Maximum Detail') {
-      safePaperLength = -2;
-    } else if (paperLength === 'Adjusted Based on Thesis') {
-      safePaperLength = -1;
-    } else {
-      safePaperLength = parseInt(paperLength, 10);
-    }
-
     try {
+      const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
+                              paperLength === 'Adjusted Based on Thesis' ? -1 :
+                              parseInt(paperLength, 10);
+
       const res = await axios.post('http://localhost:8000/generate_sections', {
         final_thesis: finalThesis,
         methodology,
@@ -96,10 +90,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   };
 
   const generateSubsectionsSequentially = async (sections) => {
-    const safePaperLength =
-      paperLength === 'Maximum Detail' ? -2 :
-      paperLength === 'Adjusted Based on Thesis' ? -1 :
-      parseInt(paperLength, 10);
+    const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
+                            paperLength === 'Adjusted Based on Thesis' ? -1 :
+                            parseInt(paperLength, 10);
 
     for (let section of sections) {
       try {
@@ -339,10 +332,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const hasQuestions = Object.values(questions).some(q => Array.isArray(q) && q.length > 0);
 
   return (
-    <div className="container position-relative">
-      <h3>Outline Generation</h3>
-
-      <div className="d-flex" style={{ position: 'absolute', top: '10px', right: '10px' }}>
+    <div className="mb-4 position-relative w-100">
+      <div className="d-flex" style={{ position: 'absolute', top: 10, right: 10 }}>
         <FaSyncAlt 
           style={{ 
             cursor: 'pointer', 
@@ -360,6 +351,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
           {allCollapsed ? 'Expand All' : 'Collapse All'}
         </button>
       </div>
+
+      <h3>Outline Generation</h3>
 
       {!hasGenerated && (
         <button className="btn btn-primary my-3" onClick={generateOutline} disabled={loading}>

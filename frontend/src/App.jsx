@@ -27,7 +27,6 @@ function App() {
   const [pageLengthFinalized, setPageLengthFinalized] = useState(false);
   const [categoriesFinalized, setCategoriesFinalized] = useState(false);
   const [selectedPaperType, setSelectedPaperType] = useState(null);
-  const [showThesisRefinement, setShowThesisRefinement] = useState(false);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -57,10 +56,6 @@ function App() {
 
   const proceedToOutline = () => setReadyForOutline(true);
   const resetOutline = () => setOutlineVersion(prev => prev + 1);
-  const handlePaperTypeSelected = (paperType) => {
-    setSelectedPaperType(paperType);
-    setShowThesisRefinement(true);
-  };
 
   return (
     <div className="container py-5">
@@ -71,11 +66,11 @@ function App() {
 
       {/* Paper Type Selector */}
       <div className="card p-3 mb-4">
-        <PaperTypeSelector onPaperTypeSelected={handlePaperTypeSelected} />
+        <PaperTypeSelector onPaperTypeSelected={setSelectedPaperType} />
       </div>
 
       {/* Thesis Refinement Section */}
-      {showThesisRefinement && (
+      {selectedPaperType && (
         <div className="card p-3 mb-4">
           <ThesisRefinement 
             onFinalize={setFinalThesis} 
@@ -117,6 +112,8 @@ function App() {
             setMethodology={setMethodology}
             proceedToOutline={proceedToOutline}
             resetOutline={resetOutline}
+            selectedPaperType={selectedPaperType}
+            pageCount={paperLength}
           />
         </div>
       )}

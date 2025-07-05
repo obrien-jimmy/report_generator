@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from schemas.outline import (
-    MethodologyRequest, MethodologyResponse, OutlineRequest, OutlineResponse,
-    SectionsRequest, SectionsResponse, SubsectionsRequest, SubsectionsResponse,
+    OutlineRequest, OutlineResponse,
+    SectionsRequest, SectionsResponse, 
+    SubsectionsRequest, SubsectionsResponse,
     QuestionsRequest, QuestionsResponse
 )
+from schemas.methodology import MethodologyRequest, MethodologyResponse
 from services.bedrock_service import invoke_bedrock
 import json
 import re
