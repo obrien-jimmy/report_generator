@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaEdit, FaSave, FaTimes, FaInfoCircle, FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
-import PaperStructurePreview from './PaperStructurePreview';
 
 const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
@@ -728,17 +727,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                   </button>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Paper Structure Preview */}
-          {finalized && (
-            <div className="mt-4">
-              <PaperStructurePreview
-                paperType={selectedPaperType}
-                methodology={selectedMethodology}
-                subMethodology={selectedSubMethodology}
-              />
             </div>
           )}
         </>

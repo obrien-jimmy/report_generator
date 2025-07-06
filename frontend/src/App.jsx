@@ -130,6 +130,7 @@ function App() {
             methodology={methodology}
             paperLength={paperLength || 0}
             sourceCategories={sourceCategories}
+            selectedPaperType={selectedPaperType}
           />
         </div>
       )}

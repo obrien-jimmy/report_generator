@@ -1,44 +1,67 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import CitationCards from './CitationCards';
-import { FaSyncAlt, FaPlusCircle, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { FaFileAlt, FaList, FaEye, FaEyeSlash, FaCheck, FaEdit } from 'react-icons/fa';
 
 const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
-  const [collapsedSubsections, setCollapsedSubsections] = useState({});
-  const [collapsedQuestions, setCollapsedQuestions] = useState({});
-  const [allCollapsed, setAllCollapsed] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
 
-  const [questions, setQuestions] = useState({});
-  const [questionCitations, setQuestionCitations] = useState({});
-  const [loadingCitations, setLoadingCitations] = useState({});
-  const [generatingAllCitations, setGeneratingAllCitations] = useState(false);
+  // Paper Structure States
+  const [structureData, setStructureData] = useState(null);
+  const [structureLoading, setStructureLoading] = useState(false);
+  const [structureError, setStructureError] = useState(null);
+  const [structureApproved, setStructureApproved] = useState(false);
+  const [structureCollapsed, setStructureCollapsed] = useState(false);
 
-  // Modal state for additional context input
-  const [showContextModal, setShowContextModal] = useState(false);
-  const [contextInput, setContextInput] = useState('');
-  const [desiredCount, setDesiredCount] = useState(3);
-  const [currentAction, setCurrentAction] = useState({ 
-    section: null, 
-    subsection: null, 
-    question: null, 
-    append: false 
-  });
-
+  // Auto-load paper structure when component mounts
   useEffect(() => {
-    if (finalThesis && methodology) {
-      generateOutline();
+    if (selectedPaperType?.id && methodology) {
+      loadPaperStructure();
     }
-  }, [finalThesis, methodology]);
+  }, [selectedPaperType, methodology]);
+
+  const loadPaperStructure = async () => {
+    setStructureLoading(true);
+    setStructureError(null);
+    
+    try {
+      // Extract methodology IDs from methodology object
+      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
+      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
+
+      const response = await axios.post('http://localhost:8000/paper_structure', {
+        paper_type: selectedPaperType.id,
+        methodology_id: methodologyId,
+        sub_methodology_id: subMethodologyId
+      });
+      
+      setStructureData(response.data);
+    } catch (err) {
+      setStructureError('Failed to load paper structure');
+      console.error('Structure fetch error:', err);
+    }
+    setStructureLoading(false);
+  };
+
+  const approveStructure = () => {
+    setStructureApproved(true);
+  };
+
+  const editStructure = () => {
+    setStructureApproved(false);
+    loadPaperStructure();
+  };
 
   const generateOutline = async () => {
+    if (!structureApproved) {
+      setError('Please approve the paper structure first');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -54,7 +77,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
       // Use structured outline generation
       const res = await axios.post('http://localhost:8000/generate_structured_outline', {
         final_thesis: finalThesis,
-        paper_type: selectedPaperType?.id || 'research', // Use selected paper type
+        paper_type: selectedPaperType?.id || 'research',
         methodology,
         paper_length_pages: safePaperLength,
         source_categories: sourceCategories,
@@ -72,13 +95,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
 
       setOutline(sections);
       setHasGenerated(true);
-      setIsEditing(false);
       setSaved(true);
-      
-      // Show structure preview info
-      if (res.data.structure_preview) {
-        console.log('Generated structure:', res.data.structure_preview);
-      }
       
       // Only generate subsections for non-administrative sections
       const contentSections = sections.filter(sec => !sec.is_administrative);
@@ -90,480 +107,302 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     setLoading(false);
   };
 
-  const handleRegenerate = () => {
-    const confirmRegenerate = window.confirm(
-      "This will regenerate the entire outline and clear all questions and citations. Are you sure you want to continue?"
-    );
-    if (!confirmRegenerate) return;
-    
-    // Clear all existing data
-    setOutline([]);
-    setQuestions({});
-    setQuestionCitations({});
-    setLoadingCitations({});
-    setCollapsedSections({});
-    setCollapsedSubsections({});
-    setCollapsedQuestions({});
-    setAllCollapsed(false);
-    setHasGenerated(false);
-    setIsEditing(false);
-    setSaved(false);
-    
-    // Regenerate the outline
-    generateOutline();
-  };
-
-  const toggleCollapse = () => setCollapsed(prev => !prev);
-
   const generateSubsectionsSequentially = async (sections) => {
-    const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
-                            paperLength === 'Adjusted Based on Thesis' ? -1 :
-                            parseInt(paperLength, 10);
-
-    for (let section of sections) {
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
       try {
-        const res = await axios.post('http://localhost:8000/generate_subsections', {
-          final_thesis: finalThesis,
-          methodology,
+        const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
+                                paperLength === 'Adjusted Based on Thesis' ? -1 :
+                                parseInt(paperLength, 10);
+
+        const requestPayload = {
           section_title: section.section_title,
           section_context: section.section_context,
+          final_thesis: finalThesis,
+          methodology: methodology,
           paper_length_pages: safePaperLength,
-          source_categories: sourceCategories,
-        });
+          source_categories: sourceCategories // Add this if needed
+        };
 
-        setOutline(prevOutline => prevOutline.map(sec => {
-          if (sec.section_title === section.section_title) {
-            return { ...sec, subsections: res.data.subsections };
-          }
-          return sec;
-        }));
+        console.log('Generating subsections for:', section.section_title);
+        console.log('Request payload:', requestPayload);
+
+        const res = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
+
+        setOutline(prevOutline => 
+          prevOutline.map(outlineSection => 
+            outlineSection.section_title === section.section_title
+              ? { ...outlineSection, subsections: res.data.subsections }
+              : outlineSection
+          )
+        );
       } catch (err) {
-        console.error(`Error generating subsections for section: ${section.section_title}`, err);
-      }
-    }
-  };
-
-  const generateQuestionsSequentially = async () => {
-    for (let section of outline) {
-      for (let subsection of section.subsections) {
-        const key = `${section.section_title}-${subsection.subsection_title}`;
-
-        setQuestions(prev => ({ ...prev, [key]: 'loading' }));
-
-        try {
-          const res = await axios.post('http://localhost:8000/generate_questions', {
-            final_thesis: finalThesis,
-            methodology,
-            section_title: section.section_title,
-            section_context: section.section_context,
-            subsection_title: subsection.subsection_title,
-            subsection_context: subsection.subsection_context,
-          });
-
-          setQuestions(prev => ({ ...prev, [key]: res.data.questions }));
-        } catch (err) {
-          setQuestions(prev => ({ ...prev, [key]: [`Error: ${err.message}`] }));
-        }
-      }
-    }
-  };
-
-  const generateAllCitationsSequentially = async () => {
-    setGeneratingAllCitations(true);
-    
-    for (let section of outline) {
-      for (let subsection of section.subsections) {
-        const questionKey = `${section.section_title}-${subsection.subsection_title}`;
-        const questionsArray = questions[questionKey];
+        console.error(`Error generating subsections for ${section.section_title}:`, err);
+        console.error('Error details:', err.response?.data);
         
-        if (Array.isArray(questionsArray)) {
-          for (let question of questionsArray) {
-            // Skip error questions
-            if (question.startsWith('Error:')) continue;
-            
-            const citationKey = `${section.section_title}-${subsection.subsection_title}-${question}`;
-            
-            // Only generate if citations don't already exist
-            if (!questionCitations[citationKey]) {
-              setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
-              setQuestionCitations(prev => ({ ...prev, [citationKey]: 'loading' }));
-
-              try {
-                // Add a small delay to prevent rate limiting
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                const res = await axios.post('http://localhost:8000/generate_question_citations', {
-                  final_thesis: finalThesis,
-                  methodology,
-                  section_title: section.section_title,
-                  section_context: section.section_context,
-                  subsection_title: subsection.subsection_title,
-                  subsection_context: subsection.subsection_context,
-                  question: question,
-                  source_categories: sourceCategories,
-                  citation_count: 3,
-                });
-
-                setQuestionCitations(prev => ({
-                  ...prev,
-                  [citationKey]: res.data.recommended_sources,
-                }));
-              } catch (err) {
-                console.error(`Error generating citations for question: ${question}`, err);
-                setQuestionCitations(prev => ({
-                  ...prev,
-                  [citationKey]: [{
-                    apa: `Error: ${err.message}`,
-                    categories: ["Error"],
-                    methodologyPoints: ["Error"],
-                    description: "An error occurred retrieving citation details."
-                  }],
-                }));
-              }
-              setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
-            }
-          }
-        }
+        // Continue with other sections even if one fails
+        continue;
       }
     }
-    
-    setGeneratingAllCitations(false);
   };
 
-  const fetchQuestionCitations = async (section, subsection, question, append = false, additionalContext = '', citationCount = 3) => {
-    const key = `${section.section_title}-${subsection.subsection_title}-${question}`;
-    setLoadingCitations(prev => ({ ...prev, [key]: true }));
+  const toggleStructureCollapse = () => setStructureCollapsed(prev => !prev);
 
-    if (!append) {
-      setQuestionCitations(prev => ({ ...prev, [key]: 'loading' }));
+  // Paper Structure Preview Component
+  const PaperStructurePreview = () => {
+    if (structureLoading) {
+      return (
+        <div className="alert alert-info">
+          <FaFileAlt className="me-2" />
+          Loading paper structure...
+        </div>
+      );
     }
 
-    try {
-      const res = await axios.post('http://localhost:8000/generate_question_citations', {
-        final_thesis: finalThesis,
-        methodology,
-        section_title: section.section_title,
-        section_context: section.section_context,
-        subsection_title: subsection.subsection_title,
-        subsection_context: `${subsection.subsection_context}. Additional context: ${additionalContext}`,
-        question: question,
-        source_categories: sourceCategories,
-        citation_count: citationCount,
-      });
-
-      setQuestionCitations(prev => ({
-        ...prev,
-        [key]: append && Array.isArray(prev[key])
-          ? [...prev[key], ...res.data.recommended_sources]
-          : res.data.recommended_sources,
-      }));
-    } catch (err) {
-      setQuestionCitations(prev => ({
-        ...prev,
-        [key]: [{
-          apa: `Error: ${err.message}`,
-          categories: ["Error"],
-          methodologyPoints: ["Error"],
-          description: "An error occurred retrieving citation details."
-        }],
-      }));
+    if (structureError) {
+      return (
+        <div className="alert alert-danger">
+          <strong>Structure Error:</strong> {structureError}
+          <button 
+            className="btn btn-sm btn-outline-primary ms-2"
+            onClick={loadPaperStructure}
+          >
+            Retry
+          </button>
+        </div>
+      );
     }
-    setLoadingCitations(prev => ({ ...prev, [key]: false }));
-  };
 
-  const handleQuestionCitationClick = (section, subsection, question, append) => {
-    setCurrentAction({ section, subsection, question, append });
-    setContextInput('');
-    setDesiredCount(3);
-    setShowContextModal(true);
-  };
+    if (!structureData) {
+      return (
+        <div className="alert alert-warning">
+          <strong>No Structure:</strong> Unable to load paper structure.
+          <button 
+            className="btn btn-sm btn-outline-primary ms-2"
+            onClick={loadPaperStructure}
+          >
+            Load Structure
+          </button>
+        </div>
+      );
+    }
 
-  const handleContextSubmit = () => {
-    const { section, subsection, question, append } = currentAction;
-    fetchQuestionCitations(section, subsection, question, append, contextInput, desiredCount);
-    setShowContextModal(false);
-  };
-
-  const toggleSectionCollapse = (sectionIdx) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [sectionIdx]: !prev[sectionIdx]
-    }));
-  };
-
-  const toggleSubsectionCollapse = (sectionIdx, subIdx) => {
-    const key = `${sectionIdx}-${subIdx}`;
-    setCollapsedSubsections(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const toggleQuestionCollapse = (sectionIdx, subIdx, questionIdx) => {
-    const key = `${sectionIdx}-${subIdx}-${questionIdx}`;
-    setCollapsedQuestions(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const handleCollapseExpandAll = () => {
-    const newCollapsedState = !allCollapsed;
-    setAllCollapsed(newCollapsedState);
-
-    setCollapsedSections(
-      outline.reduce((acc, _, idx) => ({ ...acc, [idx]: newCollapsedState }), {})
-    );
-
-    setCollapsedSubsections(
-      outline.reduce((acc, section, sIdx) => {
-        section.subsections.forEach((_, subIdx) => {
-          acc[`${sIdx}-${subIdx}`] = newCollapsedState;
-        });
-        return acc;
-      }, {})
-    );
-
-    setCollapsedQuestions(
-      outline.reduce((acc, section, sIdx) => {
-        section.subsections.forEach((subsection, subIdx) => {
-          const questionKey = `${section.section_title}-${subsection.subsection_title}`;
-          const questionsArray = questions[questionKey];
-          if (Array.isArray(questionsArray)) {
-            questionsArray.forEach((_, qIdx) => {
-              acc[`${sIdx}-${subIdx}-${qIdx}`] = newCollapsedState;
-            });
-          }
-        });
-        return acc;
-      }, {})
-    );
-  };
-
-  const updateSection = (idx, field, value) => {
-    setOutline(prev =>
-      prev.map((sec, sIdx) =>
-        sIdx === idx ? { ...sec, [field]: value } : sec
-      )
-    );
-    setSaved(false);
-  };
-
-  const handleSave = () => {
-    setIsEditing(false);
-    setSaved(true);
-  };
-
-  // Check if questions exist for the citation button
-  const hasQuestions = Object.values(questions).some(q => Array.isArray(q) && q.length > 0);
-
-  return (
-    <div className="p-3 mb-4 position-relative w-100">
-      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
-        <button
-          className="btn btn-sm btn-outline-secondary me-2"
-          onClick={handleRegenerate}
-          title="Regenerate entire outline"
-        >
-          Refresh
-        </button>
-        <button
-          className="btn btn-sm btn-outline-secondary me-2"
-          onClick={handleCollapseExpandAll}
-        >
-          {allCollapsed ? 'Expand All' : 'Collapse All'}
-        </button>
-        <button
-          className="btn btn-sm btn-outline-secondary"
-          onClick={toggleCollapse}
-        >
-          {collapsed ? 'Expand' : 'Collapse'}
-        </button>
-      </div>
-
-      <h3>Outline Generation</h3>
-
-      {!collapsed && (
-        <>
-          {!hasGenerated && (
-            <button className="btn btn-primary my-3" onClick={generateOutline} disabled={loading}>
-              {loading ? 'Generating Outline...' : 'Generate Outline'}
-            </button>
-          )}
-
-          {error && <div className="alert alert-danger">{error}</div>}
-
-          {outline.map((section, sIdx) => (
-            <div key={sIdx} className="card p-4 my-3 position-relative">
-              <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
-                  onClick={() => toggleSectionCollapse(sIdx)}>
-                {collapsedSections[sIdx] ? <FaChevronRight /> : <FaChevronDown />}
+    return (
+      <div className="card mb-4">
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <div className="d-flex align-items-center">
+            <FaFileAlt className="me-2 text-primary" />
+            <h6 className="mb-0">Paper Structure Preview</h6>
+            <span className="badge bg-info ms-2">
+              {structureData.total_sections} sections
+            </span>
+            {structureApproved && (
+              <span className="badge bg-success ms-2">
+                <FaCheck className="me-1" />
+                Approved
+              </span>
+            )}
+          </div>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={toggleStructureCollapse}
+          >
+            {structureCollapsed ? <FaEye /> : <FaEyeSlash />}
+            {structureCollapsed ? ' Show' : ' Hide'}
+          </button>
+        </div>
+        
+        {!structureCollapsed && (
+          <div className="card-body">
+            {/* Structure Info */}
+            <div className="row mb-3">
+              <div className="col-md-4">
+                <small className="text-muted">
+                  <strong>Paper Type:</strong> {structureData.paper_type}
+                </small>
               </div>
+              <div className="col-md-4">
+                <small className="text-muted">
+                  <strong>Methodology:</strong> {structureData.methodology || 'Base structure'}
+                </small>
+              </div>
+              <div className="col-md-4">
+                <small className="text-muted">
+                  <strong>Enhanced:</strong> {structureData.has_methodology_sections ? 'Yes' : 'No'}
+                </small>
+              </div>
+            </div>
 
-              {!isEditing ? (
+            {/* Structure List */}
+            <div className="mb-3">
+              <h6 className="text-primary mb-2">
+                <FaList className="me-2" />
+                Recommended Structure
+              </h6>
+              <div className="list-group">
+                {structureData.structure.map((section, index) => (
+                  <div key={index} className="list-group-item d-flex align-items-center">
+                    <span className="badge bg-secondary me-2">{index + 1}</span>
+                    <span className="flex-grow-1">{section}</span>
+                    {/* Highlight methodology-specific sections */}
+                    {structureData.has_methodology_sections && 
+                     !['Title Page', 'Abstract', 'References (APA 7th)'].includes(section) && 
+                     !section.includes('Introduction') && 
+                     !section.includes('Conclusion') && (
+                      <span className="badge bg-primary ms-2">Method</span>
+                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Methodology Integration Notice */}
+            {structureData.has_methodology_sections && (
+              <div className="alert alert-success">
+                <small>
+                  <strong>📋 Structure Enhanced:</strong> Your selected methodology has been integrated into the paper structure. 
+                  Methodology-specific sections have been added to support your research approach.
+                </small>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="d-flex gap-2 mt-3">
+              {!structureApproved ? (
                 <>
-                  <h4>{section.section_title}</h4>
-                  <p><strong>Context:</strong> {section.section_context}</p>
+                  <button 
+                    className="btn btn-success"
+                    onClick={approveStructure}
+                  >
+                    <FaCheck className="me-1" />
+                    Approve Structure
+                  </button>
+                  <button 
+                    className="btn btn-outline-secondary"
+                    onClick={loadPaperStructure}
+                  >
+                    <FaEdit className="me-1" />
+                    Regenerate
+                  </button>
                 </>
               ) : (
-                <>
-                  <input
-                    className="form-control mb-2"
-                    value={section.section_title}
-                    onChange={e => updateSection(sIdx, 'section_title', e.target.value)}
-                  />
-                  <textarea
-                    className="form-control mb-3"
-                    rows={3}
-                    value={section.section_context}
-                    onChange={e => updateSection(sIdx, 'section_context', e.target.value)}
-                  />
-                </>
+                <button 
+                  className="btn btn-outline-warning"
+                  onClick={editStructure}
+                >
+                  <FaEdit className="me-1" />
+                  Edit Structure
+                </button>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-              {!collapsedSections[sIdx] && (
-                <>
-                  {section.subsections.length === 0 && <p>Generating subsections...</p>}
+  return (
+    <div className="mb-4">
+      <h4>Research Outline Generator</h4>
+      
+      {/* Paper Structure Preview - Always show first */}
+      <PaperStructurePreview />
 
-                  {section.subsections.map((sub, subIdx) => {
-                    const questionKey = `${section.section_title}-${sub.subsection_title}`;
-                    const collapseKey = `${sIdx}-${subIdx}`;
-                    const questionsArray = questions[questionKey];
+      {/* Outline Generation Section - Only show after structure is approved */}
+      {structureApproved && (
+        <div className="card">
+          <div className="card-header">
+            <h5 className="mb-0">Generate Detailed Outline</h5>
+          </div>
+          <div className="card-body">
+            {!hasGenerated && (
+              <div className="mb-3">
+                <p className="text-muted">
+                  Your paper structure has been approved. Click below to generate a detailed outline 
+                  based on your thesis, methodology, and the approved structure.
+                </p>
+                <button 
+                  className="btn btn-primary"
+                  onClick={generateOutline}
+                  disabled={loading}
+                >
+                  {loading ? 'Generating Outline...' : 'Generate Detailed Outline'}
+                </button>
+              </div>
+            )}
 
-                    return (
-                      <div key={subIdx} className="card p-3 my-2 position-relative">
-                        <div style={{ position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: '#aaa' }} 
-                            onClick={() => toggleSubsectionCollapse(sIdx, subIdx)}>
-                          {collapsedSubsections[collapseKey] ? <FaChevronRight /> : <FaChevronDown />}
-                        </div>
+            {error && (
+              <div className="alert alert-danger">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
 
-                        <h5>{sub.subsection_title}</h5>
-                        <p><strong>Context:</strong> {sub.subsection_context}</p>
+            {/* Outline Display */}
+            {hasGenerated && outline.length > 0 && (
+              <div className="mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h6>Generated Outline</h6>
+                  <div className="d-flex gap-2">
+                    <button 
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={generateOutline}
+                      disabled={loading}
+                    >
+                      {loading ? 'Regenerating...' : 'Regenerate Outline'}
+                    </button>
+                    <button 
+                      className="btn btn-sm btn-success"
+                      onClick={() => setSaved(true)}
+                    >
+                      {saved ? 'Saved' : 'Save Outline'}
+                    </button>
+                  </div>
+                </div>
 
-                        {!collapsedSubsections[collapseKey] && questionsArray && (
-                          <div className="mt-3">
-                            <strong>Research Questions:</strong>
-                            {questionsArray === 'loading' ? (
-                              <p>Generating questions...</p>
-                            ) : (
-                              <div className="mt-2">
-                                {questionsArray.map((question, qIdx) => {
-                                  const questionCollapseKey = `${sIdx}-${subIdx}-${qIdx}`;
-                                  const citationKey = `${section.section_title}-${sub.subsection_title}-${question}`;
-                                  const isQuestionCollapsed = collapsedQuestions[questionCollapseKey];
-
-                                  return (
-                                    <div key={qIdx} className="card p-2 mb-2">
-                                      <div 
-                                        className="d-flex justify-content-between align-items-center cursor-pointer"
-                                        onClick={() => toggleQuestionCollapse(sIdx, subIdx, qIdx)}
-                                      >
-                                        <span><strong>Q{qIdx + 1}:</strong> {question}</span>
-                                        {isQuestionCollapsed ? <FaChevronRight /> : <FaChevronDown />}
-                                      </div>
-
-                                      {!isQuestionCollapsed && (
-                                        <div className="mt-2">
-                                          {questionCitations[citationKey] && (
-                                            <div>
-                                              <strong>Supporting Sources:</strong>
-                                              {questionCitations[citationKey] === 'loading' || loadingCitations[citationKey] ? (
-                                                <p className="loading-text">Generating citations...</p>
-                                              ) : (
-                                                <CitationCards citations={questionCitations[citationKey]} />
-                                              )}
-                                            </div>
-                                          )}
-
-                                          {saved && (
-                                            <div className="mt-2">
-                                              <button
-                                                className="btn btn-sm btn-outline-primary me-2"
-                                                onClick={() => handleQuestionCitationClick(section, sub, question, false)}
-                                              >
-                                                <FaSyncAlt /> Generate Citations
-                                              </button>
-                                              {questionCitations[citationKey] && Array.isArray(questionCitations[citationKey]) && (
-                                                <button
-                                                  className="btn btn-sm btn-outline-secondary"
-                                                  onClick={() => handleQuestionCitationClick(section, sub, question, true)}
-                                                >
-                                                  <FaPlusCircle /> Add More Citations
-                                                </button>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                {/* Outline Sections */}
+                {outline.map((section, sectionIndex) => (
+                  <div key={sectionIndex} className="card mb-3">
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <div className="d-flex align-items-center">
+                        <span className="badge bg-primary me-2">{sectionIndex + 1}</span>
+                        <h6 className="mb-0">{section.section_title}</h6>
+                        {section.is_administrative && (
+                          <span className="badge bg-secondary ms-2">Admin</span>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setCollapsedSections(prev => ({
+                          ...prev,
+                          [sectionIndex]: !prev[sectionIndex]
+                        }))}
+                      >
+                        {collapsedSections[sectionIndex] ? <FaEye /> : <FaEyeSlash />}
+                      </button>
+                    </div>
+                    
+                    {!collapsedSections[sectionIndex] && (
+                      <div className="card-body">
+                        <p className="text-muted mb-3">{section.section_context}</p>
+                        
+                        {/* Subsections */}
+                        {section.subsections && section.subsections.length > 0 && (
+                          <div className="ms-3">
+                            <h6 className="text-secondary mb-2">Subsections:</h6>
+                            {section.subsections.map((subsection, subIndex) => (
+                              <div key={subIndex} className="mb-2 p-2 border-start border-primary ps-3">
+                                <strong>{subsection.subsection_title}</strong>
+                                <p className="text-muted small mb-0">{subsection.subsection_context}</p>
                               </div>
-                            )}
+                            ))}
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          ))}
-
-          <div className="mt-3">
-            {isEditing ? (
-              <button className="btn btn-success" onClick={handleSave}>Save Outline</button>
-            ) : (
-              <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>Edit Outline</button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
-
-            {saved && !isEditing && (
-              <>
-                <button className="btn btn-primary ms-2" onClick={generateQuestionsSequentially}>
-                  Generate Questions
-                </button>
-                {hasQuestions && (
-                  <button 
-                    className="btn btn-primary ms-2" 
-                    onClick={generateAllCitationsSequentially}
-                    disabled={generatingAllCitations}
-                  >
-                    {generatingAllCitations ? 'Generating Citations...' : 'Generate Citations'}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Context Input Modal */}
-      {showContextModal && (
-        <div className="modal-overlay" onClick={() => setShowContextModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h4>Additional Citation Search Context</h4>
-            <p><strong>Question:</strong> {currentAction.question}</p>
-            <textarea
-              className="form-control mb-2"
-              rows={3}
-              placeholder="Enter additional context for more targeted citations..."
-              value={contextInput}
-              onChange={(e) => setContextInput(e.target.value)}
-            />
-            {currentAction.append && (
-              <input
-                className="form-control mb-2"
-                type="number"
-                min={1}
-                max={10}
-                placeholder="Number of desired citations"
-                value={desiredCount}
-                onChange={(e) => setDesiredCount(parseInt(e.target.value, 10))}
-              />
-            )}
-            <button className="btn btn-primary" onClick={handleContextSubmit}>
-              Generate Citations
-            </button>
           </div>
         </div>
       )}
