@@ -26,12 +26,12 @@ class SectionGenerationResponse(BaseModel):
     sections: List[OutlineSection]
 
 class SubsectionGenerationRequest(BaseModel):
-    final_thesis: str
-    methodology: Dict[str, Any]
     section_title: str
     section_context: str
+    final_thesis: str
+    methodology: Dict[str, Any]
     paper_length_pages: int
-    source_categories: List[str]
+    source_categories: Optional[List[str]] = []
 
 class SubsectionGenerationResponse(BaseModel):
     subsections: List[OutlineSubsection]
@@ -55,7 +55,7 @@ class CitationGenerationRequest(BaseModel):
     subsection_title: str
     subsection_context: str
     question: str
-    source_categories: List[str]
+    source_categories: List[str] = []
     citation_count: int = 3
 
 class RecommendedSource(BaseModel):

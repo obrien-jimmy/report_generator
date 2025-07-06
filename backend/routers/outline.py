@@ -145,6 +145,11 @@ async def generate_subsections(request: SubsectionGenerationRequest):
         else:
             methodology_description = str(request.methodology)
         
+        # Handle source_categories if present
+        source_categories_str = ""
+        if hasattr(request, 'source_categories') and request.source_categories:
+            source_categories_str = f"Source Categories: {', '.join(request.source_categories)}"
+        
         prompt = f"""
         Generate 2-4 subsections for the section "{request.section_title}".
         
@@ -152,13 +157,16 @@ async def generate_subsections(request: SubsectionGenerationRequest):
         Thesis: "{request.final_thesis}"
         Methodology: {methodology_description}
         Paper Length: {request.paper_length_pages} pages
+        {source_categories_str}
         
-        Create subsections with titles and context descriptions.
+        Create subsections with titles and context descriptions that will help address the larger section's purpose.
+        Each subsection should connect to the methodology and support the thesis.
+        
         Format as JSON array:
         [
           {{
             "subsection_title": "Subsection Title",
-            "subsection_context": "Brief description of what this subsection covers"
+            "subsection_context": "Brief description of what this subsection covers and how it supports the section and thesis"
           }}
         ]
         
@@ -264,12 +272,18 @@ async def generate_questions(request: QuestionGenerationRequest):
 @router.post("/generate_question_citations", response_model=CitationGenerationResponse)
 async def generate_question_citations(request: CitationGenerationRequest):
     try:
+        # Debug logging
+        print(f"Received citation request: {request}")
+        
         # Extract methodology information
         methodology_description = ""
         if isinstance(request.methodology, dict):
             methodology_description = request.methodology.get('description', str(request.methodology))
         else:
             methodology_description = str(request.methodology)
+        
+        # Ensure source_categories is not None
+        source_categories = request.source_categories if request.source_categories else []
         
         prompt = f"""
         Generate {request.citation_count} recommended academic sources for the research question: "{request.question}"
@@ -280,7 +294,7 @@ async def generate_question_citations(request: CitationGenerationRequest):
         - Subsection Context: {request.subsection_context}
         - Thesis: "{request.final_thesis}"
         - Methodology: {methodology_description}
-        - Available Source Categories: {', '.join(request.source_categories)}
+        - Available Source Categories: {', '.join(source_categories)}
         
         For each source, provide:
         - APA citation
@@ -326,17 +340,18 @@ async def generate_question_citations(request: CitationGenerationRequest):
                 sources = [
                     RecommendedSource(
                         apa=f"Sample Author (2023). Research on {request.question}. Academic Journal.",
-                        categories=request.source_categories[:2] if request.source_categories else ['General'],
+                        categories=source_categories[:2] if source_categories else ['General'],
                         methodologyPoints=[methodology_description[:50] + "..." if len(methodology_description) > 50 else methodology_description],
                         description=f"Relevant source for researching: {request.question}"
                     )
                 ]
-        except:
+        except Exception as parse_error:
+            print(f"Error parsing JSON: {parse_error}")
             # Fallback sources
             sources = [
                 RecommendedSource(
                     apa=f"Sample Author (2023). Research on {request.question}. Academic Journal.",
-                    categories=request.source_categories[:2] if request.source_categories else ['General'],
+                    categories=source_categories[:2] if source_categories else ['General'],
                     methodologyPoints=[methodology_description[:50] + "..." if len(methodology_description) > 50 else methodology_description],
                     description=f"Relevant source for researching: {request.question}"
                 )
@@ -345,6 +360,7 @@ async def generate_question_citations(request: CitationGenerationRequest):
         return CitationGenerationResponse(recommended_sources=sources)
         
     except Exception as e:
+        print(f"Error in generate_question_citations: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating citations: {str(e)}")
 
 @router.post("/paper_structure", response_model=PaperStructureResponse)

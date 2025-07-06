@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaFileAlt, FaList, FaEye, FaEyeSlash, FaCheck, FaEdit } from 'react-icons/fa';
+import { FaFileAlt, FaList, FaEye, FaEyeSlash, FaCheck, FaEdit, FaQuestionCircle, FaBookOpen } from 'react-icons/fa';
+import CitationCards from './CitationCards';
 
 const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
   const [outline, setOutline] = useState([]);
@@ -17,6 +18,12 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [structureApproved, setStructureApproved] = useState(false);
   const [structureCollapsed, setStructureCollapsed] = useState(false);
 
+  // Question and Citation States
+  const [loadingQuestions, setLoadingQuestions] = useState({});
+  const [loadingCitations, setLoadingCitations] = useState({});
+  const [batchLoadingQuestions, setBatchLoadingQuestions] = useState(false);
+  const [batchLoadingCitations, setBatchLoadingCitations] = useState(false);
+
   // Auto-load paper structure when component mounts
   useEffect(() => {
     if (selectedPaperType?.id && methodology) {
@@ -29,7 +36,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     setStructureError(null);
     
     try {
-      // Extract methodology IDs from methodology object
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
       const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
 
@@ -70,11 +76,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                               paperLength === 'Adjusted Based on Thesis' ? -1 :
                               parseInt(paperLength, 10);
 
-      // Extract methodology IDs from methodology object
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
       const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
 
-      // Use structured outline generation
       const res = await axios.post('http://localhost:8000/generate_structured_outline', {
         final_thesis: finalThesis,
         paper_type: selectedPaperType?.id || 'research',
@@ -85,19 +89,19 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
         sub_methodology_id: subMethodologyId
       });
 
-      // Convert structured outline to expected format
       const sections = res.data.outline.map(section => ({
         section_title: section.section_title,
         section_context: section.section_context,
         subsections: [],
-        is_administrative: section.is_administrative || false
+        is_administrative: section.is_administrative || false,
+        questions: [],
+        citations: {}
       }));
 
       setOutline(sections);
       setHasGenerated(true);
       setSaved(true);
       
-      // Only generate subsections for non-administrative sections
       const contentSections = sections.filter(sec => !sec.is_administrative);
       await generateSubsectionsSequentially(contentSections);
 
@@ -121,29 +125,187 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
           final_thesis: finalThesis,
           methodology: methodology,
           paper_length_pages: safePaperLength,
-          source_categories: sourceCategories // Add this if needed
+          source_categories: sourceCategories
         };
-
-        console.log('Generating subsections for:', section.section_title);
-        console.log('Request payload:', requestPayload);
 
         const res = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
 
         setOutline(prevOutline => 
           prevOutline.map(outlineSection => 
             outlineSection.section_title === section.section_title
-              ? { ...outlineSection, subsections: res.data.subsections }
+              ? { 
+                  ...outlineSection, 
+                  subsections: res.data.subsections.map(sub => ({
+                    ...sub,
+                    questions: [],
+                    citations: {}
+                  }))
+                }
               : outlineSection
           )
         );
       } catch (err) {
         console.error(`Error generating subsections for ${section.section_title}:`, err);
-        console.error('Error details:', err.response?.data);
-        
-        // Continue with other sections even if one fails
         continue;
       }
     }
+  };
+
+  const generateQuestions = async (sectionIndex, subsectionIndex) => {
+    const section = outline[sectionIndex];
+    const subsection = section.subsections[subsectionIndex];
+    const questionKey = `${sectionIndex}-${subsectionIndex}`;
+
+    setLoadingQuestions(prev => ({ ...prev, [questionKey]: true }));
+
+    try {
+      const response = await axios.post('http://localhost:8000/generate_questions', {
+        section_title: section.section_title,
+        section_context: section.section_context,
+        subsection_title: subsection.subsection_title,
+        subsection_context: subsection.subsection_context,
+        final_thesis: finalThesis,
+        methodology: methodology
+      });
+
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => 
+          secIdx === sectionIndex 
+            ? {
+                ...outlineSection,
+                subsections: outlineSection.subsections.map((sub, subIdx) =>
+                  subIdx === subsectionIndex
+                    ? { ...sub, questions: response.data.questions }
+                    : sub
+                )
+              }
+            : outlineSection
+        )
+      );
+    } catch (err) {
+      console.error('Error generating questions:', err);
+    }
+
+    setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
+  };
+
+  const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
+    const section = outline[sectionIndex];
+    const subsection = section.subsections[subsectionIndex];
+    const question = subsection.questions[questionIndex];
+    const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+
+    setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
+
+    const requestPayload = {
+      final_thesis: finalThesis,
+      methodology: methodology,
+      section_title: section.section_title,
+      section_context: section.section_context,
+      subsection_title: subsection.subsection_title,
+      subsection_context: subsection.subsection_context,
+      question: question,
+      source_categories: sourceCategories || [],
+      citation_count: 3
+    };
+
+    try {
+      const response = await axios.post('http://localhost:8000/generate_question_citations', requestPayload);
+
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => 
+          secIdx === sectionIndex 
+            ? {
+                ...outlineSection,
+                subsections: outlineSection.subsections.map((sub, subIdx) =>
+                  subIdx === subsectionIndex
+                    ? { 
+                        ...sub, 
+                        citations: {
+                          ...sub.citations,
+                          [questionIndex]: response.data.recommended_sources
+                        }
+                      }
+                    : sub
+                )
+              }
+            : outlineSection
+        )
+      );
+    } catch (err) {
+      console.error('Error generating citations:', err);
+    }
+
+    setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
+  };
+
+  // NEW: Batch generate all questions
+  const generateAllQuestions = async () => {
+    setBatchLoadingQuestions(true);
+    
+    for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
+      const section = outline[sectionIndex];
+      
+      // Skip administrative sections
+      if (section.is_administrative) continue;
+      
+      for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
+        const subsection = section.subsections[subsectionIndex];
+        
+        // Skip if questions already exist
+        if (subsection.questions && subsection.questions.length > 0) continue;
+        
+        await generateQuestions(sectionIndex, subsectionIndex);
+      }
+    }
+    
+    setBatchLoadingQuestions(false);
+  };
+
+  // NEW: Batch generate all citations
+  const generateAllCitations = async () => {
+    setBatchLoadingCitations(true);
+    
+    for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
+      const section = outline[sectionIndex];
+      
+      // Skip administrative sections
+      if (section.is_administrative) continue;
+      
+      for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
+        const subsection = section.subsections[subsectionIndex];
+        
+        // Skip if no questions exist
+        if (!subsection.questions || subsection.questions.length === 0) continue;
+        
+        for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
+          // Skip if citations already exist
+          if (subsection.citations && subsection.citations[questionIndex]) continue;
+          
+          await generateCitations(sectionIndex, subsectionIndex, questionIndex);
+        }
+      }
+    }
+    
+    setBatchLoadingCitations(false);
+  };
+
+  // Helper functions to check if batch operations are available
+  const hasQuestionsToGenerate = () => {
+    return outline.some(section => 
+      !section.is_administrative && 
+      section.subsections.some(sub => !sub.questions || sub.questions.length === 0)
+    );
+  };
+
+  const hasCitationsToGenerate = () => {
+    return outline.some(section => 
+      !section.is_administrative && 
+      section.subsections.some(sub => 
+        sub.questions && sub.questions.length > 0 && 
+        sub.questions.some((_, qIndex) => !sub.citations || !sub.citations[qIndex])
+      )
+    );
   };
 
   const toggleStructureCollapse = () => setStructureCollapsed(prev => !prev);
@@ -214,7 +376,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
         
         {!structureCollapsed && (
           <div className="card-body">
-            {/* Structure Info */}
             <div className="row mb-3">
               <div className="col-md-4">
                 <small className="text-muted">
@@ -233,7 +394,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
               </div>
             </div>
 
-            {/* Structure List */}
             <div className="mb-3">
               <h6 className="text-primary mb-2">
                 <FaList className="me-2" />
@@ -256,7 +416,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
               </div>
             </div>
 
-            {/* Methodology Integration Notice */}
             {structureData.has_methodology_sections && (
               <div className="alert alert-success">
                 <small>
@@ -266,7 +425,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="d-flex gap-2 mt-3">
               {!structureApproved ? (
                 <>
@@ -305,10 +463,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     <div className="mb-4">
       <h4>Research Outline Generator</h4>
       
-      {/* Paper Structure Preview - Always show first */}
       <PaperStructurePreview />
 
-      {/* Outline Generation Section - Only show after structure is approved */}
       {structureApproved && (
         <div className="card">
           <div className="card-header">
@@ -337,7 +493,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
               </div>
             )}
 
-            {/* Outline Display */}
             {hasGenerated && outline.length > 0 && (
               <div className="mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-3">
@@ -390,9 +545,62 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                           <div className="ms-3">
                             <h6 className="text-secondary mb-2">Subsections:</h6>
                             {section.subsections.map((subsection, subIndex) => (
-                              <div key={subIndex} className="mb-2 p-2 border-start border-primary ps-3">
-                                <strong>{subsection.subsection_title}</strong>
-                                <p className="text-muted small mb-0">{subsection.subsection_context}</p>
+                              <div key={subIndex} className="mb-4 p-3 border-start border-primary ps-3">
+                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                  <div className="flex-grow-1">
+                                    <div className="d-flex align-items-center mb-2">
+                                      <strong className="me-2">{subsection.subsection_title}</strong>
+                                      {/* Question generation icon */}
+                                      <button
+                                        className="btn btn-sm p-1 text-info"
+                                        onClick={() => generateQuestions(sectionIndex, subIndex)}
+                                        disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
+                                        style={{ border: 'none', background: 'transparent' }}
+                                        title="Generate questions for this subsection"
+                                      >
+                                        <FaQuestionCircle 
+                                          className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
+                                        />
+                                      </button>
+                                    </div>
+                                    <p className="text-muted small mb-2">{subsection.subsection_context}</p>
+                                  </div>
+                                </div>
+
+                                {subsection.questions && subsection.questions.length > 0 && (
+                                  <div className="mt-3">
+                                    <h6 className="text-info mb-2">
+                                      Research Questions:
+                                    </h6>
+                                    {subsection.questions.map((question, questionIndex) => (
+                                      <div key={questionIndex} className="mb-3 p-2 bg-light rounded">
+                                        <div className="d-flex justify-content-between align-items-start mb-2">
+                                          <p className="mb-0 small flex-grow-1">
+                                            <strong>Q{questionIndex + 1}:</strong> {question}
+                                          </p>
+                                          {/* Citation generation icon */}
+                                          <button
+                                            className="btn btn-sm p-1 text-info ms-2"
+                                            onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
+                                            disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
+                                            style={{ border: 'none', background: 'transparent' }}
+                                            title="Generate citations for this question"
+                                          >
+                                            <FaBookOpen 
+                                              className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
+                                            />
+                                          </button>
+                                        </div>
+
+                                        {subsection.citations && subsection.citations[questionIndex] && (
+                                          <div className="mt-2">
+                                            <CitationCards citations={subsection.citations[questionIndex]} />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -401,6 +609,37 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                     )}
                   </div>
                 ))}
+
+                {/* Batch Generation Controls */}
+                <div className="mt-4 p-3 bg-light rounded">
+                  <h6 className="mb-3">Batch Generation</h6>
+                  <div className="d-flex gap-2">
+                    {hasQuestionsToGenerate() && (
+                      <button 
+                        className="btn btn-info"
+                        onClick={generateAllQuestions}
+                        disabled={batchLoadingQuestions}
+                      >
+                        <FaQuestionCircle className="me-1" />
+                        {batchLoadingQuestions ? 'Generating All Questions...' : 'Generate All Questions'}
+                      </button>
+                    )}
+                    
+                    {hasCitationsToGenerate() && (
+                      <button 
+                        className="btn btn-info"
+                        onClick={generateAllCitations}
+                        disabled={batchLoadingCitations}
+                      >
+                        <FaBookOpen className="me-1" />
+                        {batchLoadingCitations ? 'Generating All Citations...' : 'Generate All Citations'}
+                      </button>
+                    )}
+                  </div>
+                  <small className="text-muted mt-2 d-block">
+                    Use batch generation to automatically populate questions and citations for all subsections.
+                  </small>
+                </div>
               </div>
             )}
           </div>
