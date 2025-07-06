@@ -14,7 +14,14 @@ from schemas.outline import (
     OutlineSubsection,
     RecommendedSource
 )
+from schemas.structure import (
+    PaperStructureRequest,
+    PaperStructureResponse,
+    StructuredOutlineRequest,
+    StructuredOutlineResponse
+)
 from services.bedrock_service import invoke_bedrock
+from services.paper_structure_service import PaperStructureService
 import json
 import re
 
@@ -339,3 +346,83 @@ async def generate_question_citations(request: CitationGenerationRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating citations: {str(e)}")
+
+@router.post("/paper_structure", response_model=PaperStructureResponse)
+async def get_paper_structure(request: PaperStructureRequest):
+    """Get the structured outline for a paper type and methodology combination."""
+    try:
+        structure_data = PaperStructureService.get_structure_preview(
+            request.paper_type,
+            request.methodology_id,
+            request.sub_methodology_id
+        )
+        
+        return PaperStructureResponse(**structure_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating paper structure: {str(e)}")
+
+@router.post("/generate_structured_outline", response_model=StructuredOutlineResponse)
+async def generate_structured_outline(request: StructuredOutlineRequest):
+    """Generate a structured outline based on paper type and methodology."""
+    try:
+        # Get the structured outline
+        structure_preview = PaperStructureService.get_structure_preview(
+            request.paper_type,
+            request.methodology_id,
+            request.sub_methodology_id
+        )
+        
+        # Generate sections based on structure
+        structure_sections = structure_preview["structure"]
+        
+        # Extract methodology information
+        methodology_description = ""
+        if isinstance(request.methodology, dict):
+            methodology_description = request.methodology.get('description', str(request.methodology))
+        else:
+            methodology_description = str(request.methodology)
+        
+        # Generate contextual sections
+        outline_sections = []
+        for section_title in structure_sections:
+            # Skip administrative sections
+            if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)']:
+                outline_sections.append({
+                    "section_title": section_title,
+                    "section_context": f"Standard {section_title.lower()} section",
+                    "subsections": [],
+                    "is_administrative": True
+                })
+                continue
+            
+            # Generate contextual description for content sections
+            context_prompt = f"""
+            Generate a brief context description for the section "{section_title}" in a {request.paper_type} paper.
+            
+            Thesis: "{request.final_thesis}"
+            Methodology: {methodology_description}
+            
+            Provide a 1-2 sentence description of what this section should cover.
+            Return only the description, no additional text.
+            """
+            
+            try:
+                context_response = invoke_bedrock(context_prompt)
+                section_context = context_response.strip()
+            except:
+                section_context = f"Analysis and discussion relevant to {section_title.lower()}"
+            
+            outline_sections.append({
+                "section_title": section_title,
+                "section_context": section_context,
+                "subsections": [],
+                "is_administrative": False
+            })
+        
+        return StructuredOutlineResponse(
+            outline=outline_sections,
+            structure_preview=structure_preview
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating structured outline: {str(e)}")

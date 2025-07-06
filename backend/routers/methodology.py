@@ -18,66 +18,56 @@ router = APIRouter()
 async def get_methodology_options():
     methodologies = [
         MethodologyOption(
-            id="literature_review",
-            name="Literature-Based Review",
-            description="An approach that systematically collects, reads, appraises, and synthesizes existing scholarship (e.g., peer-reviewed articles, books, reports) to summarize the state of knowledge on a specific question or topic.",
-            sub_methodologies=[
-                MethodologyOption(id="narrative_review", name="Narrative (Traditional) Review", description="Broad, unsystematic overview of a topic, often organized thematically or chronologically."),
-                MethodologyOption(id="systematized_review", name="Systematized Review", description="Incorporates some systematic-review steps (e.g., structured search) but without full appraisal and synthesis."),
-                MethodologyOption(id="systematic_review", name="Systematic Review", description="Fully protocolled process of search, appraisal, and synthesis."),
-                MethodologyOption(id="scoping_review", name="Scoping Review", description="Maps key concepts and gaps without formal quality assessment."),
-                MethodologyOption(id="rapid_review", name="Rapid Review", description="Streamlined methods for quicker turnaround."),
-                MethodologyOption(id="umbrella_review", name="Umbrella Review", description="Synthesizes findings from multiple systematic reviews."),
-                MethodologyOption(id="integrative_review", name="Integrative Review", description="Combines experimental and non-experimental studies for holistic insight."),
-                MethodologyOption(id="critical_review", name="Critical Review", description="Evaluates methodological rigor and theoretical contributions."),
-                MethodologyOption(id="evidence_mapping", name="Evidence Mapping (Mapping Review)", description="Visual/tabular mapping of study characteristics and research clusters."),
-                MethodologyOption(id="meta_analysis", name="Meta-Analysis", description="Statistical pooling of quantitative effect sizes across studies."),
-                MethodologyOption(id="meta_synthesis", name="Meta-Synthesis", description="Aggregates qualitative findings into higher-order interpretations."),
-                MethodologyOption(id="state_of_art", name="State-of-the-Art Review", description="Focuses on the very latest developments and frontiers in a field."),
-                MethodologyOption(id="state_of_science", name="State-of-the-Science Review", description="Assesses the current level of empirical evidence on a topic."),
-                MethodologyOption(id="conceptual_review", name="Conceptual Review", description="Clarifies and refines key concepts, definitions, and theoretical frameworks."),
-                MethodologyOption(id="theoretical_review", name="Theoretical Review", description="Critically examines and compares existing theories and models.")
-            ]
-        ),
-        MethodologyOption(
             id="quantitative",
             name="Quantitative Analysis",
-            description="An approach focused on measuring and analyzing variables numerically to test hypotheses and estimate relationships or effects. It relies on structured instruments and statistical procedures to produce generalizable findings.",
+            description="An approach focused on measuring and analyzing variables numerically to test hypotheses and estimate relationships or effects. Best suited for data-rich research with statistical analysis needs.",
+            rank=1,
             sub_methodologies=[
-                MethodologyOption(id="experimental", name="Experimental & Quasi-Experimental Designs", description="Randomized controlled trials, true experiments, and quasi-experiments with control groups."),
-                MethodologyOption(id="survey_observational", name="Survey & Observational Designs", description="Cross-sectional surveys, longitudinal studies, cohort studies, and case-control studies."),
-                MethodologyOption(id="descriptive_correlational", name="Descriptive & Correlational Designs", description="Descriptive research, correlational studies, and exploratory data analysis."),
-                MethodologyOption(id="statistical_techniques", name="Core Statistical Techniques", description="Descriptive statistics, inferential statistics, hypothesis testing, and ANOVA."),
-                MethodologyOption(id="regression_models", name="Regression & Generalized Models", description="Linear regression, logistic regression, and generalized linear models."),
-                MethodologyOption(id="multivariate", name="Multivariate & Latent-Variable Techniques", description="Factor analysis, cluster analysis, structural equation modeling, and multilevel modeling."),
-                MethodologyOption(id="time_series", name="Time-Series & Longitudinal Analysis", description="ARIMA models, growth curve modeling, and longitudinal data analysis."),
-                MethodologyOption(id="survival_analysis", name="Survival & Event-History Analysis", description="Kaplan-Meier estimation, Cox proportional hazards, and parametric survival models."),
-                MethodologyOption(id="meta_analysis_quant", name="Meta-Analysis & Meta-Regression", description="Effect-size computation, forest plots, and meta-regression analysis."),
-                MethodologyOption(id="bayesian", name="Bayesian & Simulation Methods", description="Bayesian inference, Monte Carlo simulation, and bootstrapping methods."),
-                MethodologyOption(id="econometric", name="Econometric Techniques", description="Instrumental variables, difference-in-differences, and panel data models."),
-                MethodologyOption(id="bibliometric", name="Bibliometric & Network Analysis", description="Citation analysis, co-authorship networks, and keyword co-occurrence mapping.")
+                MethodologyOption(id="statistical_techniques", name="Core Statistical Techniques", description="Descriptive and inferential statistics, hypothesis testing, and ANOVA. Limited by available quantitative data sources.", rank=1),
+                MethodologyOption(id="regression_models", name="Regression & Generalized Models", description="Linear regression, logistic regression, and generalized linear models. Requires structured datasets.", rank=2),
+                MethodologyOption(id="descriptive_correlational", name="Descriptive & Correlational Designs", description="Descriptive research, correlational studies, and exploratory data analysis using available data sources.", rank=3),
+                MethodologyOption(id="meta_analysis_quant", name="Meta-Analysis & Meta-Regression", description="Effect-size computation and meta-regression analysis from published studies. Good RAG compatibility.", rank=4),
+                MethodologyOption(id="bibliometric", name="Bibliometric & Network Analysis", description="Citation analysis, co-authorship networks, and keyword co-occurrence mapping from literature databases.", rank=5)
             ]
         ),
         MethodologyOption(
             id="qualitative",
             name="Qualitative Analysis",
-            description="An approach centered on understanding meanings, experiences, and social contexts by collecting and interpreting non-numeric data through methods such as thematic analysis, grounded theory, and ethnography.",
+            description="An approach centered on understanding meanings, experiences, and social contexts through systematic analysis of textual and documentary sources.",
+            rank=2,
             sub_methodologies=[
-                MethodologyOption(id="qual_synthesis", name="Qualitative Evidence Synthesis Methods", description="Meta-synthesis, meta-ethnography, and critical interpretive synthesis."),
-                MethodologyOption(id="qual_review", name="Review Designs & Typologies", description="Qualitative systematic reviews, scoping reviews, and integrative reviews."),
-                MethodologyOption(id="conceptual_theoretical", name="Conceptual & Theoretical Reviews", description="Conceptual reviews, theoretical reviews, and state-of-the-art assessments.")
+                MethodologyOption(id="thematic_analysis", name="Thematic Analysis", description="Identifying, analyzing, and reporting patterns (themes) within qualitative data sources. Excellent RAG compatibility.", rank=1),
+                MethodologyOption(id="content_analysis", name="Content Analysis", description="Systematic coding and categorization of textual data to quantify patterns and interpret context. Perfect for RAG/LLM analysis.", rank=2),
+                MethodologyOption(id="case_study", name="Case Study", description="In-depth exploration of specific cases using documents, reports, and archival materials to build comprehensive understanding.", rank=3),
+                MethodologyOption(id="discourse_analysis", name="Discourse Analysis", description="Study of language use and communication practices through systematic analysis of texts and documents.", rank=4),
+                MethodologyOption(id="narrative_analysis", name="Narrative Analysis", description="Examination of how narratives are constructed in documents, reports, and communications.", rank=5),
+                MethodologyOption(id="archival_analysis", name="Document & Archival Analysis", description="Analysis of historical records, official documents, and archival materials. Excellent for RAG-based research.", rank=6)
+            ]
+        ),
+        MethodologyOption(
+            id="literature_review",
+            name="Literature-Based Review",
+            description="A systematic approach to collecting, analyzing, and synthesizing existing scholarship. Perfectly suited for RAG/LLM-based research and comprehensive source analysis.",
+            rank=3,
+            sub_methodologies=[
+                MethodologyOption(id="systematic_review", name="Systematic Review", description="Fully protocolled process of search, appraisal, and synthesis. Excellent for comprehensive RAG-based analysis.", rank=1),
+                MethodologyOption(id="narrative_review", name="Narrative (Traditional) Review", description="Broad overview of a topic, organized thematically or chronologically. Perfect RAG compatibility.", rank=2),
+                MethodologyOption(id="scoping_review", name="Scoping Review", description="Maps key concepts and gaps without formal quality assessment. Ideal for exploratory RAG research.", rank=3),
+                MethodologyOption(id="integrative_review", name="Integrative Review", description="Combines diverse study types for holistic insight. Excellent for mixed-source RAG analysis.", rank=4),
+                MethodologyOption(id="critical_review", name="Critical Review", description="Evaluates methodological rigor and theoretical contributions through systematic source analysis.", rank=5),
+                MethodologyOption(id="conceptual_review", name="Conceptual Review", description="Clarifies and refines key concepts, definitions, and theoretical frameworks from literature sources.", rank=6),
+                MethodologyOption(id="meta_synthesis", name="Meta-Synthesis", description="Aggregates qualitative findings into higher-order interpretations through systematic literature analysis.", rank=7)
             ]
         ),
         MethodologyOption(
             id="mixed_methods",
             name="Mixed Methods",
-            description="An integrative approach that deliberately combines both qualitative and quantitative strategies within a single study to capitalize on their complementary strengths.",
+            description="An integrative approach that combines multiple analytical strategies to provide comprehensive analysis through diverse source types and analytical techniques.",
+            rank=4,
             sub_methodologies=[
-                MethodologyOption(id="sequential_concurrent", name="Core Sequential & Concurrent Designs", description="Convergent parallel, explanatory sequential, and exploratory sequential designs."),
-                MethodologyOption(id="embedded_multiphase", name="Embedded & Multiphase Designs", description="Complex, programmatic approaches for multi-stage or nested integration."),
-                MethodologyOption(id="transformative", name="Transformative & Pragmatic Designs", description="Social-justice frameworks and pragmatic 'what works' approaches."),
-                MethodologyOption(id="participatory", name="Participatory, Action & Evaluation Hybrids", description="Community engagement and immediate practice change focus."),
-                MethodologyOption(id="specialized", name="Specialized & Emerging Mixed Designs", description="Instrument development, case-study mixed methods, and multilevel approaches.")
+                MethodologyOption(id="sequential_concurrent", name="Sequential & Concurrent Analysis", description="Combines literature review with quantitative data analysis in structured phases. Good RAG compatibility.", rank=1),
+                MethodologyOption(id="case_study_mixed", name="Case-Study Mixed Methods", description="Combines qualitative document analysis with available quantitative measures within case studies.", rank=2),
+                MethodologyOption(id="mixed_methods_systematic_review", name="Mixed-Methods Systematic Review", description="Systematic review incorporating both quantitative and qualitative syntheses. Excellent RAG compatibility.", rank=3)
             ]
         )
     ]

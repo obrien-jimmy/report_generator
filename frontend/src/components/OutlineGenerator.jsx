@@ -3,7 +3,7 @@ import axios from 'axios';
 import CitationCards from './CitationCards';
 import { FaSyncAlt, FaPlusCircle, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 
-const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories }) => {
+const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -47,19 +47,42 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                               paperLength === 'Adjusted Based on Thesis' ? -1 :
                               parseInt(paperLength, 10);
 
-      const res = await axios.post('http://localhost:8000/generate_sections', {
+      // Extract methodology IDs from methodology object
+      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
+      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
+
+      // Use structured outline generation
+      const res = await axios.post('http://localhost:8000/generate_structured_outline', {
         final_thesis: finalThesis,
+        paper_type: selectedPaperType?.id || 'research', // Use selected paper type
         methodology,
         paper_length_pages: safePaperLength,
         source_categories: sourceCategories,
+        methodology_id: methodologyId,
+        sub_methodology_id: subMethodologyId
       });
 
-      setOutline(res.data.sections.map(sec => ({ ...sec, subsections: [] })));
+      // Convert structured outline to expected format
+      const sections = res.data.outline.map(section => ({
+        section_title: section.section_title,
+        section_context: section.section_context,
+        subsections: [],
+        is_administrative: section.is_administrative || false
+      }));
+
+      setOutline(sections);
       setHasGenerated(true);
       setIsEditing(false);
       setSaved(true);
       
-      await generateSubsectionsSequentially(res.data.sections);
+      // Show structure preview info
+      if (res.data.structure_preview) {
+        console.log('Generated structure:', res.data.structure_preview);
+      }
+      
+      // Only generate subsections for non-administrative sections
+      const contentSections = sections.filter(sec => !sec.is_administrative);
+      await generateSubsectionsSequentially(contentSections);
 
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to generate outline.');
