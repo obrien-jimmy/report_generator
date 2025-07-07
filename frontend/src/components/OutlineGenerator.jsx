@@ -5,7 +5,15 @@ import CitationViewer from './CitationViewer';
 import './CitationViewer.css';
 import PaperStructurePreview from './PaperStructurePreview';
 
-const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
+const OutlineGenerator = ({ 
+  finalThesis, 
+  methodology, 
+  paperLength, 
+  sourceCategories, 
+  selectedPaperType, 
+  onFrameworkComplete, 
+  onTransferToOutlineDraft 
+}) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -199,9 +207,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     try {
       const response = await axios.post('http://localhost:8000/generate_questions', {
         section_title: section.section_title,
-        section_context: section.section_context,
+        section_context: section.section_context,  // ✓ Already passing section context
         subsection_title: subsection.subsection_title,
-        subsection_context: subsection.subsection_context,
+        subsection_context: subsection.subsection_context,  // ✓ Already passing subsection context
         final_thesis: finalThesis,
         methodology: methodology
       });
@@ -239,9 +247,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
       final_thesis: finalThesis,
       methodology: methodology,
       section_title: section.section_title,
-      section_context: section.section_context,
+      section_context: section.section_context,  // ✓ Already passing section context
       subsection_title: subsection.subsection_title,
-      subsection_context: subsection.subsection_context,
+      subsection_context: subsection.subsection_context,  // ✓ Already passing subsection context
       question: question,
       source_categories: sourceCategories || [],
       citation_count: 3
@@ -272,6 +280,11 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
       );
     } catch (err) {
       console.error('Error generating citations:', err);
+      
+      // Handle rate limit errors gracefully
+      if (err.response?.status === 429 || err.message?.includes('rate limit')) {
+        console.log('Rate limit detected for citations generation');
+      }
     }
 
     setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
@@ -344,6 +357,13 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
         sub.questions.some((_, qIndex) => !sub.citations || !sub.citations[qIndex])
       )
     );
+  };
+
+  // Add this function to handle framework completion
+  const handleFrameworkComplete = () => {
+    if (onFrameworkComplete) {
+      onFrameworkComplete(outline);
+    }
   };
 
   return (
@@ -617,6 +637,23 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                         Use batch generation to automatically populate questions and citations for all subsections.
                       </small>
                     </div>
+
+                    {/* Framework Completion */}
+                    {outline.length > 0 && (
+                      <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
+                        <h6 className="text-success mb-3">Framework Complete</h6>
+                        <p className="mb-3">Your outline framework is ready. Transfer it to the Outline Draft to begin generating responses.</p>
+                        <button 
+                          className="btn btn-success"
+                          onClick={() => {
+                            handleFrameworkComplete();
+                            onTransferToOutlineDraft();
+                          }}
+                        >
+                          Transfer to Outline Draft
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
