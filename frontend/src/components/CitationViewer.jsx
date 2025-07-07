@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaPlus, FaTrash } from 'react-icons/fa';
+import axios from 'axios';
 
 const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    source: '',
+    year: '',
+    author: ''
+  });
+  const [isSearching, setIsSearching] = useState(false);
 
   const toggleExpanded = () => setExpanded(!expanded);
 
@@ -22,10 +31,150 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
     closeCitationDetails();
   };
 
+  const handleAddCitation = () => {
+    setShowAddForm(true);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const submitForm = async (e) => {
+    e.preventDefault();
+    setIsSearching(true);
+
+    try {
+      const response = await axios.post('http://localhost:8000/identify_citation', formData);
+      
+      const identifiedCitation = response.data.citation;
+      const newCitation = {
+        apa: identifiedCitation.apa,
+        categories: identifiedCitation.categories,
+        methodologyPoints: identifiedCitation.methodologyPoints,
+        description: identifiedCitation.description,
+      };
+
+      // Add the new citation using the parent's callback
+      if (onAddCitation) {
+        onAddCitation(newCitation);
+      }
+
+      // Reset form and close modal
+      setFormData({ title: '', source: '', year: '', author: '' });
+      setShowAddForm(false);
+    } catch (err) {
+      console.error('Error identifying citation:', err);
+      alert(err.response?.data?.detail || err.message || 'Failed to identify citation.');
+    }
+    setIsSearching(false);
+  };
+
+  const closeAddForm = () => {
+    setShowAddForm(false);
+    setFormData({ title: '', source: '', year: '', author: '' });
+  };
+
   if (!citations || citations.length === 0) {
     return (
       <div className="citation-viewer">
-        <div className="text-muted small">No citations generated yet</div>
+        <div className="citation-summary d-flex justify-content-between align-items-center p-2 bg-light rounded">
+          <div className="text-muted small">No citations generated yet</div>
+          <button 
+            className="btn btn-sm btn-outline-primary"
+            onClick={handleAddCitation}
+            title="Add custom citation"
+          >
+            <FaPlus />
+          </button>
+        </div>
+
+        {/* Add Citation Form Modal */}
+        {showAddForm && (
+          <div className="modal-overlay" onClick={closeAddForm}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header d-flex justify-content-between align-items-center mb-3">
+                <h5 className="mb-0">Search for Citation</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={closeAddForm}
+                  aria-label="Close"
+                ></button>
+              </div>
+              
+              <form onSubmit={submitForm}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Title</label>
+                    <input 
+                      type="text"
+                      className="form-control" 
+                      name="title" 
+                      value={formData.title} 
+                      onChange={handleFormChange}
+                      placeholder="Enter the title of the work"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Source/Publication</label>
+                    <input 
+                      type="text"
+                      className="form-control" 
+                      name="source" 
+                      value={formData.source} 
+                      onChange={handleFormChange}
+                      placeholder="Journal, book, website, etc."
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Year</label>
+                    <input 
+                      type="text"
+                      className="form-control" 
+                      name="year" 
+                      value={formData.year} 
+                      onChange={handleFormChange}
+                      placeholder="Publication year"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Author</label>
+                    <input 
+                      type="text"
+                      className="form-control" 
+                      name="author" 
+                      value={formData.author} 
+                      onChange={handleFormChange}
+                      placeholder="Author name(s)"
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={closeAddForm}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isSearching}
+                  >
+                    {isSearching ? 'Searching...' : 'Search for Citation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -41,15 +190,13 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
           </span>
         </div>
         <div className="d-flex gap-2">
-          {onAddCitation && (
-            <button 
-              className="btn btn-sm btn-outline-primary"
-              onClick={onAddCitation}
-              title="Add custom citation"
-            >
-              <FaPlus />
-            </button>
-          )}
+          <button 
+            className="btn btn-sm btn-outline-primary"
+            onClick={handleAddCitation}
+            title="Add custom citation"
+          >
+            <FaPlus />
+          </button>
           <button 
             className="btn btn-sm btn-outline-secondary"
             onClick={toggleExpanded}
@@ -71,7 +218,6 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
                     <div className="citation-apa small">
                       {citation.apa}
                     </div>
-                    {/* Remove categories display from preview */}
                   </div>
                   <div className="citation-actions">
                     <button
@@ -162,6 +308,90 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Citation Form Modal */}
+      {showAddForm && (
+        <div className="modal-overlay" onClick={closeAddForm}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Search for Citation</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closeAddForm}
+                aria-label="Close"
+              ></button>
+            </div>
+            
+            <form onSubmit={submitForm}>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Title</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    name="title" 
+                    value={formData.title} 
+                    onChange={handleFormChange}
+                    placeholder="Enter the title of the work"
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Source/Publication</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    name="source" 
+                    value={formData.source} 
+                    onChange={handleFormChange}
+                    placeholder="Journal, book, website, etc."
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Year</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    name="year" 
+                    value={formData.year} 
+                    onChange={handleFormChange}
+                    placeholder="Publication year"
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Author</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    name="author" 
+                    value={formData.author} 
+                    onChange={handleFormChange}
+                    placeholder="Author name(s)"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeAddForm}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSearching}
+                >
+                  {isSearching ? 'Searching...' : 'Search for Citation'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -38,9 +38,33 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     setStructureApproved(false);
   };
 
-  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex) => {
-    // Placeholder for add citation functionality
-    console.log('Add citation for:', sectionIndex, subsectionIndex, questionIndex);
+  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex, newCitation) => {
+    if (newCitation) {
+      // Add a new citation that was created through the form
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => 
+          secIdx === sectionIndex 
+            ? {
+                ...outlineSection,
+                subsections: outlineSection.subsections.map((sub, subIdx) =>
+                  subIdx === subsectionIndex
+                    ? { 
+                        ...sub, 
+                        citations: {
+                          ...sub.citations,
+                          [questionIndex]: [...(sub.citations[questionIndex] || []), newCitation]
+                        }
+                      }
+                    : sub
+                )
+              }
+            : outlineSection
+        )
+      );
+    } else {
+      // Placeholder for other add citation functionality
+      console.log('Add citation for:', sectionIndex, subsectionIndex, questionIndex);
+    }
   };
 
   const handleRemoveCitation = (sectionIndex, subsectionIndex, questionIndex, citationIndex) => {
@@ -543,7 +567,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                                             {/* Citation Viewer */}
                                             <CitationViewer
                                               citations={subsection.citations?.[questionIndex] || []}
-                                              onAddCitation={() => handleAddCitation(sectionIndex, subIndex, questionIndex)}
+                                              onAddCitation={(newCitation) => handleAddCitation(sectionIndex, subIndex, questionIndex, newCitation)}
                                               onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
                                             />
                                           </div>
