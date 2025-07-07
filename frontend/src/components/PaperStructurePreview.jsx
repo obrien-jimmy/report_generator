@@ -41,11 +41,25 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
     setError(null);
     
     try {
+      // Get the actual methodology ID to send
+      const methodologyId = methodology?.methodologyType || methodology?.methodology_type || methodology;
+      const subMethodologyId = subMethodology?.subMethodology || subMethodology?.sub_methodology || subMethodology;
+      
+      console.log('Sending to backend:');
+      console.log('- Paper Type:', paperType.id);
+      console.log('- Methodology ID:', methodologyId);
+      console.log('- Sub-methodology ID:', subMethodologyId);
+      console.log('- Original methodology object:', methodology);
+      
       const response = await axios.post('http://localhost:8000/paper_structure', {
         paper_type: paperType.id,
-        methodology_id: methodology,
-        sub_methodology_id: subMethodology
+        methodology_id: methodologyId,
+        sub_methodology_id: subMethodologyId
       });
+      
+      // Debug logging
+      console.log('Structure response:', response.data);
+      console.log('Has methodology sections:', response.data.has_methodology_sections);
       
       setStructureData(response.data);
       initializeEditableStructure(response.data);
@@ -59,29 +73,37 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
   const initializeEditableStructure = (data) => {
     const sections = data.structure.map((section, index) => {
       const isAdmin = ['Title Page', 'Abstract', 'References (APA 7th)'].includes(section);
-      const isMethodology = data.has_methodology_sections && 
-                           !isAdmin && 
-                           !section.includes('Introduction') && 
-                           !section.includes('Conclusion');
       
       // Determine section type for tagging
-      const isIntro = section.includes('Introduction') && !isMethodology;
-      const isSummary = section.includes('Conclusion') || section.includes('Summary');
+      const isIntro = section.toLowerCase().includes('introduction');
+      const isSummary = section.toLowerCase().includes('conclusion') || section.toLowerCase().includes('summary');
+      
+      // TEMPORARY: Force methodology sections to appear for debugging
+      console.log('Section:', section);
+      console.log('- isAdmin:', isAdmin);
+      console.log('- isIntro:', isIntro);
+      console.log('- isSummary:', isSummary);
+      console.log('- data.has_methodology_sections:', data.has_methodology_sections);
+      
+      // Force methodology detection for debugging - all non-admin, non-intro, non-summary sections
+      const isMethodology = !isAdmin && !isIntro && !isSummary;
+      console.log('- Final isMethodology:', isMethodology);
       
       // Calculate default percentage allocation
       let defaultPercentage = 10;
       if (isAdmin) {
         defaultPercentage = 0; // Admin sections don't count toward percentage
-      } else if (section.includes('Introduction')) {
+      } else if (isIntro) {
         defaultPercentage = 15;
-      } else if (section.includes('Conclusion')) {
+      } else if (isSummary) {
         defaultPercentage = 10;
       } else {
         // Distribute remaining percentage among content sections
         const contentSections = data.structure.filter(s => 
           !['Title Page', 'Abstract', 'References (APA 7th)'].includes(s) &&
-          !s.includes('Introduction') && 
-          !s.includes('Conclusion')
+          !s.toLowerCase().includes('introduction') && 
+          !s.toLowerCase().includes('conclusion') &&
+          !s.toLowerCase().includes('summary')
         ).length;
         const remainingPercentage = 100 - 25; // 25% for intro/conclusion
         defaultPercentage = Math.round(remainingPercentage / contentSections);
@@ -92,15 +114,16 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
         title: section,
         context: '',
         percentage: defaultPercentage,
-        pages: isAdmin ? 0 : Math.ceil((defaultPercentage / 100) * totalPages) || 1, // Ensure at least 1 page for non-admin sections
+        pages: isAdmin ? 0 : Math.ceil((defaultPercentage / 100) * totalPages) || 1,
         isAdmin,
-        isMethodology,
+        isMethodology, // Using the correctly defined variable
         isIntro,
         isSummary,
         order: index
       };
     });
 
+    console.log('Final sections with methodology tags:', sections);
     setEditableStructure(sections);
     
     // Notify parent component

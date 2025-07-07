@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash } from 'react-icons/fa';
-import CitationCards from './CitationCards';
+import CitationViewer from './CitationViewer';
+import './CitationViewer.css';
 import PaperStructurePreview from './PaperStructurePreview';
 
 const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
@@ -35,6 +36,34 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
 
   const editStructure = () => {
     setStructureApproved(false);
+  };
+
+  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex) => {
+    // Placeholder for add citation functionality
+    console.log('Add citation for:', sectionIndex, subsectionIndex, questionIndex);
+  };
+
+  const handleRemoveCitation = (sectionIndex, subsectionIndex, questionIndex, citationIndex) => {
+    setOutline(prevOutline => 
+      prevOutline.map((outlineSection, secIdx) => 
+        secIdx === sectionIndex 
+          ? {
+              ...outlineSection,
+              subsections: outlineSection.subsections.map((sub, subIdx) =>
+                subIdx === subsectionIndex
+                  ? { 
+                      ...sub, 
+                      citations: {
+                        ...sub.citations,
+                        [questionIndex]: sub.citations[questionIndex]?.filter((_, idx) => idx !== citationIndex) || []
+                      }
+                    }
+                  : sub
+              )
+            }
+          : outlineSection
+      )
+    );
   };
 
   const generateOutline = async () => {
@@ -492,9 +521,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                                           Research Questions:
                                         </h6>
                                         {subsection.questions.map((question, questionIndex) => (
-                                          <div key={questionIndex} className="mb-3 p-2 bg-light rounded">
+                                          <div key={questionIndex} className="mb-3 p-3 bg-light rounded">
                                             <div className="d-flex justify-content-between align-items-start mb-2">
-                                              <p className="mb-0 small flex-grow-1">
+                                              <p className="mb-0 flex-grow-1">
                                                 <strong>Q{questionIndex + 1}:</strong> {question}
                                               </p>
                                               {/* Citation generation icon */}
@@ -511,11 +540,12 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                                               </button>
                                             </div>
 
-                                            {subsection.citations && subsection.citations[questionIndex] && (
-                                              <div className="mt-2">
-                                                <CitationCards citations={subsection.citations[questionIndex]} />
-                                              </div>
-                                            )}
+                                            {/* Citation Viewer */}
+                                            <CitationViewer
+                                              citations={subsection.citations?.[questionIndex] || []}
+                                              onAddCitation={() => handleAddCitation(sectionIndex, subIndex, questionIndex)}
+                                              onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
+                                            />
                                           </div>
                                         ))}
                                       </div>
