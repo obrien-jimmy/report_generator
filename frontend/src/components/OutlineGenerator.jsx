@@ -569,6 +569,10 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                                               citations={subsection.citations?.[questionIndex] || []}
                                               onAddCitation={(newCitation) => handleAddCitation(sectionIndex, subIndex, questionIndex, newCitation)}
                                               onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
+                                              finalThesis={finalThesis}
+                                              methodology={methodology}
+                                              paperLength={paperLength}
+                                              sourceCategories={sourceCategories}
                                             />
                                           </div>
                                         ))}

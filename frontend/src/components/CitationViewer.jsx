@@ -1,18 +1,24 @@
 import { useState } from 'react';
-import { FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaSearch, FaTrash, FaTimes } from 'react-icons/fa';
 import axios from 'axios';
 
-const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
+const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesis, methodology, paperLength, sourceCategories }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddMoreForm, setShowAddMoreForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     source: '',
     year: '',
     author: ''
   });
+  const [addMoreData, setAddMoreData] = useState({
+    count: 3,
+    context: ''
+  });
   const [isSearching, setIsSearching] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const toggleExpanded = () => setExpanded(!expanded);
 
@@ -35,11 +41,23 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
     setShowAddForm(true);
   };
 
+  const handleAddMore = () => {
+    setShowAddMoreForm(true);
+  };
+
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const handleAddMoreChange = (e) => {
+    const { name, value } = e.target;
+    setAddMoreData(prev => ({
+      ...prev,
+      [name]: name === 'count' ? parseInt(value) || 1 : value
     }));
   };
 
@@ -73,9 +91,48 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
     setIsSearching(false);
   };
 
+  const submitAddMore = async (e) => {
+    e.preventDefault();
+    setIsGenerating(true);
+
+    try {
+      const response = await axios.post('http://localhost:8000/generate_citations', {
+        final_thesis: finalThesis,
+        methodology: methodology,
+        paper_length: paperLength,
+        source_categories: sourceCategories,
+        count: addMoreData.count,
+        context: addMoreData.context,
+        existing_citations: citations.map(c => c.apa) // Avoid duplicates
+      });
+
+      const newCitations = response.data.citations;
+      
+      // Add all new citations using the parent's callback
+      if (onAddCitation && newCitations) {
+        newCitations.forEach(citation => {
+          onAddCitation(citation);
+        });
+      }
+
+      // Reset form and close modal
+      setAddMoreData({ count: 3, context: '' });
+      setShowAddMoreForm(false);
+    } catch (err) {
+      console.error('Error generating citations:', err);
+      alert(err.response?.data?.detail || err.message || 'Failed to generate additional citations.');
+    }
+    setIsGenerating(false);
+  };
+
   const closeAddForm = () => {
     setShowAddForm(false);
     setFormData({ title: '', source: '', year: '', author: '' });
+  };
+
+  const closeAddMoreForm = () => {
+    setShowAddMoreForm(false);
+    setAddMoreData({ count: 3, context: '' });
   };
 
   if (!citations || citations.length === 0) {
@@ -83,27 +140,114 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
       <div className="citation-viewer">
         <div className="citation-summary d-flex justify-content-between align-items-center p-2 bg-light rounded">
           <div className="text-muted small">No citations generated yet</div>
-          <button 
-            className="btn btn-sm btn-outline-primary"
-            onClick={handleAddCitation}
-            title="Add custom citation"
-          >
-            <FaPlus />
-          </button>
+          <div className="d-flex gap-2">
+            <button 
+              className="btn btn-sm btn-outline-primary"
+              onClick={handleAddMore}
+              title="Add more citations"
+            >
+              Add More
+            </button>
+            <button 
+              className="btn btn-sm btn-outline-primary"
+              onClick={handleAddCitation}
+              title="Search for citation"
+            >
+              <FaSearch />
+            </button>
+          </div>
         </div>
 
-        {/* Add Citation Form Modal */}
+        {/* Add More Citations Modal */}
+        {showAddMoreForm && (
+          <div className="modal-overlay" onClick={closeAddMoreForm}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Add More Citations</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={closeAddMoreForm}
+                  aria-label="Close"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              
+              <form onSubmit={submitAddMore}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Number of Citations</label>
+                    <select 
+                      className="form-select"
+                      name="count"
+                      value={addMoreData.count}
+                      onChange={handleAddMoreChange}
+                      required
+                    >
+                      <option value={1}>1 citation</option>
+                      <option value={2}>2 citations</option>
+                      <option value={3}>3 citations</option>
+                      <option value={4}>4 citations</option>
+                      <option value={5}>5 citations</option>
+                      <option value={6}>6 citations</option>
+                      <option value={7}>7 citations</option>
+                      <option value={8}>8 citations</option>
+                      <option value={9}>9 citations</option>
+                      <option value={10}>10 citations</option>
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Additional Context (Optional)</label>
+                    <textarea 
+                      className="form-control"
+                      name="context"
+                      value={addMoreData.context}
+                      onChange={handleAddMoreChange}
+                      placeholder="e.g., 'All sources must be newer than 2015 and from government agencies' or 'Focus on peer-reviewed journal articles about methodology'"
+                      rows="3"
+                    />
+                    <small className="form-text text-muted">
+                      Provide specific criteria or focus areas for the new citations.
+                    </small>
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={closeAddMoreForm}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? 'Generating...' : `Generate ${addMoreData.count} Citations`}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Search Citation Form Modal */}
         {showAddForm && (
           <div className="modal-overlay" onClick={closeAddForm}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header d-flex justify-content-between align-items-center mb-3">
+              <div className="modal-header d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">Search for Citation</h5>
                 <button
                   type="button"
                   className="btn-close"
                   onClick={closeAddForm}
                   aria-label="Close"
-                ></button>
+                >
+                  <FaTimes />
+                </button>
               </div>
               
               <form onSubmit={submitForm}>
@@ -192,10 +336,17 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
         <div className="d-flex gap-2">
           <button 
             className="btn btn-sm btn-outline-primary"
-            onClick={handleAddCitation}
-            title="Add custom citation"
+            onClick={handleAddMore}
+            title="Add more citations"
           >
-            <FaPlus />
+            Add More
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-primary"
+            onClick={handleAddCitation}
+            title="Search for citation"
+          >
+            <FaSearch />
           </button>
           <button 
             className="btn btn-sm btn-outline-secondary"
@@ -239,14 +390,16 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
       {selectedCitation && (
         <div className="modal-overlay" onClick={closeCitationDetails}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header d-flex justify-content-between align-items-center mb-3">
+            <div className="modal-header d-flex justify-content-between align-items-center">
               <h5 className="mb-0">Citation Details</h5>
               <button
                 type="button"
                 className="btn-close"
                 onClick={closeCitationDetails}
                 aria-label="Close"
-              ></button>
+              >
+                <FaTimes />
+              </button>
             </div>
             
             <div className="modal-body">
@@ -312,18 +465,96 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation }) => {
         </div>
       )}
 
-      {/* Add Citation Form Modal */}
+      {/* Add More Citations Modal */}
+      {showAddMoreForm && (
+        <div className="modal-overlay" onClick={closeAddMoreForm}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Add More Citations</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closeAddMoreForm}
+                aria-label="Close"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            
+            <form onSubmit={submitAddMore}>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Number of Citations</label>
+                  <select 
+                    className="form-select"
+                    name="count"
+                    value={addMoreData.count}
+                    onChange={handleAddMoreChange}
+                    required
+                  >
+                    <option value={1}>1 citation</option>
+                    <option value={2}>2 citations</option>
+                    <option value={3}>3 citations</option>
+                    <option value={4}>4 citations</option>
+                    <option value={5}>5 citations</option>
+                    <option value={6}>6 citations</option>
+                    <option value={7}>7 citations</option>
+                    <option value={8}>8 citations</option>
+                    <option value={9}>9 citations</option>
+                    <option value={10}>10 citations</option>
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Additional Context (Optional)</label>
+                  <textarea 
+                    className="form-control"
+                    name="context"
+                    value={addMoreData.context}
+                    onChange={handleAddMoreChange}
+                    placeholder="e.g., 'All sources must be newer than 2015 and from government agencies' or 'Focus on peer-reviewed journal articles about methodology'"
+                    rows="3"
+                  />
+                  <small className="form-text text-muted">
+                    Provide specific criteria or focus areas for the new citations.
+                  </small>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeAddMoreForm}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? 'Generating...' : `Generate ${addMoreData.count} Citations`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Search Citation Form Modal */}
       {showAddForm && (
         <div className="modal-overlay" onClick={closeAddForm}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header d-flex justify-content-between align-items-center mb-3">
+            <div className="modal-header d-flex justify-content-between align-items-center">
               <h5 className="mb-0">Search for Citation</h5>
               <button
                 type="button"
                 className="btn-close"
                 onClick={closeAddForm}
                 aria-label="Close"
-              ></button>
+              >
+                <FaTimes />
+              </button>
             </div>
             
             <form onSubmit={submitForm}>
