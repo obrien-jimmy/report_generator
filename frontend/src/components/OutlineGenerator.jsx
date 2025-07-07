@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { FaFileAlt, FaList, FaEye, FaEyeSlash, FaCheck, FaEdit, FaQuestionCircle, FaBookOpen } from 'react-icons/fa';
+import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen } from 'react-icons/fa';
 import CitationCards from './CitationCards';
+import PaperStructurePreview from './PaperStructurePreview';
 
 const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategories, selectedPaperType }) => {
   const [outline, setOutline] = useState([]);
@@ -12,11 +13,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [collapsedSections, setCollapsedSections] = useState({});
 
   // Paper Structure States
-  const [structureData, setStructureData] = useState(null);
-  const [structureLoading, setStructureLoading] = useState(false);
-  const [structureError, setStructureError] = useState(null);
+  const [customStructure, setCustomStructure] = useState(null);
   const [structureApproved, setStructureApproved] = useState(false);
-  const [structureCollapsed, setStructureCollapsed] = useState(false);
 
   // Question and Citation States
   const [loadingQuestions, setLoadingQuestions] = useState({});
@@ -24,33 +22,9 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [batchLoadingQuestions, setBatchLoadingQuestions] = useState(false);
   const [batchLoadingCitations, setBatchLoadingCitations] = useState(false);
 
-  // Auto-load paper structure when component mounts
-  useEffect(() => {
-    if (selectedPaperType?.id && methodology) {
-      loadPaperStructure();
-    }
-  }, [selectedPaperType, methodology]);
-
-  const loadPaperStructure = async () => {
-    setStructureLoading(true);
-    setStructureError(null);
-    
-    try {
-      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
-      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
-
-      const response = await axios.post('http://localhost:8000/paper_structure', {
-        paper_type: selectedPaperType.id,
-        methodology_id: methodologyId,
-        sub_methodology_id: subMethodologyId
-      });
-      
-      setStructureData(response.data);
-    } catch (err) {
-      setStructureError('Failed to load paper structure');
-      console.error('Structure fetch error:', err);
-    }
-    setStructureLoading(false);
+  const handleStructureChange = (structure) => {
+    setCustomStructure(structure);
+    setStructureApproved(false); // Reset approval when structure changes
   };
 
   const approveStructure = () => {
@@ -59,7 +33,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
 
   const editStructure = () => {
     setStructureApproved(false);
-    loadPaperStructure();
   };
 
   const generateOutline = async () => {
@@ -79,6 +52,14 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
       const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
 
+      // Use custom structure if available
+      const structureToUse = customStructure ? 
+        customStructure.filter(s => !s.isAdmin).map(s => ({
+          section_title: s.title,
+          section_context: s.context || `Analysis and discussion of ${s.title}`,
+          pages_allocated: s.pages
+        })) : null;
+
       const res = await axios.post('http://localhost:8000/generate_structured_outline', {
         final_thesis: finalThesis,
         paper_type: selectedPaperType?.id || 'research',
@@ -86,7 +67,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
         paper_length_pages: safePaperLength,
         source_categories: sourceCategories,
         methodology_id: methodologyId,
-        sub_methodology_id: subMethodologyId
+        sub_methodology_id: subMethodologyId,
+        custom_structure: structureToUse // Send custom structure to backend
       });
 
       const sections = res.data.outline.map(section => ({
@@ -94,6 +76,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
         section_context: section.section_context,
         subsections: [],
         is_administrative: section.is_administrative || false,
+        pages_allocated: section.pages_allocated || 2,
         questions: [],
         citations: {}
       }));
@@ -125,7 +108,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
           final_thesis: finalThesis,
           methodology: methodology,
           paper_length_pages: safePaperLength,
-          source_categories: sourceCategories
+          source_categories: sourceCategories,
+          pages_allocated: section.pages_allocated || 2
         };
 
         const res = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
@@ -308,142 +292,49 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
     );
   };
 
-  const toggleStructureCollapse = () => setStructureCollapsed(prev => !prev);
+  return (
+    <div className="mb-4">
+      <h4>Research Outline Generator</h4>
+      
+      <PaperStructurePreview 
+        paperType={selectedPaperType}
+        methodology={methodology?.methodologyType || methodology?.methodology_type}
+        subMethodology={methodology?.subMethodology || methodology?.sub_methodology}
+        paperLength={paperLength}
+        onStructureChange={handleStructureChange}
+      />
 
-  // Paper Structure Preview Component
-  const PaperStructurePreview = () => {
-    if (structureLoading) {
-      return (
-        <div className="alert alert-info">
-          <FaFileAlt className="me-2" />
-          Loading paper structure...
-        </div>
-      );
-    }
-
-    if (structureError) {
-      return (
-        <div className="alert alert-danger">
-          <strong>Structure Error:</strong> {structureError}
-          <button 
-            className="btn btn-sm btn-outline-primary ms-2"
-            onClick={loadPaperStructure}
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    if (!structureData) {
-      return (
-        <div className="alert alert-warning">
-          <strong>No Structure:</strong> Unable to load paper structure.
-          <button 
-            className="btn btn-sm btn-outline-primary ms-2"
-            onClick={loadPaperStructure}
-          >
-            Load Structure
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <div className="card mb-4">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center">
-            <FaFileAlt className="me-2 text-primary" />
-            <h6 className="mb-0">Paper Structure Preview</h6>
-            <span className="badge bg-info ms-2">
-              {structureData.total_sections} sections
-            </span>
+      {customStructure && (
+        <div className="card mb-3">
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <h6 className="mb-0">Structure Approval</h6>
             {structureApproved && (
-              <span className="badge bg-success ms-2">
+              <span className="badge bg-success">
                 <FaCheck className="me-1" />
                 Approved
               </span>
             )}
           </div>
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={toggleStructureCollapse}
-          >
-            {structureCollapsed ? <FaEye /> : <FaEyeSlash />}
-            {structureCollapsed ? ' Show' : ' Hide'}
-          </button>
-        </div>
-        
-        {!structureCollapsed && (
           <div className="card-body">
-            <div className="row mb-3">
-              <div className="col-md-4">
-                <small className="text-muted">
-                  <strong>Paper Type:</strong> {structureData.paper_type}
-                </small>
+            {!structureApproved ? (
+              <div>
+                <p className="text-muted mb-3">
+                  Review the paper structure above and approve it to proceed with outline generation.
+                  You can customize sections, allocate pages, and add specific focus areas.
+                </p>
+                <button 
+                  className="btn btn-success"
+                  onClick={approveStructure}
+                >
+                  <FaCheck className="me-1" />
+                  Approve Structure
+                </button>
               </div>
-              <div className="col-md-4">
-                <small className="text-muted">
-                  <strong>Methodology:</strong> {structureData.methodology || 'Base structure'}
-                </small>
-              </div>
-              <div className="col-md-4">
-                <small className="text-muted">
-                  <strong>Enhanced:</strong> {structureData.has_methodology_sections ? 'Yes' : 'No'}
-                </small>
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <h6 className="text-primary mb-2">
-                <FaList className="me-2" />
-                Recommended Structure
-              </h6>
-              <div className="list-group">
-                {structureData.structure.map((section, index) => (
-                  <div key={index} className="list-group-item d-flex align-items-center">
-                    <span className="badge bg-secondary me-2">{index + 1}</span>
-                    <span className="flex-grow-1">{section}</span>
-                    {/* Highlight methodology-specific sections */}
-                    {structureData.has_methodology_sections && 
-                     !['Title Page', 'Abstract', 'References (APA 7th)'].includes(section) && 
-                     !section.includes('Introduction') && 
-                     !section.includes('Conclusion') && (
-                      <span className="badge bg-primary ms-2">Method</span>
-                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {structureData.has_methodology_sections && (
-              <div className="alert alert-success">
-                <small>
-                  <strong>📋 Structure Enhanced:</strong> Your selected methodology has been integrated into the paper structure. 
-                  Methodology-specific sections have been added to support your research approach.
-                </small>
-              </div>
-            )}
-
-            <div className="d-flex gap-2 mt-3">
-              {!structureApproved ? (
-                <>
-                  <button 
-                    className="btn btn-success"
-                    onClick={approveStructure}
-                  >
-                    <FaCheck className="me-1" />
-                    Approve Structure
-                  </button>
-                  <button 
-                    className="btn btn-outline-secondary"
-                    onClick={loadPaperStructure}
-                  >
-                    <FaEdit className="me-1" />
-                    Regenerate
-                  </button>
-                </>
-              ) : (
+            ) : (
+              <div>
+                <p className="text-success mb-3">
+                  ✓ Structure approved! You can now generate the detailed outline.
+                </p>
                 <button 
                   className="btn btn-outline-warning"
                   onClick={editStructure}
@@ -451,19 +342,11 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                   <FaEdit className="me-1" />
                   Edit Structure
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="mb-4">
-      <h4>Research Outline Generator</h4>
-      
-      <PaperStructurePreview />
+        </div>
+      )}
 
       {structureApproved && (
         <div className="card">
@@ -532,7 +415,7 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
                           [sectionIndex]: !prev[sectionIndex]
                         }))}
                       >
-                        {collapsedSections[sectionIndex] ? <FaEye /> : <FaEyeSlash />}
+                        {collapsedSections[sectionIndex] ? <FaBookOpen /> : <FaQuestionCircle />}
                       </button>
                     </div>
                     
