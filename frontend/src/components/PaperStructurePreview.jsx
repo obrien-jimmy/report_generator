@@ -206,6 +206,7 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
       'regression_models': 'Regression & Generalized Models',
       'content_analysis': 'Content Analysis',
       'narrative_review': 'Narrative Review',
+      'narrative_analysis': 'Narrative Analysis',
       'scoping_review': 'Scoping Review',
       'integrative_review': 'Integrative Review',
       'critical_review': 'Critical Review',
@@ -213,12 +214,18 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
       'meta_synthesis': 'Meta-Synthesis'
     };
     
+    // Get the main methodology display name
     const mainMethod = methodologyNames[methodology] || methodology;
-    const subMethod = subMethodology ? subMethodologyNames[subMethodology] || subMethodology : null;
     
-    if (subMethod) {
+    // Get the sub-methodology display name if it exists
+    const subMethod = subMethodology ? subMethodologyNames[subMethodology] : null;
+    
+    // Only show the sub-methodology if it exists and is different from the main methodology
+    if (subMethod && subMethod !== mainMethod) {
       return `${mainMethod} - ${subMethod}`;
     }
+    
+    // If sub-methodology is the same as main or doesn't exist, just show the main
     return mainMethod;
   };
 
@@ -417,7 +424,7 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                             <span className="badge bg-primary" style={{ minWidth: '50px' }}>Method</span>
                           )}
                           {section.isIntro && (
-                            <span className="badge bg-info" style={{ minWidth: '50px' }}>Intro</span>
+                            <span className="badge bg-success" style={{ minWidth: '50px' }}>Intro</span>
                           )}
                           {section.isSummary && (
                             <span className="badge bg-success" style={{ minWidth: '50px' }}>Summary</span>
