@@ -8,8 +8,20 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [editableStructure, setEditableStructure] = useState([]);
-  const [editingSection, setEditingSection] = useState(null);
-  const [totalPages, setTotalPages] = useState(0);
+  const [editingMode, setEditingMode] = useState(false);
+
+  // Calculate total pages based on paperLength
+  const getTotalPages = () => {
+    if (paperLength === 'Maximum Detail') {
+      return 25;
+    } else if (paperLength === 'Adjusted Based on Thesis') {
+      return 15;
+    } else {
+      return parseInt(paperLength, 10) || 10;
+    }
+  };
+
+  const totalPages = getTotalPages();
 
   useEffect(() => {
     if (paperType?.id && methodology) {
@@ -17,14 +29,10 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
     }
   }, [paperType, methodology, subMethodology]);
 
+  // Re-initialize structure when paperLength changes
   useEffect(() => {
-    // Set total pages based on paperLength
-    if (paperLength === 'Maximum Detail') {
-      setTotalPages(25);
-    } else if (paperLength === 'Adjusted Based on Thesis') {
-      setTotalPages(15);
-    } else {
-      setTotalPages(parseInt(paperLength, 10) || 10);
+    if (structureData) {
+      initializeEditableStructure(structureData);
     }
   }, [paperLength]);
 
@@ -56,32 +64,39 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                            !section.includes('Introduction') && 
                            !section.includes('Conclusion');
       
-      // Calculate default page allocation
-      let defaultPages = 1;
+      // Determine section type for tagging
+      const isIntro = section.includes('Introduction') && !isMethodology;
+      const isSummary = section.includes('Conclusion') || section.includes('Summary');
+      
+      // Calculate default percentage allocation
+      let defaultPercentage = 10;
       if (isAdmin) {
-        defaultPages = section === 'Abstract' ? 1 : 0.5;
+        defaultPercentage = 0; // Admin sections don't count toward percentage
       } else if (section.includes('Introduction')) {
-        defaultPages = Math.ceil(totalPages * 0.15);
+        defaultPercentage = 15;
       } else if (section.includes('Conclusion')) {
-        defaultPages = Math.ceil(totalPages * 0.10);
+        defaultPercentage = 10;
       } else {
-        // Distribute remaining pages among content sections
+        // Distribute remaining percentage among content sections
         const contentSections = data.structure.filter(s => 
           !['Title Page', 'Abstract', 'References (APA 7th)'].includes(s) &&
           !s.includes('Introduction') && 
           !s.includes('Conclusion')
         ).length;
-        const remainingPages = totalPages - Math.ceil(totalPages * 0.25); // 25% for intro/conclusion
-        defaultPages = Math.ceil(remainingPages / contentSections);
+        const remainingPercentage = 100 - 25; // 25% for intro/conclusion
+        defaultPercentage = Math.round(remainingPercentage / contentSections);
       }
 
       return {
         id: `section-${index}`,
         title: section,
         context: '',
-        pages: defaultPages,
+        percentage: defaultPercentage,
+        pages: isAdmin ? 0 : Math.ceil((defaultPercentage / 100) * totalPages) || 1, // Ensure at least 1 page for non-admin sections
         isAdmin,
         isMethodology,
+        isIntro,
+        isSummary,
         order: index
       };
     });
@@ -95,9 +110,17 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
   };
 
   const updateSection = (sectionId, updates) => {
-    const newStructure = editableStructure.map(section =>
-      section.id === sectionId ? { ...section, ...updates } : section
-    );
+    const newStructure = editableStructure.map(section => {
+      if (section.id === sectionId) {
+        const updatedSection = { ...section, ...updates };
+        // Recalculate pages when percentage changes
+        if (updates.percentage !== undefined) {
+          updatedSection.pages = updatedSection.isAdmin ? 0 : Math.ceil((updates.percentage / 100) * totalPages) || 1;
+        }
+        return updatedSection;
+      }
+      return section;
+    });
     setEditableStructure(newStructure);
     
     if (onStructureChange) {
@@ -110,15 +133,17 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
       id: `section-${Date.now()}`,
       title: 'New Section',
       context: '',
-      pages: 2,
+      percentage: 10,
+      pages: Math.ceil((10 / 100) * totalPages) || 1,
       isAdmin: false,
       isMethodology: false,
+      isIntro: false,
+      isSummary: false,
       order: editableStructure.length
     };
     
     const newStructure = [...editableStructure, newSection];
     setEditableStructure(newStructure);
-    setEditingSection(newSection.id);
     
     if (onStructureChange) {
       onStructureChange(newStructure);
@@ -156,8 +181,10 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
     }
   };
 
-  const getTotalAllocatedPages = () => {
-    return editableStructure.reduce((total, section) => total + section.pages, 0);
+  const getTotalAllocatedPercentage = () => {
+    return editableStructure
+      .filter(section => !section.isAdmin)
+      .reduce((total, section) => total + section.percentage, 0);
   };
 
   const getMethodologyDisplay = () => {
@@ -176,8 +203,14 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
       'case_study': 'Case Study',
       'systematic_review': 'Systematic Review',
       'statistical_techniques': 'Core Statistical Techniques',
-      'regression_models': 'Regression & Generalized Models'
-      // Add more as needed
+      'regression_models': 'Regression & Generalized Models',
+      'content_analysis': 'Content Analysis',
+      'narrative_review': 'Narrative Review',
+      'scoping_review': 'Scoping Review',
+      'integrative_review': 'Integrative Review',
+      'critical_review': 'Critical Review',
+      'conceptual_review': 'Conceptual Review',
+      'meta_synthesis': 'Meta-Synthesis'
     };
     
     const mainMethod = methodologyNames[methodology] || methodology;
@@ -190,6 +223,7 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
   };
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
+  const toggleEditingMode = () => setEditingMode(prev => !prev);
 
   if (loading) {
     return (
@@ -211,8 +245,8 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
     return null;
   }
 
-  const totalAllocated = getTotalAllocatedPages();
-  const pagesDifference = totalAllocated - totalPages;
+  const totalAllocated = getTotalAllocatedPercentage();
+  const percentageDifference = totalAllocated - 100;
 
   return (
     <div className="card mb-4">
@@ -222,8 +256,8 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
           <span className="badge bg-info ms-2">
             {editableStructure.length} sections
           </span>
-          <span className={`badge ms-2 ${pagesDifference === 0 ? 'bg-success' : pagesDifference > 0 ? 'bg-warning' : 'bg-secondary'}`}>
-            {totalAllocated}/{totalPages} pages
+          <span className={`badge ms-2 ${percentageDifference === 0 ? 'bg-success' : percentageDifference > 0 ? 'bg-warning' : 'bg-secondary'}`}>
+            {totalAllocated}% allocated
           </span>
         </div>
         <div className="d-flex gap-2">
@@ -236,10 +270,16 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
           </button>
           <button
             className="btn btn-sm btn-outline-secondary"
+            onClick={toggleEditingMode}
+            title="Edit all sections"
+          >
+            <FaEdit />
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
             onClick={toggleCollapse}
           >
             {collapsed ? <FaEye /> : <FaEyeSlash />}
-            {collapsed ? ' Show' : ' Hide'}
           </button>
         </div>
       </div>
@@ -250,7 +290,7 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
           <div className="row mb-3">
             <div className="col-md-4">
               <small className="text-muted">
-                <strong>Paper Type:</strong> {structureData.paper_type}
+                <strong>Paper Type:</strong> {paperType?.name || structureData.paper_type}
               </small>
             </div>
             <div className="col-md-4">
@@ -265,14 +305,14 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
             </div>
           </div>
 
-          {/* Page Allocation Warning */}
-          {pagesDifference !== 0 && (
-            <div className={`alert ${pagesDifference > 0 ? 'alert-warning' : 'alert-info'} mb-3`}>
+          {/* Percentage Allocation Warning */}
+          {percentageDifference !== 0 && (
+            <div className={`alert ${percentageDifference > 0 ? 'alert-warning' : 'alert-info'} mb-3`}>
               <small>
-                <strong>Page Allocation:</strong> 
-                {pagesDifference > 0 
-                  ? ` You've allocated ${pagesDifference} more pages than the target length.`
-                  : ` You have ${Math.abs(pagesDifference)} pages remaining to allocate.`
+                <strong>Percentage Allocation:</strong> 
+                {percentageDifference > 0 
+                  ? ` You've allocated ${percentageDifference}% more than 100%.`
+                  : ` You have ${Math.abs(percentageDifference)}% remaining to allocate.`
                 }
               </small>
             </div>
@@ -288,8 +328,8 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
             <div className="list-group">
               {editableStructure.map((section, index) => (
                 <div key={section.id} className="list-group-item">
-                  {editingSection === section.id ? (
-                    // Edit Mode
+                  {editingMode ? (
+                    // Edit Mode for All Sections
                     <div className="row align-items-center">
                       <div className="col-md-4">
                         <input
@@ -313,27 +353,39 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                         <input
                           type="number"
                           className="form-control form-control-sm"
-                          value={section.pages}
-                          onChange={(e) => updateSection(section.id, { pages: parseFloat(e.target.value) || 0 })}
+                          value={section.percentage}
+                          onChange={(e) => updateSection(section.id, { percentage: parseInt(e.target.value) || 0 })}
                           min="0"
-                          step="0.5"
+                          max="100"
+                          disabled={section.isAdmin}
+                          placeholder={section.isAdmin ? "N/A" : "%"}
                         />
                       </div>
                       <div className="col-md-2">
                         <div className="d-flex gap-1">
                           <button
-                            className="btn btn-sm btn-success"
-                            onClick={() => setEditingSection(null)}
-                            title="Save"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => moveSection(section.id, 'up')}
+                            disabled={index === 0}
+                            title="Move up"
                           >
-                            <FaSave />
+                            <FaArrowUp />
                           </button>
                           <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => setEditingSection(null)}
-                            title="Cancel"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => moveSection(section.id, 'down')}
+                            disabled={index === editableStructure.length - 1}
+                            title="Move down"
                           >
-                            <FaTimes />
+                            <FaArrowDown />
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => removeSection(section.id)}
+                            title="Remove section"
+                            disabled={section.isAdmin}
+                          >
+                            <FaTrash />
                           </button>
                         </div>
                       </div>
@@ -353,62 +405,56 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                         </div>
                         <div className="d-flex align-items-center gap-2 me-3">
                           <span className="badge bg-light text-dark">
-                            {section.pages} {section.pages === 1 ? 'page' : 'pages'}
+                            {section.isAdmin ? 'Admin' : `${section.percentage}%`}
+                          </span>
+                          <span className="badge bg-light text-dark">
+                            {section.isAdmin ? 'N/A' : `${section.pages}p`}
                           </span>
                           {section.isAdmin && (
-                            <span className="badge bg-secondary">Admin</span>
+                            <span className="badge bg-secondary" style={{ minWidth: '50px' }}>Admin</span>
                           )}
                           {section.isMethodology && (
-                            <span className="badge bg-primary">Method</span>
+                            <span className="badge bg-primary" style={{ minWidth: '50px' }}>Method</span>
+                          )}
+                          {section.isIntro && (
+                            <span className="badge bg-info" style={{ minWidth: '50px' }}>Intro</span>
+                          )}
+                          {section.isSummary && (
+                            <span className="badge bg-success" style={{ minWidth: '50px' }}>Summary</span>
                           )}
                         </div>
-                      </div>
-                      
-                      <div className="d-flex gap-1">
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => moveSection(section.id, 'up')}
-                          disabled={index === 0}
-                          title="Move up"
-                        >
-                          <FaArrowUp />
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => moveSection(section.id, 'down')}
-                          disabled={index === editableStructure.length - 1}
-                          title="Move down"
-                        >
-                          <FaArrowDown />
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => setEditingSection(section.id)}
-                          title="Edit section"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeSection(section.id)}
-                          title="Remove section"
-                          disabled={section.isAdmin} // Prevent removing admin sections
-                        >
-                          <FaTrash />
-                        </button>
                       </div>
                     </div>
                   )}
                 </div>
               ))}
             </div>
+            
+            {editingMode && (
+              <div className="mt-3 d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-success"
+                  onClick={() => setEditingMode(false)}
+                >
+                  <FaSave className="me-1" />
+                  Save Changes
+                </button>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setEditingMode(false)}
+                >
+                  <FaTimes className="me-1" />
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Methodology Integration Notice */}
           {structureData.has_methodology_sections && (
             <div className="alert alert-success">
               <small>
-                <strong>📋 Structure Enhanced:</strong> Your selected methodology has been integrated into the paper structure. 
+                <strong>Structure Enhanced:</strong> Your selected methodology has been integrated into the paper structure. 
                 Methodology-specific sections have been added to support your research approach.
               </small>
             </div>
@@ -421,11 +467,11 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                 <small><strong>About this structure</strong></small>
               </summary>
               <small className="mt-2 d-block">
-                This structure is specifically designed for <strong>{paperType.name}</strong> papers
+                This structure is specifically designed for <strong>{paperType?.name || structureData.paper_type}</strong> papers
                 {structureData.has_methodology_sections && (
                   <span> with integrated <strong>{getMethodologyDisplay()}</strong> methodology sections</span>
                 )}. 
-                You can customize section titles, add context/focus areas, adjust page allocations, 
+                You can customize section titles, add context/focus areas, adjust percentage allocations, 
                 and reorder sections to match your research needs. The outline generator will use 
                 this customized structure as a foundation.
               </small>
@@ -455,9 +501,9 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
               </div>
               <div className="col-md-3">
                 <small className="text-muted">
-                  <strong>Page Allocation:</strong><br/>
-                  <span className={pagesDifference === 0 ? 'text-success' : 'text-warning'}>
-                    {totalAllocated}/{totalPages}
+                  <strong>Total Pages:</strong><br/>
+                  <span className={percentageDifference === 0 ? 'text-success' : 'text-warning'}>
+                    {editableStructure.filter(s => !s.isAdmin).reduce((total, s) => total + s.pages, 0)}/{totalPages}
                   </span>
                 </small>
               </div>

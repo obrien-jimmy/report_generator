@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen } from 'react-icons/fa';
+import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash } from 'react-icons/fa';
 import CitationCards from './CitationCards';
 import PaperStructurePreview from './PaperStructurePreview';
 
@@ -9,8 +9,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [collapsed, setCollapsed] = useState(false);
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
@@ -21,6 +21,8 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   const [loadingCitations, setLoadingCitations] = useState({});
   const [batchLoadingQuestions, setBatchLoadingQuestions] = useState(false);
   const [batchLoadingCitations, setBatchLoadingCitations] = useState(false);
+
+  const toggleCollapse = () => setCollapsed(prev => !prev);
 
   const handleStructureChange = (structure) => {
     setCustomStructure(structure);
@@ -83,7 +85,6 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
 
       setOutline(sections);
       setHasGenerated(true);
-      setSaved(true);
       
       const contentSections = sections.filter(sec => !sec.is_administrative);
       await generateSubsectionsSequentially(contentSections);
@@ -293,240 +294,264 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
   };
 
   return (
-    <div className="mb-4">
-      <h4>Research Outline Generator</h4>
+    <div className="mb-4 position-relative w-100">
+      <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={toggleCollapse}
+        >
+          {collapsed ? <FaEye /> : <FaEyeSlash />}
+          {collapsed ? ' Show' : ' Hide'}
+        </button>
+      </div>
+
+      <h3>Research Outline Generator</h3>
       
-      <PaperStructurePreview 
-        paperType={selectedPaperType}
-        methodology={methodology?.methodologyType || methodology?.methodology_type}
-        subMethodology={methodology?.subMethodology || methodology?.sub_methodology}
-        paperLength={paperLength}
-        onStructureChange={handleStructureChange}
-      />
+      {!collapsed && (
+        <>
+          <PaperStructurePreview 
+            paperType={selectedPaperType}
+            methodology={methodology?.methodologyType || methodology?.methodology_type}
+            subMethodology={methodology?.subMethodology || methodology?.sub_methodology}
+            paperLength={paperLength}
+            onStructureChange={handleStructureChange}
+          />
 
-      {customStructure && (
-        <div className="card mb-3">
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <h6 className="mb-0">Structure Approval</h6>
-            {structureApproved && (
-              <span className="badge bg-success">
-                <FaCheck className="me-1" />
-                Approved
-              </span>
-            )}
-          </div>
-          <div className="card-body">
-            {!structureApproved ? (
-              <div>
-                <p className="text-muted mb-3">
-                  Review the paper structure above and approve it to proceed with outline generation.
-                  You can customize sections, allocate pages, and add specific focus areas.
-                </p>
-                <button 
-                  className="btn btn-success"
-                  onClick={approveStructure}
-                >
-                  <FaCheck className="me-1" />
-                  Approve Structure
-                </button>
+          {customStructure && (
+            <div className="card mb-3">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h6 className="mb-0">Structure Approval</h6>
+                {structureApproved && (
+                  <span className="badge bg-success">
+                    <FaCheck className="me-1" />
+                    Approved
+                  </span>
+                )}
               </div>
-            ) : (
-              <div>
-                <p className="text-success mb-3">
-                  ✓ Structure approved! You can now generate the detailed outline.
-                </p>
-                <button 
-                  className="btn btn-outline-warning"
-                  onClick={editStructure}
-                >
-                  <FaEdit className="me-1" />
-                  Edit Structure
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {structureApproved && (
-        <div className="card">
-          <div className="card-header">
-            <h5 className="mb-0">Generate Detailed Outline</h5>
-          </div>
-          <div className="card-body">
-            {!hasGenerated && (
-              <div className="mb-3">
-                <p className="text-muted">
-                  Your paper structure has been approved. Click below to generate a detailed outline 
-                  based on your thesis, methodology, and the approved structure.
-                </p>
-                <button 
-                  className="btn btn-primary"
-                  onClick={generateOutline}
-                  disabled={loading}
-                >
-                  {loading ? 'Generating Outline...' : 'Generate Detailed Outline'}
-                </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="alert alert-danger">
-                <strong>Error:</strong> {error}
-              </div>
-            )}
-
-            {hasGenerated && outline.length > 0 && (
-              <div className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6>Generated Outline</h6>
-                  <div className="d-flex gap-2">
+              <div className="card-body">
+                {!structureApproved ? (
+                  <div>
+                    <p className="text-muted mb-3">
+                      Review the paper structure above and approve it to proceed with outline generation.
+                      You can customize sections, allocate pages, and add specific focus areas.
+                    </p>
                     <button 
-                      className="btn btn-sm btn-outline-primary"
+                      className="btn btn-success"
+                      onClick={approveStructure}
+                    >
+                      <FaCheck className="me-1" />
+                      Approve Structure
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-success mb-3">
+                      ✓ Structure approved! You can now generate the detailed outline.
+                    </p>
+                    <button 
+                      className="btn btn-outline-warning"
+                      onClick={editStructure}
+                    >
+                      <FaEdit className="me-1" />
+                      Edit Structure
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {structureApproved && (
+            <div className="card">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Generate Detailed Outline</h5>
+                {hasGenerated && (
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setCollapsedSections(prev => {
+                      const allCollapsed = Object.values(prev).every(val => val);
+                      const newState = {};
+                      outline.forEach((_, index) => {
+                        newState[index] = !allCollapsed;
+                      });
+                      return newState;
+                    })}
+                  >
+                    {Object.values(collapsedSections).every(val => val) ? <FaEye /> : <FaEyeSlash />}
+                    {Object.values(collapsedSections).every(val => val) ? ' Show All' : ' Hide All'}
+                  </button>
+                )}
+              </div>
+              <div className="card-body">
+                {!hasGenerated && (
+                  <div className="mb-3">
+                    <p className="text-muted">
+                      Your paper structure has been approved. Click below to generate a detailed outline 
+                      based on your thesis, methodology, and the approved structure.
+                    </p>
+                    <button 
+                      className="btn btn-primary"
                       onClick={generateOutline}
                       disabled={loading}
                     >
-                      {loading ? 'Regenerating...' : 'Regenerate Outline'}
-                    </button>
-                    <button 
-                      className="btn btn-sm btn-success"
-                      onClick={() => setSaved(true)}
-                    >
-                      {saved ? 'Saved' : 'Save Outline'}
+                      {loading ? 'Generating Outline...' : 'Generate Detailed Outline'}
                     </button>
                   </div>
-                </div>
+                )}
 
-                {/* Outline Sections */}
-                {outline.map((section, sectionIndex) => (
-                  <div key={sectionIndex} className="card mb-3">
-                    <div className="card-header d-flex justify-content-between align-items-center">
-                      <div className="d-flex align-items-center">
-                        <span className="badge bg-primary me-2">{sectionIndex + 1}</span>
-                        <h6 className="mb-0">{section.section_title}</h6>
-                        {section.is_administrative && (
-                          <span className="badge bg-secondary ms-2">Admin</span>
-                        )}
+                {error && (
+                  <div className="alert alert-danger">
+                    <strong>Error:</strong> {error}
+                  </div>
+                )}
+
+                {hasGenerated && outline.length > 0 && (
+                  <div className="mt-4">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6>Generated Outline</h6>
+                      <div className="d-flex gap-2">
+                        <button 
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={generateOutline}
+                          disabled={loading}
+                        >
+                          {loading ? 'Regenerating...' : 'Regenerate Outline'}
+                        </button>
                       </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => setCollapsedSections(prev => ({
-                          ...prev,
-                          [sectionIndex]: !prev[sectionIndex]
-                        }))}
-                      >
-                        {collapsedSections[sectionIndex] ? <FaBookOpen /> : <FaQuestionCircle />}
-                      </button>
                     </div>
-                    
-                    {!collapsedSections[sectionIndex] && (
-                      <div className="card-body">
-                        <p className="text-muted mb-3">{section.section_context}</p>
-                        
-                        {/* Subsections */}
-                        {section.subsections && section.subsections.length > 0 && (
-                          <div className="ms-3">
-                            <h6 className="text-secondary mb-2">Subsections:</h6>
-                            {section.subsections.map((subsection, subIndex) => (
-                              <div key={subIndex} className="mb-4 p-3 border-start border-primary ps-3">
-                                <div className="d-flex justify-content-between align-items-start mb-2">
-                                  <div className="flex-grow-1">
-                                    <div className="d-flex align-items-center mb-2">
-                                      <strong className="me-2">{subsection.subsection_title}</strong>
-                                      {/* Question generation icon */}
-                                      <button
-                                        className="btn btn-sm p-1 text-info"
-                                        onClick={() => generateQuestions(sectionIndex, subIndex)}
-                                        disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
-                                        style={{ border: 'none', background: 'transparent' }}
-                                        title="Generate questions for this subsection"
-                                      >
-                                        <FaQuestionCircle 
-                                          className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
-                                        />
-                                      </button>
-                                    </div>
-                                    <p className="text-muted small mb-2">{subsection.subsection_context}</p>
-                                  </div>
-                                </div>
 
-                                {subsection.questions && subsection.questions.length > 0 && (
-                                  <div className="mt-3">
-                                    <h6 className="text-info mb-2">
-                                      Research Questions:
-                                    </h6>
-                                    {subsection.questions.map((question, questionIndex) => (
-                                      <div key={questionIndex} className="mb-3 p-2 bg-light rounded">
-                                        <div className="d-flex justify-content-between align-items-start mb-2">
-                                          <p className="mb-0 small flex-grow-1">
-                                            <strong>Q{questionIndex + 1}:</strong> {question}
-                                          </p>
-                                          {/* Citation generation icon */}
+                    {/* Outline Sections */}
+                    {outline.map((section, sectionIndex) => (
+                      <div key={sectionIndex} className="card mb-3">
+                        <div className="card-header d-flex justify-content-between align-items-center">
+                          <div className="d-flex align-items-center">
+                            <span className="badge bg-primary me-2">{sectionIndex + 1}</span>
+                            <h6 className="mb-0">{section.section_title}</h6>
+                            {section.is_administrative && (
+                              <span className="badge bg-secondary ms-2">Admin</span>
+                            )}
+                          </div>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => setCollapsedSections(prev => ({
+                              ...prev,
+                              [sectionIndex]: !prev[sectionIndex]
+                            }))}
+                          >
+                            {collapsedSections[sectionIndex] ? <FaEye /> : <FaEyeSlash />}
+                          </button>
+                        </div>
+                        
+                        {!collapsedSections[sectionIndex] && (
+                          <div className="card-body">
+                            <p className="text-muted mb-3">{section.section_context}</p>
+                            
+                            {/* Subsections */}
+                            {section.subsections && section.subsections.length > 0 && (
+                              <div className="ms-3">
+                                <h6 className="text-secondary mb-2">Subsections:</h6>
+                                {section.subsections.map((subsection, subIndex) => (
+                                  <div key={subIndex} className="mb-4 p-3 border-start border-primary ps-3">
+                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                      <div className="flex-grow-1">
+                                        <div className="d-flex align-items-center mb-2">
+                                          <strong className="me-2">{subsection.subsection_title}</strong>
+                                          {/* Question generation icon */}
                                           <button
-                                            className="btn btn-sm p-1 text-info ms-2"
-                                            onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
-                                            disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
+                                            className="btn btn-sm p-1 text-info"
+                                            onClick={() => generateQuestions(sectionIndex, subIndex)}
+                                            disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
                                             style={{ border: 'none', background: 'transparent' }}
-                                            title="Generate citations for this question"
+                                            title="Generate questions for this subsection"
                                           >
-                                            <FaBookOpen 
-                                              className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
+                                            <FaQuestionCircle 
+                                              className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
                                             />
                                           </button>
                                         </div>
-
-                                        {subsection.citations && subsection.citations[questionIndex] && (
-                                          <div className="mt-2">
-                                            <CitationCards citations={subsection.citations[questionIndex]} />
-                                          </div>
-                                        )}
+                                        <p className="text-muted small mb-2">{subsection.subsection_context}</p>
                                       </div>
-                                    ))}
+                                    </div>
+
+                                    {subsection.questions && subsection.questions.length > 0 && (
+                                      <div className="mt-3">
+                                        <h6 className="text-info mb-2">
+                                          Research Questions:
+                                        </h6>
+                                        {subsection.questions.map((question, questionIndex) => (
+                                          <div key={questionIndex} className="mb-3 p-2 bg-light rounded">
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                              <p className="mb-0 small flex-grow-1">
+                                                <strong>Q{questionIndex + 1}:</strong> {question}
+                                              </p>
+                                              {/* Citation generation icon */}
+                                              <button
+                                                className="btn btn-sm p-1 text-info ms-2"
+                                                onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
+                                                disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
+                                                style={{ border: 'none', background: 'transparent' }}
+                                                title="Generate citations for this question"
+                                              >
+                                                <FaBookOpen 
+                                                  className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
+                                                />
+                                              </button>
+                                            </div>
+
+                                            {subsection.citations && subsection.citations[questionIndex] && (
+                                              <div className="mt-2">
+                                                <CitationCards citations={subsection.citations[questionIndex]} />
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                    ))}
 
-                {/* Batch Generation Controls */}
-                <div className="mt-4 p-3 bg-light rounded">
-                  <h6 className="mb-3">Batch Generation</h6>
-                  <div className="d-flex gap-2">
-                    {hasQuestionsToGenerate() && (
-                      <button 
-                        className="btn btn-info"
-                        onClick={generateAllQuestions}
-                        disabled={batchLoadingQuestions}
-                      >
-                        <FaQuestionCircle className="me-1" />
-                        {batchLoadingQuestions ? 'Generating All Questions...' : 'Generate All Questions'}
-                      </button>
-                    )}
-                    
-                    {hasCitationsToGenerate() && (
-                      <button 
-                        className="btn btn-info"
-                        onClick={generateAllCitations}
-                        disabled={batchLoadingCitations}
-                      >
-                        <FaBookOpen className="me-1" />
-                        {batchLoadingCitations ? 'Generating All Citations...' : 'Generate All Citations'}
-                      </button>
-                    )}
+                    {/* Batch Generation Controls */}
+                    <div className="mt-4 p-3 bg-light rounded">
+                      <h6 className="mb-3">Batch Generation</h6>
+                      <div className="d-flex gap-2">
+                        {hasQuestionsToGenerate() && (
+                          <button 
+                            className="btn btn-info"
+                            onClick={generateAllQuestions}
+                            disabled={batchLoadingQuestions}
+                          >
+                            <FaQuestionCircle className="me-1" />
+                            {batchLoadingQuestions ? 'Generating All Questions...' : 'Generate All Questions'}
+                          </button>
+                        )}
+                        
+                        {hasCitationsToGenerate() && (
+                          <button 
+                            className="btn btn-info"
+                            onClick={generateAllCitations}
+                            disabled={batchLoadingCitations}
+                          >
+                            <FaBookOpen className="me-1" />
+                            {batchLoadingCitations ? 'Generating All Citations...' : 'Generate All Citations'}
+                          </button>
+                        )}
+                      </div>
+                      <small className="text-muted mt-2 d-block">
+                        Use batch generation to automatically populate questions and citations for all subsections.
+                      </small>
+                    </div>
                   </div>
-                  <small className="text-muted mt-2 d-block">
-                    Use batch generation to automatically populate questions and citations for all subsections.
-                  </small>
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
