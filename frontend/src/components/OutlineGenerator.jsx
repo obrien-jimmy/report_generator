@@ -320,44 +320,57 @@ const OutlineGenerator = ({ finalThesis, methodology, paperLength, sourceCategor
           {customStructure && (
             <div className="card mb-3">
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h6 className="mb-0">Structure Approval</h6>
-                {structureApproved && (
-                  <span className="badge bg-success">
-                    <FaCheck className="me-1" />
-                    Approved
-                  </span>
-                )}
-              </div>
-              <div className="card-body">
-                {!structureApproved ? (
-                  <div>
-                    <p className="text-muted mb-3">
-                      Review the paper structure above and approve it to proceed with outline generation.
-                      You can customize sections, allocate pages, and add specific focus areas.
-                    </p>
-                    <button 
-                      className="btn btn-success"
-                      onClick={approveStructure}
-                    >
+                <div className="d-flex align-items-center">
+                  <h6 className="mb-0">Structure Approval</h6>
+                  {structureApproved && (
+                    <span className="badge bg-success ms-2">
                       <FaCheck className="me-1" />
-                      Approve Structure
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-success mb-3">
-                      ✓ Structure approved! You can now generate the detailed outline.
-                    </p>
-                    <button 
-                      className="btn btn-outline-warning"
-                      onClick={editStructure}
-                    >
-                      <FaEdit className="me-1" />
-                      Edit Structure
-                    </button>
-                  </div>
-                )}
+                      Approved
+                    </span>
+                  )}
+                </div>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setCollapsedSections(prev => ({
+                    ...prev,
+                    structureApproval: !prev.structureApproval
+                  }))}
+                >
+                  {collapsedSections.structureApproval ? <FaEye /> : <FaEyeSlash />}
+                </button>
               </div>
+              {!collapsedSections.structureApproval && (
+                <div className="card-body">
+                  {!structureApproved ? (
+                    <div>
+                      <p className="text-muted mb-3">
+                        Review the paper structure above and approve it to proceed with outline generation.
+                        You can customize sections, allocate pages, and add specific focus areas.
+                      </p>
+                      <button 
+                        className="btn btn-success"
+                        onClick={approveStructure}
+                      >
+                        <FaCheck className="me-1" />
+                        Approve Structure
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-success mb-3">
+                        ✓ Structure approved! You can now generate the detailed outline.
+                      </p>
+                      <button 
+                        className="btn btn-outline-secondary"
+                        onClick={editStructure}
+                      >
+                        <FaEdit className="me-1" />
+                        Edit Structure
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
