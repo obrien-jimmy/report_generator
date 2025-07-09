@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa';
 import CitationViewer from './CitationViewer';
 import './CitationViewer.css';
 import PaperStructurePreview from './PaperStructurePreview';
+import RetryService from '../services/retryService';
 
 const OutlineGenerator = ({ 
   finalThesis, 
@@ -12,7 +13,8 @@ const OutlineGenerator = ({
   sourceCategories, 
   selectedPaperType, 
   onFrameworkComplete, 
-  onTransferToOutlineDraft 
+  onTransferToOutlineDraft,
+  savedOutlineData
 }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,7 @@ const OutlineGenerator = ({
   const [hasGenerated, setHasGenerated] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
   const [collapsed, setCollapsed] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState('');
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
@@ -31,11 +34,29 @@ const OutlineGenerator = ({
   const [batchLoadingQuestions, setBatchLoadingQuestions] = useState(false);
   const [batchLoadingCitations, setBatchLoadingCitations] = useState(false);
 
+  // Restore saved outline data
+  useEffect(() => {
+    if (savedOutlineData && Array.isArray(savedOutlineData) && savedOutlineData.length > 0) {
+      console.log('OutlineGenerator: Restoring saved outline data:', savedOutlineData);
+      setOutline(savedOutlineData);
+      setHasGenerated(true);
+      setStructureApproved(true);
+    }
+  }, [savedOutlineData]);
+
+  // Auto-call framework complete when outline is generated
+  useEffect(() => {
+    if (outline.length > 0 && hasGenerated && onFrameworkComplete) {
+      console.log('OutlineGenerator: Auto-calling framework complete with outline:', outline);
+      onFrameworkComplete(outline);
+    }
+  }, [outline, hasGenerated, onFrameworkComplete]);
+
   const toggleCollapse = () => setCollapsed(prev => !prev);
 
   const handleStructureChange = (structure) => {
     setCustomStructure(structure);
-    setStructureApproved(false); // Reset approval when structure changes
+    setStructureApproved(false);
   };
 
   const approveStructure = () => {
@@ -44,23 +65,282 @@ const OutlineGenerator = ({
 
   const editStructure = () => {
     setStructureApproved(false);
+    setOutline([]);
+    setHasGenerated(false);
+    setError(null);
   };
 
-  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex, newCitation) => {
-    if (newCitation) {
-      // Add a new citation that was created through the form
+  const generateOutline = async (isRegeneration = false) => {
+    if (!structureApproved) {
+      setError('Please approve the paper structure first');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setGenerationProgress('Generating initial outline structure...');
+    
+    if (isRegeneration) {
+      setOutline([]);
+      setHasGenerated(false);
+    }
+    
+    try {
+      const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
+                              paperLength === 'Adjusted Based on Thesis' ? -1 :
+                              parseInt(paperLength, 10);
+
+      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
+      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
+
+      const structureToUse = customStructure ? 
+        customStructure.filter(s => !s.isAdmin).map(s => ({
+          section_title: s.title,
+          section_context: s.context || `Analysis and discussion of ${s.title}`,
+          pages_allocated: s.pages
+        })) : null;
+
+      // Step 1: Generate initial outline structure
+      const res = await RetryService.withRetry(async () => {
+        return await axios.post('http://localhost:8000/generate_structured_outline', {
+          final_thesis: finalThesis,
+          paper_type: selectedPaperType?.id || 'research',
+          methodology,
+          paper_length_pages: safePaperLength,
+          source_categories: sourceCategories,
+          methodology_id: methodologyId,
+          sub_methodology_id: subMethodologyId,
+          custom_structure: structureToUse
+        });
+      }, 3, 3000);
+
+      let sections = res.data.outline.map(section => ({
+        section_title: section.section_title,
+        section_context: section.section_context,
+        subsections: [],
+        is_administrative: section.is_administrative || false,
+        pages_allocated: section.pages_allocated || 2,
+        questions: [],
+        citations: {}
+      }));
+
+      console.log('OutlineGenerator: Initial structure generated:', sections);
+      setOutline(sections);
+
+      // Step 2: Generate detailed subsections for content sections
+      const contentSections = sections.filter(sec => !sec.is_administrative);
+      
+      if (contentSections.length > 0) {
+        setGenerationProgress(`Generating detailed subsections for ${contentSections.length} sections...`);
+        
+        // Create operations for batch processing
+        const operations = contentSections.map(section => async () => {
+          const requestPayload = {
+            section_title: section.section_title,
+            section_context: section.section_context,
+            final_thesis: finalThesis,
+            methodology: methodology,
+            paper_length_pages: safePaperLength,
+            source_categories: sourceCategories,
+            pages_allocated: section.pages_allocated || 2
+          };
+
+          console.log(`OutlineGenerator: Generating subsections for: ${section.section_title}`);
+          const response = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
+          return { 
+            section_title: section.section_title, 
+            data: response.data 
+          };
+        });
+
+        // Process in batches to avoid rate limits
+        const results = await RetryService.batchWithRetry(operations, 2, 3000);
+        
+        // Update sections with subsections
+        sections = sections.map(section => {
+          if (section.is_administrative) return section;
+          
+          const result = results.find(r => r && r.section_title === section.section_title);
+          if (result && result.data.subsections) {
+            return {
+              ...section,
+              subsections: result.data.subsections.map(sub => ({
+                ...sub,
+                questions: [],
+                citations: {}
+              }))
+            };
+          }
+          return section;
+        });
+
+        console.log('OutlineGenerator: Subsections generated, now generating questions...');
+        setGenerationProgress('Generating questions for subsections...');
+
+        // Step 3: Generate questions for each subsection
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+          const section = sections[sectionIndex];
+          if (section.is_administrative) continue;
+
+          for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
+            const subsection = section.subsections[subsectionIndex];
+            
+            try {
+              const questionResponse = await axios.post('http://localhost:8000/generate_question_response', {
+                thesis: finalThesis,
+                methodology: methodology,
+                section_context: section.section_context,
+                subsection_context: subsection.subsection_context,
+                subsection_title: subsection.subsection_title
+              });
+
+              // Update the specific subsection with questions
+              sections[sectionIndex].subsections[subsectionIndex].questions = questionResponse.data.questions || [];
+              
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limit protection
+            } catch (err) {
+              console.error(`Error generating questions for ${section.section_title} - ${subsection.subsection_title}:`, err);
+            }
+          }
+        }
+
+        console.log('OutlineGenerator: Questions generated, now generating citations...');
+        setGenerationProgress('Generating citations for questions...');
+
+        // Step 4: Generate citations for each question
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+          const section = sections[sectionIndex];
+          if (section.is_administrative) continue;
+
+          for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
+            const subsection = section.subsections[subsectionIndex];
+            
+            if (subsection.questions && subsection.questions.length > 0) {
+              for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
+                const question = subsection.questions[questionIndex];
+                
+                try {
+                  const citationResponse = await axios.post('http://localhost:8000/generate_citations', {
+                    final_thesis: finalThesis,
+                    methodology: methodology,
+                    source_categories: sourceCategories,
+                    question: question,
+                    section_context: section.section_context,
+                    subsection_context: subsection.subsection_context,
+                    count: 3
+                  });
+
+                  // Initialize citations object if it doesn't exist
+                  if (!sections[sectionIndex].subsections[subsectionIndex].citations) {
+                    sections[sectionIndex].subsections[subsectionIndex].citations = {};
+                  }
+                  
+                  // Add citations for this question
+                  sections[sectionIndex].subsections[subsectionIndex].citations[questionIndex] = citationResponse.data.citations || [];
+                  
+                  await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limit protection
+                } catch (err) {
+                  console.error(`Error generating citations for question ${questionIndex}:`, err);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      console.log('OutlineGenerator: Complete detailed outline generated:', sections);
+      setOutline(sections);
+      setHasGenerated(true);
+      setGenerationProgress('');
+
+    } catch (err) {
+      console.error('Error generating detailed outline:', err);
+      setGenerationProgress('');
+      
+      if (err.response?.status === 429 || err.message?.includes('rate limit')) {
+        setError('Rate limit exceeded. The system will automatically retry in a few moments.');
+        
+        // Auto-retry after delay
+        setTimeout(() => {
+          generateOutline(isRegeneration);
+        }, 10000);
+      } else {
+        setError(err.response?.data?.detail || err.message || 'Failed to generate detailed outline.');
+      }
+    }
+    setLoading(false);
+  };
+
+  // Keep existing citation and question generation functions
+  const generateQuestions = async (sectionIndex, subsectionIndex) => {
+    const questionKey = `${sectionIndex}-${subsectionIndex}`;
+    setLoadingQuestions(prev => ({ ...prev, [questionKey]: true }));
+
+    try {
+      const section = outline[sectionIndex];
+      const subsection = section.subsections[subsectionIndex];
+
+      const res = await axios.post('http://localhost:8000/generate_question_response', {
+        thesis: finalThesis,
+        methodology: methodology,
+        section_context: section.section_context,
+        subsection_context: subsection.subsection_context,
+        subsection_title: subsection.subsection_title
+      });
+
       setOutline(prevOutline => 
         prevOutline.map((outlineSection, secIdx) => 
           secIdx === sectionIndex 
             ? {
                 ...outlineSection,
-                subsections: outlineSection.subsections.map((sub, subIdx) =>
-                  subIdx === subsectionIndex
+                subsections: outlineSection.subsections.map((sub, subIdx) => 
+                  subIdx === subsectionIndex 
+                    ? { ...sub, questions: res.data.questions || [] }
+                    : sub
+                )
+              }
+            : outlineSection
+        )
+      );
+    } catch (err) {
+      console.error('Error generating questions:', err);
+      setError('Failed to generate questions for this subsection.');
+    }
+
+    setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
+  };
+
+  const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
+    const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+    setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
+
+    try {
+      const section = outline[sectionIndex];
+      const subsection = section.subsections[subsectionIndex];
+      const question = subsection.questions[questionIndex];
+
+      const res = await axios.post('http://localhost:8000/generate_citations', {
+        final_thesis: finalThesis,
+        methodology: methodology,
+        source_categories: sourceCategories,
+        question: question,
+        section_context: section.section_context,
+        subsection_context: subsection.subsection_context,
+        count: 3
+      });
+
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => 
+          secIdx === sectionIndex 
+            ? {
+                ...outlineSection,
+                subsections: outlineSection.subsections.map((sub, subIdx) => 
+                  subIdx === subsectionIndex 
                     ? { 
                         ...sub, 
                         citations: {
                           ...sub.citations,
-                          [questionIndex]: [...(sub.citations[questionIndex] || []), newCitation]
+                          [questionIndex]: res.data.citations || []
                         }
                       }
                     : sub
@@ -69,9 +349,35 @@ const OutlineGenerator = ({
             : outlineSection
         )
       );
-    } else {
-      // Placeholder for other add citation functionality
-      console.log('Add citation for:', sectionIndex, subsectionIndex, questionIndex);
+    } catch (err) {
+      console.error('Error generating citations:', err);
+    }
+
+    setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
+  };
+
+  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex, newCitation) => {
+    if (newCitation) {
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => 
+          secIdx === sectionIndex 
+            ? {
+                ...outlineSection,
+                subsections: outlineSection.subsections.map((sub, subIdx) => 
+                  subIdx === subsectionIndex 
+                    ? { 
+                        ...sub, 
+                        citations: {
+                          ...sub.citations,
+                          [questionIndex]: [...(sub.citations?.[questionIndex] || []), newCitation]
+                        }
+                      }
+                    : sub
+                )
+              }
+            : outlineSection
+        )
+      );
     }
   };
 
@@ -81,8 +387,8 @@ const OutlineGenerator = ({
         secIdx === sectionIndex 
           ? {
               ...outlineSection,
-              subsections: outlineSection.subsections.map((sub, subIdx) =>
-                subIdx === subsectionIndex
+              subsections: outlineSection.subsections.map((sub, subIdx) => 
+                subIdx === subsectionIndex 
                   ? { 
                       ...sub, 
                       citations: {
@@ -98,212 +404,17 @@ const OutlineGenerator = ({
     );
   };
 
-  const generateOutline = async () => {
-    if (!structureApproved) {
-      setError('Please approve the paper structure first');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
-                              paperLength === 'Adjusted Based on Thesis' ? -1 :
-                              parseInt(paperLength, 10);
-
-      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
-      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
-
-      // Use custom structure if available
-      const structureToUse = customStructure ? 
-        customStructure.filter(s => !s.isAdmin).map(s => ({
-          section_title: s.title,
-          section_context: s.context || `Analysis and discussion of ${s.title}`,
-          pages_allocated: s.pages
-        })) : null;
-
-      const res = await axios.post('http://localhost:8000/generate_structured_outline', {
-        final_thesis: finalThesis,
-        paper_type: selectedPaperType?.id || 'research',
-        methodology,
-        paper_length_pages: safePaperLength,
-        source_categories: sourceCategories,
-        methodology_id: methodologyId,
-        sub_methodology_id: subMethodologyId,
-        custom_structure: structureToUse // Send custom structure to backend
-      });
-
-      const sections = res.data.outline.map(section => ({
-        section_title: section.section_title,
-        section_context: section.section_context,
-        subsections: [],
-        is_administrative: section.is_administrative || false,
-        pages_allocated: section.pages_allocated || 2,
-        questions: [],
-        citations: {}
-      }));
-
-      setOutline(sections);
-      setHasGenerated(true);
-      
-      const contentSections = sections.filter(sec => !sec.is_administrative);
-      await generateSubsectionsSequentially(contentSections);
-
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to generate outline.');
-    }
-    setLoading(false);
-  };
-
-  const generateSubsectionsSequentially = async (sections) => {
-    for (let i = 0; i < sections.length; i++) {
-      const section = sections[i];
-      try {
-        const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
-                                paperLength === 'Adjusted Based on Thesis' ? -1 :
-                                parseInt(paperLength, 10);
-
-        const requestPayload = {
-          section_title: section.section_title,
-          section_context: section.section_context,
-          final_thesis: finalThesis,
-          methodology: methodology,
-          paper_length_pages: safePaperLength,
-          source_categories: sourceCategories,
-          pages_allocated: section.pages_allocated || 2
-        };
-
-        const res = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
-
-        setOutline(prevOutline => 
-          prevOutline.map(outlineSection => 
-            outlineSection.section_title === section.section_title
-              ? { 
-                  ...outlineSection, 
-                  subsections: res.data.subsections.map(sub => ({
-                    ...sub,
-                    questions: [],
-                    citations: {}
-                  }))
-                }
-              : outlineSection
-          )
-        );
-      } catch (err) {
-        console.error(`Error generating subsections for ${section.section_title}:`, err);
-        continue;
-      }
-    }
-  };
-
-  const generateQuestions = async (sectionIndex, subsectionIndex) => {
-    const section = outline[sectionIndex];
-    const subsection = section.subsections[subsectionIndex];
-    const questionKey = `${sectionIndex}-${subsectionIndex}`;
-
-    setLoadingQuestions(prev => ({ ...prev, [questionKey]: true }));
-
-    try {
-      const response = await axios.post('http://localhost:8000/generate_questions', {
-        section_title: section.section_title,
-        section_context: section.section_context,  // ✓ Already passing section context
-        subsection_title: subsection.subsection_title,
-        subsection_context: subsection.subsection_context,  // ✓ Already passing subsection context
-        final_thesis: finalThesis,
-        methodology: methodology
-      });
-
-      setOutline(prevOutline => 
-        prevOutline.map((outlineSection, secIdx) => 
-          secIdx === sectionIndex 
-            ? {
-                ...outlineSection,
-                subsections: outlineSection.subsections.map((sub, subIdx) =>
-                  subIdx === subsectionIndex
-                    ? { ...sub, questions: response.data.questions }
-                    : sub
-                )
-              }
-            : outlineSection
-        )
-      );
-    } catch (err) {
-      console.error('Error generating questions:', err);
-    }
-
-    setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
-  };
-
-  const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
-    const section = outline[sectionIndex];
-    const subsection = section.subsections[subsectionIndex];
-    const question = subsection.questions[questionIndex];
-    const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-
-    setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
-
-    const requestPayload = {
-      final_thesis: finalThesis,
-      methodology: methodology,
-      section_title: section.section_title,
-      section_context: section.section_context,  // ✓ Already passing section context
-      subsection_title: subsection.subsection_title,
-      subsection_context: subsection.subsection_context,  // ✓ Already passing subsection context
-      question: question,
-      source_categories: sourceCategories || [],
-      citation_count: 3
-    };
-
-    try {
-      const response = await axios.post('http://localhost:8000/generate_question_citations', requestPayload);
-
-      setOutline(prevOutline => 
-        prevOutline.map((outlineSection, secIdx) => 
-          secIdx === sectionIndex 
-            ? {
-                ...outlineSection,
-                subsections: outlineSection.subsections.map((sub, subIdx) =>
-                  subIdx === subsectionIndex
-                    ? { 
-                        ...sub, 
-                        citations: {
-                          ...sub.citations,
-                          [questionIndex]: response.data.recommended_sources
-                        }
-                      }
-                    : sub
-                )
-              }
-            : outlineSection
-        )
-      );
-    } catch (err) {
-      console.error('Error generating citations:', err);
-      
-      // Handle rate limit errors gracefully
-      if (err.response?.status === 429 || err.message?.includes('rate limit')) {
-        console.log('Rate limit detected for citations generation');
-      }
-    }
-
-    setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
-  };
-
-  // NEW: Batch generate all questions
   const generateAllQuestions = async () => {
     setBatchLoadingQuestions(true);
     
     for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
       const section = outline[sectionIndex];
       
-      // Skip administrative sections
       if (section.is_administrative) continue;
       
       for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
         const subsection = section.subsections[subsectionIndex];
         
-        // Skip if questions already exist
         if (subsection.questions && subsection.questions.length > 0) continue;
         
         await generateQuestions(sectionIndex, subsectionIndex);
@@ -313,24 +424,20 @@ const OutlineGenerator = ({
     setBatchLoadingQuestions(false);
   };
 
-  // NEW: Batch generate all citations
   const generateAllCitations = async () => {
     setBatchLoadingCitations(true);
     
     for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
       const section = outline[sectionIndex];
       
-      // Skip administrative sections
       if (section.is_administrative) continue;
       
       for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
         const subsection = section.subsections[subsectionIndex];
         
-        // Skip if no questions exist
         if (!subsection.questions || subsection.questions.length === 0) continue;
         
         for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
-          // Skip if citations already exist
           if (subsection.citations && subsection.citations[questionIndex]) continue;
           
           await generateCitations(sectionIndex, subsectionIndex, questionIndex);
@@ -341,7 +448,6 @@ const OutlineGenerator = ({
     setBatchLoadingCitations(false);
   };
 
-  // Helper functions to check if batch operations are available
   const hasQuestionsToGenerate = () => {
     return outline.some(section => 
       !section.is_administrative && 
@@ -359,9 +465,9 @@ const OutlineGenerator = ({
     );
   };
 
-  // Add this function to handle framework completion
   const handleFrameworkComplete = () => {
-    if (onFrameworkComplete) {
+    console.log('OutlineGenerator: Manual framework completion triggered');
+    if (onFrameworkComplete && outline.length > 0) {
       onFrameworkComplete(outline);
     }
   };
@@ -390,7 +496,7 @@ const OutlineGenerator = ({
             onStructureChange={handleStructureChange}
           />
 
-          {customStructure && (
+          {customStructure && !hasGenerated && (
             <div className="card mb-3">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center">
@@ -402,86 +508,71 @@ const OutlineGenerator = ({
                     </span>
                   )}
                 </div>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setCollapsedSections(prev => ({
-                    ...prev,
-                    structureApproval: !prev.structureApproval
-                  }))}
-                >
-                  {collapsedSections.structureApproval ? <FaEye /> : <FaEyeSlash />}
-                </button>
               </div>
-              {!collapsedSections.structureApproval && (
-                <div className="card-body">
-                  {!structureApproved ? (
-                    <div>
-                      <p className="text-muted mb-3">
-                        Review the paper structure above and approve it to proceed with outline generation.
-                        You can customize sections, allocate pages, and add specific focus areas.
-                      </p>
-                      <button 
-                        className="btn btn-success"
-                        onClick={approveStructure}
-                      >
-                        <FaCheck className="me-1" />
-                        Approve Structure
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-success mb-3">
-                        ✓ Structure approved! You can now generate the detailed outline.
-                      </p>
-                      <button 
-                        className="btn btn-outline-secondary"
-                        onClick={editStructure}
-                      >
-                        <FaEdit className="me-1" />
-                        Edit Structure
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="card-body">
+                {!structureApproved ? (
+                  <div>
+                    <p className="text-muted mb-3">
+                      Review the paper structure above and approve it to proceed with detailed outline generation.
+                    </p>
+                    <button 
+                      className="btn btn-success"
+                      onClick={approveStructure}
+                    >
+                      <FaCheck className="me-1" />
+                      Approve Structure
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-success mb-3">
+                      ✓ Structure approved! You can now generate the detailed outline with subsections, questions, and citations.
+                    </p>
+                    <button 
+                      className="btn btn-outline-secondary"
+                      onClick={editStructure}
+                    >
+                      <FaEdit className="me-1" />
+                      Edit Structure
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {structureApproved && (
+          {(structureApproved || hasGenerated) && (
             <div className="card">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Generate Detailed Outline</h5>
-                {hasGenerated && (
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => setCollapsedSections(prev => {
-                      const allCollapsed = Object.values(prev).every(val => val);
-                      const newState = {};
-                      outline.forEach((_, index) => {
-                        newState[index] = !allCollapsed;
-                      });
-                      return newState;
-                    })}
-                  >
-                    {Object.values(collapsedSections).every(val => val) ? <FaEye /> : <FaEyeSlash />}
-                    {Object.values(collapsedSections).every(val => val) ? ' Show All' : ' Hide All'}
-                  </button>
-                )}
+              <div className="card-header">
+                <h5 className="mb-0">Generate Complete Research Framework</h5>
               </div>
               <div className="card-body">
                 {!hasGenerated && (
                   <div className="mb-3">
                     <p className="text-muted">
-                      Your paper structure has been approved. Click below to generate a detailed outline 
-                      based on your thesis, methodology, and the approved structure.
+                      Generate a complete research framework including sections, subsections, questions, and citations.
                     </p>
                     <button 
                       className="btn btn-primary"
-                      onClick={generateOutline}
+                      onClick={() => generateOutline(false)}
                       disabled={loading}
                     >
-                      {loading ? 'Generating Outline...' : 'Generate Detailed Outline'}
+                      {loading ? (
+                        <>
+                          <FaSpinner className="fa-spin me-2" />
+                          Generating Complete Framework...
+                        </>
+                      ) : (
+                        'Generate Complete Research Framework'
+                      )}
                     </button>
+                  </div>
+                )}
+
+                {loading && generationProgress && (
+                  <div className="alert alert-info">
+                    <FaSpinner className="fa-spin me-2" />
+                    {generationProgress}
                   </div>
                 )}
 
@@ -494,19 +585,27 @@ const OutlineGenerator = ({
                 {hasGenerated && outline.length > 0 && (
                   <div className="mt-4">
                     <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6>Generated Outline</h6>
-                      <div className="d-flex gap-2">
-                        <button 
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={generateOutline}
-                          disabled={loading}
-                        >
-                          {loading ? 'Regenerating...' : 'Regenerate Outline'}
-                        </button>
-                      </div>
+                      <h6>
+                        Complete Research Framework ({outline.length} sections, {
+                          outline.reduce((total, section) => total + (section.subsections?.length || 0), 0)
+                        } subsections, {
+                          outline.reduce((total, section) => 
+                            total + section.subsections?.reduce((subTotal, sub) => 
+                              subTotal + (sub.questions?.length || 0), 0
+                            ) || 0, 0
+                          )
+                        } questions)
+                      </h6>
+                      <button 
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => generateOutline(true)}
+                        disabled={loading}
+                      >
+                        {loading ? 'Regenerating...' : 'Regenerate Framework'}
+                      </button>
                     </div>
 
-                    {/* Outline Sections */}
+                    {/* Outline Sections with complete data display */}
                     {outline.map((section, sectionIndex) => (
                       <div key={sectionIndex} className="card mb-3">
                         <div className="card-header d-flex justify-content-between align-items-center">
@@ -515,6 +614,9 @@ const OutlineGenerator = ({
                             <h6 className="mb-0">{section.section_title}</h6>
                             {section.is_administrative && (
                               <span className="badge bg-secondary ms-2">Admin</span>
+                            )}
+                            {section.subsections && section.subsections.length > 0 && (
+                              <span className="badge bg-info ms-2">{section.subsections.length} subsections</span>
                             )}
                           </div>
                           <button
@@ -532,51 +634,40 @@ const OutlineGenerator = ({
                           <div className="card-body">
                             <p className="text-muted mb-3">{section.section_context}</p>
                             
-                            {/* Subsections */}
+                            {/* Show subsections with questions and citations */}
                             {section.subsections && section.subsections.length > 0 && (
-                              <div className="ms-3">
-                                <h6 className="text-secondary mb-2">Subsections:</h6>
+                              <div className="mt-3">
+                                <h6 className="text-primary mb-3">Subsections:</h6>
                                 {section.subsections.map((subsection, subIndex) => (
-                                  <div key={subIndex} className="mb-4 p-3 border-start border-primary ps-3">
-                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                      <div className="flex-grow-1">
-                                        <div className="d-flex align-items-center mb-2">
-                                          <strong className="me-2">{subsection.subsection_title}</strong>
-                                          {/* Question generation icon */}
-                                          <button
-                                            className="btn btn-sm p-1 text-info"
-                                            onClick={() => generateQuestions(sectionIndex, subIndex)}
-                                            disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
-                                            style={{ border: 'none', background: 'transparent' }}
-                                            title="Generate questions for this subsection"
-                                          >
-                                            <FaQuestionCircle 
-                                              className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
-                                            />
-                                          </button>
-                                        </div>
-                                        <p className="text-muted small mb-2">{subsection.subsection_context}</p>
+                                  <div key={subIndex} className="border-start border-3 border-primary ps-3 mb-4">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                      <h6 className="mb-1">{subsection.subsection_title}</h6>
+                                      <div className="d-flex gap-1">
+                                        <button
+                                          className="btn btn-sm btn-outline-info"
+                                          onClick={() => generateQuestions(sectionIndex, subIndex)}
+                                          disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
+                                        >
+                                          <FaQuestionCircle 
+                                            className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
+                                          />
+                                        </button>
                                       </div>
                                     </div>
-
+                                    <p className="text-muted small mb-3">{subsection.subsection_context}</p>
+                                    
+                                    {/* Questions and Citations */}
                                     {subsection.questions && subsection.questions.length > 0 && (
-                                      <div className="mt-3">
-                                        <h6 className="text-info mb-2">
-                                          Research Questions:
-                                        </h6>
+                                      <div className="mt-2">
+                                        <strong className="small text-info">Questions:</strong>
                                         {subsection.questions.map((question, questionIndex) => (
-                                          <div key={questionIndex} className="mb-3 p-3 bg-light rounded">
+                                          <div key={questionIndex} className="mt-2 p-2 bg-light rounded">
                                             <div className="d-flex justify-content-between align-items-start mb-2">
-                                              <p className="mb-0 flex-grow-1">
-                                                <strong>Q{questionIndex + 1}:</strong> {question}
-                                              </p>
-                                              {/* Citation generation icon */}
+                                              <p className="mb-1 small">{question}</p>
                                               <button
-                                                className="btn btn-sm p-1 text-info ms-2"
+                                                className="btn btn-sm btn-outline-warning"
                                                 onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
                                                 disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
-                                                style={{ border: 'none', background: 'transparent' }}
-                                                title="Generate citations for this question"
                                               >
                                                 <FaBookOpen 
                                                   className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
@@ -639,21 +730,22 @@ const OutlineGenerator = ({
                     </div>
 
                     {/* Framework Completion */}
-                    {outline.length > 0 && (
-                      <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
-                        <h6 className="text-success mb-3">Framework Complete</h6>
-                        <p className="mb-3">Your outline framework is ready. Transfer it to the Outline Draft to begin generating responses.</p>
-                        <button 
-                          className="btn btn-success"
-                          onClick={() => {
-                            handleFrameworkComplete();
-                            onTransferToOutlineDraft();
-                          }}
-                        >
-                          Transfer to Outline Draft
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
+                      <h6 className="text-success mb-3">Complete Research Framework Ready</h6>
+                      <p className="mb-3">
+                        Your complete research framework with detailed sections, subsections, questions, and citations is ready. 
+                        Transfer it to the Outline Draft to begin generating responses.
+                      </p>
+                      <button 
+                        className="btn btn-success"
+                        onClick={() => {
+                          handleFrameworkComplete();
+                          onTransferToOutlineDraft();
+                        }}
+                      >
+                        Transfer to Outline Draft
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

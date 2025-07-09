@@ -89,11 +89,27 @@ function App() {
   const resetOutline = () => setOutlineVersion(prev => prev + 1);
 
   const handleFrameworkComplete = (outlineData) => {
-    setOutlineData(outlineData);
-    setFrameworkComplete(true);
+    console.log('=== App.jsx: handleFrameworkComplete called ===');
+    console.log('App.jsx: Received outline data:', outlineData);
+    console.log('App.jsx: Outline data type:', typeof outlineData);
+    console.log('App.jsx: Is array:', Array.isArray(outlineData));
+    console.log('App.jsx: Length:', outlineData?.length);
+    
+    if (outlineData && Array.isArray(outlineData) && outlineData.length > 0) {
+      console.log('App.jsx: Setting outline data...');
+      setOutlineData(outlineData);
+      
+      console.log('App.jsx: Setting framework complete to true...');
+      setFrameworkComplete(true);
+      
+      console.log('App.jsx: Framework completion successful');
+    } else {
+      console.error('App.jsx: Invalid outline data received:', outlineData);
+    }
   };
 
   const handleTransferToOutlineDraft = () => {
+    console.log('App.jsx: Transferring to outline draft');
     setActiveTab('outline');
   };
 
@@ -166,6 +182,7 @@ function App() {
         <div className="card-body">
           <ProjectManager
             currentProject={currentProject}
+            setCurrentProject={setCurrentProject} // Add this line
             onLoadProject={handleLoadProject}
             onNewProject={handleNewProject}
             finalThesis={finalThesis}
@@ -283,6 +300,7 @@ function App() {
                     selectedPaperType={selectedPaperType}
                     onFrameworkComplete={handleFrameworkComplete}
                     onTransferToOutlineDraft={handleTransferToOutlineDraft}
+                    savedOutlineData={outlineData}
                   />
                 </div>
               )}
