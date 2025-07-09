@@ -186,12 +186,14 @@ const OutlineGenerator = ({
             const subsection = section.subsections[subsectionIndex];
             
             try {
-              const questionResponse = await axios.post('http://localhost:8000/generate_question_response', {
-                thesis: finalThesis,
+              // Fix: Change the endpoint and request payload
+              const questionResponse = await axios.post('http://localhost:8000/generate_questions', {
+                final_thesis: finalThesis,
                 methodology: methodology,
+                section_title: section.section_title,
                 section_context: section.section_context,
-                subsection_context: subsection.subsection_context,
-                subsection_title: subsection.subsection_title
+                subsection_title: subsection.subsection_title,
+                subsection_context: subsection.subsection_context
               });
 
               // Update the specific subsection with questions
@@ -271,7 +273,7 @@ const OutlineGenerator = ({
     setLoading(false);
   };
 
-  // Keep existing citation and question generation functions
+  // Update the generateQuestions function
   const generateQuestions = async (sectionIndex, subsectionIndex) => {
     const questionKey = `${sectionIndex}-${subsectionIndex}`;
     setLoadingQuestions(prev => ({ ...prev, [questionKey]: true }));
@@ -280,12 +282,14 @@ const OutlineGenerator = ({
       const section = outline[sectionIndex];
       const subsection = section.subsections[subsectionIndex];
 
-      const res = await axios.post('http://localhost:8000/generate_question_response', {
-        thesis: finalThesis,
+      // Fix: Change the endpoint and request payload
+      const res = await axios.post('http://localhost:8000/generate_questions', {
+        final_thesis: finalThesis,
         methodology: methodology,
+        section_title: section.section_title,
         section_context: section.section_context,
-        subsection_context: subsection.subsection_context,
-        subsection_title: subsection.subsection_title
+        subsection_title: subsection.subsection_title,
+        subsection_context: subsection.subsection_context
       });
 
       setOutline(prevOutline => 
