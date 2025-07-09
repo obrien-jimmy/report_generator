@@ -221,17 +221,21 @@ const OutlineGenerator = ({
                 const questionObj = subsection.questions[questionIndex];
                 
                 try {
-                  const citationResponse = await axios.post('http://localhost:8000/generate_citations', {
+                  // Fix: Use the correct endpoint and response field
+                  const citationResponse = await axios.post('http://localhost:8000/generate_question_citations', {
                     final_thesis: finalThesis,
                     methodology: methodology,
                     source_categories: sourceCategories,
                     question: questionObj.question,
+                    section_title: section.section_title,
                     section_context: section.section_context,
+                    subsection_title: subsection.subsection_title,
                     subsection_context: subsection.subsection_context,
-                    count: 3
+                    citation_count: 3
                   });
                   
-                  sections[sectionIndex].subsections[subsectionIndex].questions[questionIndex].citations = citationResponse.data.citations || [];
+                  // Fix: Use the correct response field name
+                  sections[sectionIndex].subsections[subsectionIndex].questions[questionIndex].citations = citationResponse.data.recommended_sources || [];
                   
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 } catch (err) {
@@ -308,6 +312,7 @@ const OutlineGenerator = ({
     setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
   };
 
+  // Update the generateCitations function (around line 307)
   const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
     const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
     setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
@@ -317,14 +322,17 @@ const OutlineGenerator = ({
       const subsection = section.subsections[subsectionIndex];
       const questionObj = subsection.questions[questionIndex];
 
-      const res = await axios.post('http://localhost:8000/generate_citations', {
+      // Fix: Use the correct endpoint from your backend
+      const res = await axios.post('http://localhost:8000/generate_question_citations', {
         final_thesis: finalThesis,
         methodology: methodology,
         source_categories: sourceCategories,
         question: questionObj.question,
+        section_title: section.section_title,
         section_context: section.section_context,
+        subsection_title: subsection.subsection_title,
         subsection_context: subsection.subsection_context,
-        count: 3
+        citation_count: 3
       });
 
       setOutline(prevOutline => 
@@ -338,7 +346,8 @@ const OutlineGenerator = ({
                 ...sub,
                 questions: sub.questions.map((q, qIdx) => {
                   if (qIdx !== questionIndex) return q;
-                  return { ...q, citations: res.data.citations || [] };
+                  // Fix: Use the correct response field name
+                  return { ...q, citations: res.data.recommended_sources || [] };
                 })
               };
             })
