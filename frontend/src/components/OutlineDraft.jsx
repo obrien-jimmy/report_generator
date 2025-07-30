@@ -1,22 +1,20 @@
 import { useState } from 'react';
-import { FaPlay, FaPlayCircle, FaPause, FaExpand, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckCircle, FaSpinner } from 'react-icons/fa';
 import axios from 'axios';
 
 const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftComplete }) => {
-  const [responses, setResponses] = useState({});
+  const [responses, setResponses] = useState({}); // { questionKey: [resp1, resp2, ..., fusedResp] }
   const [loading, setLoading] = useState({});
+  const [currentResponseIdx, setCurrentResponseIdx] = useState({}); // { questionKey: idx }
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
 
-  // Helper to build LLM prompt with citations
-  const buildPrompt = (questionObj, sectionContext, subsectionContext) => {
-    let citationsText = '';
-    if (questionObj.citations && questionObj.citations.length > 0) {
-      citationsText = `Citations:\n${questionObj.citations.map((c, i) => `${i + 1}. ${c.apa || c.title || c.source || JSON.stringify(c)}`).join('\n')}\n`;
-    }
-    return `
-Answer the following question using the provided citations as primary sources.
+  // Helper to build LLM prompt for a single citation
+  const buildCitationPrompt = (questionObj, citation, sectionContext, subsectionContext) => `
+You are an expert on the works of ${citation.author || "the cited author"}.
+Answer the following question using ONLY the cited work, quoting exactly and providing a detailed, multi-tiered outline (I, 1, A, a, bullets) with slight indentations for each hierarchy.
+Be exact in quoting the author from the cited text.
 
 Thesis: ${finalThesis}
 Methodology: ${methodology}
@@ -25,45 +23,124 @@ Subsection Context: ${subsectionContext || ''}
 
 Question: ${questionObj.question}
 
-${citationsText}
-Answer:
-`;
-  };
+Citation: ${citation.apa || citation.title || citation.source || JSON.stringify(citation)}
 
-  const generateResponse = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
+In your outline, clearly indicate which citation this information comes from (e.g., [${citation.apa || citation.title || citation.source}]).
+`;
+
+  // Helper to build LLM prompt for the fused/master outline
+  const buildFusedPrompt = (questionObj, citationResponses, sectionContext, subsectionContext) => `
+You are an expert academic analyst.
+Given the following detailed outlines (one per citation) answering the question, create a master outline that:
+- Combines the arguments of each citation
+- Groups supporting factors
+- Calls out contradictions between citations
+- Presents the result in a detailed, multi-tiered outline (I, 1, A, a, bullets)
+- Identifies any additional resources the analyst might want to consider
+
+Thesis: ${finalThesis}
+Methodology: ${methodology}
+Section Context: ${sectionContext || ''}
+Subsection Context: ${subsectionContext || ''}
+
+Question: ${questionObj.question}
+
+Citation Outlines:
+${citationResponses.map((resp, i) => `Citation ${i + 1}: \n${resp}`).join('\n\n')}
+
+Master Outline:
+`;
+
+  // Generate all responses for a question: one per citation, then fused
+  const generateAllQuestionResponses = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
     const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
     setLoading(prev => ({ ...prev, [key]: true }));
 
     try {
-      // Build prompt with citations
-      const prompt = buildPrompt(
-        questionObj,
-        outlineData[sectionIndex]?.section_context,
-        outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context
-      );
+      const sectionContext = outlineData[sectionIndex]?.section_context;
+      const subsectionContext = outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context;
+      const citations = questionObj.citations || [];
 
-      const response = await axios.post('http://localhost:8000/generate_question_response', {
-        prompt,
-        thesis: finalThesis,
-        methodology: methodology,
-        question: questionObj.question,
-        citations: questionObj.citations,
-        section_context: outlineData[sectionIndex]?.section_context,
-        subsection_context: outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context
-      });
+      // 1. Generate outline for each citation
+      const citationResponses = [];
+      for (let i = 0; i < citations.length; i++) {
+        const prompt = buildCitationPrompt(questionObj, citations[i], sectionContext, subsectionContext);
+        const response = await axios.post('http://localhost:8000/generate_question_response', {
+          prompt,
+          thesis: finalThesis,
+          methodology: methodology,
+          question: questionObj.question,
+          citation: citations[i],
+          section_context: sectionContext,
+          subsection_context: subsectionContext
+        });
+        citationResponses.push(response.data.response);
+      }
 
+      // 2. Generate fused/master outline
+      let fusedResponse = '';
+      if (citationResponses.length > 0) {
+        const fusedPrompt = buildFusedPrompt(questionObj, citationResponses, sectionContext, subsectionContext);
+        const fusedResp = await axios.post('http://localhost:8000/generate_question_response', {
+          prompt: fusedPrompt,
+          thesis: finalThesis,
+          methodology: methodology,
+          question: questionObj.question,
+          citations: citations,
+          section_context: sectionContext,
+          subsection_context: subsectionContext
+        });
+        fusedResponse = fusedResp.data.response;
+      }
+
+      // 3. Store all responses (one per citation, then fused)
       setResponses(prev => ({
         ...prev,
-        [key]: response.data.response
+        [key]: [...citationResponses, fusedResponse]
+      }));
+      setCurrentResponseIdx(prev => ({
+        ...prev,
+        [key]: 0
       }));
     } catch (error) {
-      console.error('Error generating response:', error);
-      alert('Failed to generate response. Please try again.');
+      console.error('Error generating responses:', error);
+      alert('Failed to generate responses. Please try again.');
     }
 
     setLoading(prev => ({ ...prev, [key]: false }));
   };
 
+  // Navigation for responses
+  const handlePrevResponse = (key) => {
+    setCurrentResponseIdx(prev => ({
+      ...prev,
+      [key]: Math.max(0, (prev[key] || 0) - 1)
+    }));
+  };
+  const handleNextResponse = (key) => {
+    setCurrentResponseIdx(prev => ({
+      ...prev,
+      [key]: Math.min((responses[key]?.length || 1) - 1, (prev[key] || 0) + 1)
+    }));
+  };
+  const handleJumpToResponse = (key, idx) => {
+    setCurrentResponseIdx(prev => ({
+      ...prev,
+      [key]: idx
+    }));
+  };
+
+  // Modal controls
+  const openModal = (response, question) => {
+    setSelectedResponse({ response, question });
+    setShowModal(true);
+  };
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedResponse(null);
+  };
+
+  // Batch processing
   const generateAllResponses = async () => {
     setBatchProcessing(true);
     for (const [sectionIndex, section] of outlineData.entries()) {
@@ -73,7 +150,7 @@ Answer:
             for (const [questionIndex, questionObj] of subsection.questions.entries()) {
               const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
               if (!responses[key]) {
-                await generateResponse(sectionIndex, subsectionIndex, questionIndex, questionObj);
+                await generateAllQuestionResponses(sectionIndex, subsectionIndex, questionIndex, questionObj);
                 await new Promise(resolve => setTimeout(resolve, 1000));
               }
             }
@@ -84,16 +161,7 @@ Answer:
     setBatchProcessing(false);
   };
 
-  const openModal = (response, question) => {
-    setSelectedResponse({ response, question });
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedResponse(null);
-  };
-
+  // Completion
   const getTotalQuestions = () => {
     let total = 0;
     outlineData?.forEach(section => {
@@ -103,15 +171,8 @@ Answer:
     });
     return total;
   };
-
-  const getCompletedQuestions = () => {
-    return Object.keys(responses).length;
-  };
-
-  const isAllComplete = () => {
-    return getCompletedQuestions() === getTotalQuestions();
-  };
-
+  const getCompletedQuestions = () => Object.keys(responses).length;
+  const isAllComplete = () => getCompletedQuestions() === getTotalQuestions();
   const handleCompleteOutlineDraft = () => {
     if (onOutlineDraftComplete) {
       onOutlineDraftComplete({
@@ -188,8 +249,14 @@ Answer:
 
                 {subsection.questions?.map((questionObj, questionIndex) => {
                   const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-                  const response = responses[key];
+                  const respArr = responses[key] || [];
+                  const idx = currentResponseIdx[key] || 0;
                   const isLoading = loading[key];
+                  const citations = questionObj.citations || [];
+                  const totalResponses = citations.length + (citations.length > 0 ? 1 : 0); // +1 for fused
+
+                  // Citation numbering: questionNumber.citationNumber
+                  const questionNum = questionIndex + 1;
 
                   return (
                     <div key={questionIndex} className="card mb-3">
@@ -199,25 +266,82 @@ Answer:
                           <div className="col-md-6">
                             <div className="border-end pe-3">
                               <h6 className="text-info mb-2">
-                                Question {questionIndex + 1}
+                                Question {questionNum}
                               </h6>
                               <p className="mb-3">{questionObj.question}</p>
-                              {/* Render citations if present */}
-                              {questionObj.citations && questionObj.citations.length > 0 && (
+                              {/* Render citations with numbering */}
+                              {citations.length > 0 && (
                                 <div className="mb-2">
                                   <strong>Citations:</strong>
                                   <ul className="mb-2">
-                                    {questionObj.citations.map((citation, i) => (
-                                      <li key={i} style={{ fontSize: '0.95em' }}>
+                                    {citations.map((citation, i) => (
+                                      <li
+                                        key={i}
+                                        style={{
+                                          fontSize: '0.95em',
+                                          cursor: 'pointer',
+                                          background: idx === i ? '#e7f7fb' : 'transparent', // subtle highlight for active
+                                          borderRadius: '4px',
+                                          padding: '2px 6px',
+                                          display: 'inline-block',
+                                          marginBottom: '2px',
+                                          marginRight: '6px',
+                                          textDecoration: 'none'
+                                        }}
+                                        onClick={() => handleJumpToResponse(key, i)}
+                                      >
+                                        <span
+                                          style={{
+                                            color: '#0dcaf0', // Bootstrap light blue for citation number only
+                                            background: 'transparent',
+                                            borderRadius: '3px',
+                                            padding: '1px 6px',
+                                            marginRight: '4px',
+                                            fontWeight: 'normal'
+                                          }}
+                                        >
+                                          {`${questionNum}.${i + 1}`}
+                                        </span>
                                         {citation.apa || citation.title || citation.source || JSON.stringify(citation)}
                                       </li>
                                     ))}
+                                    {/* Fused/master outline */}
+                                    {citations.length > 0 && (
+                                      <li
+                                        style={{
+                                          fontSize: '0.95em',
+                                          cursor: 'pointer',
+                                          background: idx === citations.length ? '#e7f7fb' : 'transparent',
+                                          borderRadius: '4px',
+                                          padding: '2px 6px',
+                                          display: 'inline-block',
+                                          marginBottom: '2px',
+                                          marginRight: '6px',
+                                          textDecoration: 'none'
+                                        }}
+                                        onClick={() => handleJumpToResponse(key, citations.length)}
+                                      >
+                                        <span
+                                          style={{
+                                            color: '#0dcaf0',
+                                            background: 'transparent',
+                                            borderRadius: '3px',
+                                            padding: '1px 6px',
+                                            marginRight: '4px',
+                                            fontWeight: 'normal'
+                                          }}
+                                        >
+                                          {`${questionNum}.F`}
+                                        </span>
+                                        <em>Fused/Master Outline</em>
+                                      </li>
+                                    )}
                                   </ul>
                                 </div>
                               )}
                               <button
                                 className="btn btn-sm btn-outline-primary"
-                                onClick={() => generateResponse(sectionIndex, subsectionIndex, questionIndex, questionObj)}
+                                onClick={() => generateAllQuestionResponses(sectionIndex, subsectionIndex, questionIndex, questionObj)}
                                 disabled={isLoading || batchProcessing}
                               >
                                 {isLoading ? (
@@ -239,30 +363,64 @@ Answer:
                           <div className="col-md-6">
                             <div className="ps-3">
                               <div className="d-flex justify-content-between align-items-center mb-2">
-                                <h6 className="text-success mb-0">Response</h6>
-                                {response && (
+                                <h6 className="text-success mb-0">
+                                  Response{' '}
+                                  {citations.length > 0 && (
+                                    <span
+                                      className="badge ms-2"
+                                      style={{
+                                        backgroundColor: 'transparent',
+                                        color: '#0dcaf0',
+                                        fontWeight: 'normal',
+                                        border: '1px solid #0dcaf0'
+                                      }}
+                                    >
+                                      {idx < citations.length
+                                        ? `${questionNum}.${idx + 1}`
+                                        : `${questionNum}.F`}
+                                    </span>
+                                  )}
+                                </h6>
+                                {respArr[idx] && (
                                   <button
                                     className="btn btn-sm btn-outline-secondary"
-                                    onClick={() => openModal(response, questionObj.question)}
+                                    onClick={() => openModal(respArr[idx], questionObj.question)}
                                   >
                                     <FaExpand className="me-1" />
                                     Expand
                                   </button>
                                 )}
                               </div>
-                              
-                              {response ? (
-                                <div className="bg-light p-3 rounded">
-                                  <p className="mb-0" style={{ 
-                                    maxHeight: '150px', 
+                              <div className="d-flex align-items-center mb-2">
+                                <button
+                                  className="btn btn-sm btn-outline-secondary me-2"
+                                  onClick={() => handlePrevResponse(key)}
+                                  disabled={idx === 0}
+                                >
+                                  <FaChevronLeft />
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  onClick={() => handleNextResponse(key)}
+                                  disabled={idx >= totalResponses - 1}
+                                >
+                                  <FaChevronRight />
+                                </button>
+                              </div>
+                              {respArr[idx] ? (
+                                <div className="bg-light p-3 rounded" style={{ minHeight: 120 }}>
+                                  <pre className="mb-0" style={{
+                                    maxHeight: '150px',
                                     overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
+                                    textOverflow: 'ellipsis',
+                                    fontFamily: 'inherit',
+                                    whiteSpace: 'pre-wrap'
                                   }}>
-                                    {response.length > 200 ? `${response.substring(0, 200)}...` : response}
-                                  </p>
+                                    {respArr[idx]}
+                                  </pre>
                                 </div>
                               ) : (
-                                <div className="bg-light p-3 rounded text-muted">
+                                <div className="bg-light p-3 rounded text-muted" style={{ minHeight: 120 }}>
                                   <em>No response generated yet</em>
                                 </div>
                               )}
@@ -294,19 +452,16 @@ Answer:
                 ×
               </button>
             </div>
-            
             <div className="modal-body">
               <h6 className="text-primary mb-3">Question:</h6>
               <p className="mb-4 bg-light p-3 rounded">{selectedResponse.question}</p>
-              
               <h6 className="text-success mb-3">Response:</h6>
               <div className="bg-light p-3 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                <pre className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
                   {selectedResponse.response}
-                </p>
+                </pre>
               </div>
             </div>
-
             <div className="modal-footer">
               <button
                 type="button"
