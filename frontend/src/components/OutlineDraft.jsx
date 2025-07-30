@@ -9,15 +9,45 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
   const [showModal, setShowModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
 
-  const generateResponse = async (sectionIndex, subsectionIndex, questionIndex, question) => {
+  // Helper to build LLM prompt with citations
+  const buildPrompt = (questionObj, sectionContext, subsectionContext) => {
+    let citationsText = '';
+    if (questionObj.citations && questionObj.citations.length > 0) {
+      citationsText = `Citations:\n${questionObj.citations.map((c, i) => `${i + 1}. ${c.apa || c.title || c.source || JSON.stringify(c)}`).join('\n')}\n`;
+    }
+    return `
+Answer the following question using the provided citations as primary sources.
+
+Thesis: ${finalThesis}
+Methodology: ${methodology}
+Section Context: ${sectionContext || ''}
+Subsection Context: ${subsectionContext || ''}
+
+Question: ${questionObj.question}
+
+${citationsText}
+Answer:
+`;
+  };
+
+  const generateResponse = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
     const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
     setLoading(prev => ({ ...prev, [key]: true }));
 
     try {
+      // Build prompt with citations
+      const prompt = buildPrompt(
+        questionObj,
+        outlineData[sectionIndex]?.section_context,
+        outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context
+      );
+
       const response = await axios.post('http://localhost:8000/generate_question_response', {
+        prompt,
         thesis: finalThesis,
         methodology: methodology,
-        question: question,
+        question: questionObj.question,
+        citations: questionObj.citations,
         section_context: outlineData[sectionIndex]?.section_context,
         subsection_context: outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context
       });
@@ -36,16 +66,14 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
 
   const generateAllResponses = async () => {
     setBatchProcessing(true);
-    
     for (const [sectionIndex, section] of outlineData.entries()) {
       if (section.subsections) {
         for (const [subsectionIndex, subsection] of section.subsections.entries()) {
           if (subsection.questions) {
-            for (const [questionIndex, question] of subsection.questions.entries()) {
+            for (const [questionIndex, questionObj] of subsection.questions.entries()) {
               const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
               if (!responses[key]) {
-                await generateResponse(sectionIndex, subsectionIndex, questionIndex, question);
-                // Add a small delay to avoid overwhelming the server
+                await generateResponse(sectionIndex, subsectionIndex, questionIndex, questionObj);
                 await new Promise(resolve => setTimeout(resolve, 1000));
               }
             }
@@ -53,7 +81,6 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
         }
       }
     }
-    
     setBatchProcessing(false);
   };
 
@@ -159,7 +186,7 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
                 </h6>
                 <p className="text-muted small mb-3">{subsection.subsection_context}</p>
 
-                {subsection.questions?.map((question, questionIndex) => {
+                {subsection.questions?.map((questionObj, questionIndex) => {
                   const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
                   const response = responses[key];
                   const isLoading = loading[key];
@@ -174,10 +201,23 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
                               <h6 className="text-info mb-2">
                                 Question {questionIndex + 1}
                               </h6>
-                              <p className="mb-3">{question}</p>
+                              <p className="mb-3">{questionObj.question}</p>
+                              {/* Render citations if present */}
+                              {questionObj.citations && questionObj.citations.length > 0 && (
+                                <div className="mb-2">
+                                  <strong>Citations:</strong>
+                                  <ul className="mb-2">
+                                    {questionObj.citations.map((citation, i) => (
+                                      <li key={i} style={{ fontSize: '0.95em' }}>
+                                        {citation.apa || citation.title || citation.source || JSON.stringify(citation)}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                               <button
                                 className="btn btn-sm btn-outline-primary"
-                                onClick={() => generateResponse(sectionIndex, subsectionIndex, questionIndex, question)}
+                                onClick={() => generateResponse(sectionIndex, subsectionIndex, questionIndex, questionObj)}
                                 disabled={isLoading || batchProcessing}
                               >
                                 {isLoading ? (
@@ -203,7 +243,7 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
                                 {response && (
                                   <button
                                     className="btn btn-sm btn-outline-secondary"
-                                    onClick={() => openModal(response, question)}
+                                    onClick={() => openModal(response, questionObj.question)}
                                   >
                                     <FaExpand className="me-1" />
                                     Expand

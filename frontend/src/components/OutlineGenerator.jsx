@@ -46,11 +46,11 @@ const OutlineGenerator = ({
 
   // Auto-call framework complete when outline is generated
   useEffect(() => {
-    if (outline.length > 0 && hasGenerated && onFrameworkComplete) {
+    if (hasGenerated && outline.length > 0 && onFrameworkComplete) {
       console.log('OutlineGenerator: Auto-calling framework complete with outline:', outline);
       onFrameworkComplete(outline);
     }
-  }, [outline, hasGenerated, onFrameworkComplete]);
+  }, [hasGenerated, outline, onFrameworkComplete]);
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
 
@@ -495,6 +495,9 @@ const OutlineGenerator = ({
             subMethodology={methodology?.subMethodology || methodology?.sub_methodology}
             paperLength={paperLength}
             onStructureChange={handleStructureChange}
+            onGenerateOutline={() => generateOutline(false)}
+            loading={loading}
+            hasGenerated={hasGenerated}
           />
 
           {customStructure && !hasGenerated && (
@@ -584,161 +587,159 @@ const OutlineGenerator = ({
                 )}
 
                 {hasGenerated && outline.length > 0 && (
-                  <div className="mt-4">
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6>
-                        Complete Research Framework ({outline.length} sections, {
-                          outline.reduce((total, section) => total + (section.subsections?.length || 0), 0)
-                        } subsections, {
-                          outline.reduce((total, section) => 
-                            total + section.subsections?.reduce((subTotal, sub) => 
-                              subTotal + (sub.questions?.length || 0), 0
-                            ) || 0, 0
-                          )} questions)
-                      </h6>
-                      <button 
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={() => generateOutline(true)}
-                        disabled={loading}
-                      >
-                        {loading ? 'Regenerating...' : 'Regenerate Framework'}
-                      </button>
+                  <div className="card">
+                    <div className="card-header">
+                      <h5 className="mb-0">Generated Research Framework</h5>
                     </div>
-
-                    {outline.map((section, sectionIndex) => (
-                      <div key={sectionIndex} className="card mb-3">
-                        <div className="card-header d-flex justify-content-between align-items-center">
-                          <div className="d-flex align-items-center">
-                            <span className="badge bg-primary me-2">{sectionIndex + 1}</span>
-                            <h6 className="mb-0">{section.section_title}</h6>
-                            {section.is_administrative && (
-                              <span className="badge bg-secondary ms-2">Admin</span>
-                            )}
-                            {section.subsections && section.subsections.length > 0 && (
-                              <span className="badge bg-info ms-2">{section.subsections.length} subsections</span>
-                            )}
-                          </div>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={() => setCollapsedSections(prev => ({
-                              ...prev,
-                              [sectionIndex]: !prev[sectionIndex]
-                            }))}
-                          >
-                            {collapsedSections[sectionIndex] ? <FaEye /> : <FaEyeSlash />}
-                          </button>
+                    <div className="card-body">
+                      {loading && generationProgress && (
+                        <div className="alert alert-info">
+                          <FaSpinner className="fa-spin me-2" />
+                          {generationProgress}
                         </div>
-                        
-                        {!collapsedSections[sectionIndex] && (
-                          <div className="card-body">
-                            <p className="text-muted mb-3">{section.section_context}</p>
-                            
-                            {section.subsections && section.subsections.length > 0 && (
-                              <div className="mt-3">
-                                <h6 className="text-primary mb-3">Subsections:</h6>
-                                {section.subsections.map((subsection, subIndex) => (
-                                  <div key={subIndex} className="border-start border-3 border-primary ps-3 mb-4">
-                                    <div className="d-flex justify-content-between align-items-center mb-2">
-                                      <h6 className="mb-1">{subsection.subsection_title}</h6>
-                                      <div className="d-flex gap-1">
-                                        <button
-                                          className="btn btn-sm btn-outline-info"
-                                          onClick={() => generateQuestions(sectionIndex, subIndex)}
-                                          disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
-                                        >
-                                          <FaQuestionCircle 
-                                            className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
-                                          />
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <p className="text-muted small mb-3">{subsection.subsection_context}</p>
-                                    
-                                    {subsection.questions && subsection.questions.length > 0 && (
-                                      <div className="mt-2">
-                                        <strong className="small text-info">Questions:</strong>
-                                        {subsection.questions.map((question, questionIndex) => (
-                                          <div key={questionIndex} className="mt-2 p-2 bg-light rounded">
-                                            <div className="d-flex justify-content-between align-items-start mb-2">
-                                              <p className="mb-1 small">{question.question}</p>
-                                              <button
-                                                className="btn btn-sm btn-outline-warning"
-                                                onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
-                                                disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
-                                              >
-                                                <FaBookOpen 
-                                                  className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
-                                                />
-                                              </button>
-                                            </div>
+                      )}
 
-                                            <CitationViewer
-                                              citations={question.citations || []}
-                                              onAddCitation={(newCitation) => handleAddCitation(sectionIndex, subIndex, questionIndex, newCitation)}
-                                              onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
-                                              finalThesis={finalThesis}
-                                              methodology={methodology}
-                                              paperLength={paperLength}
-                                              sourceCategories={sourceCategories}
-                                            />
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                      {error && (
+                        <div className="alert alert-danger">
+                          <strong>Error:</strong> {error}
+                        </div>
+                      )}
+
+                      {outline.map((section, sectionIndex) => (
+                        <div key={sectionIndex} className="card mb-3">
+                          <div className="card-header d-flex justify-content-between align-items-center">
+                            <div className="d-flex align-items-center">
+                              <span className="badge bg-primary me-2">{sectionIndex + 1}</span>
+                              <h6 className="mb-0">{section.section_title}</h6>
+                              {section.is_administrative && (
+                                <span className="badge bg-secondary ms-2">Admin</span>
+                              )}
+                              {section.subsections && section.subsections.length > 0 && (
+                                <span className="badge bg-info ms-2">{section.subsections.length} subsections</span>
+                              )}
+                            </div>
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => setCollapsedSections(prev => ({
+                                ...prev,
+                                [sectionIndex]: !prev[sectionIndex]
+                              }))}
+                            >
+                              {collapsedSections[sectionIndex] ? <FaEye /> : <FaEyeSlash />}
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          
+                          {!collapsedSections[sectionIndex] && (
+                            <div className="card-body">
+                              <p className="text-muted mb-3">{section.section_context}</p>
+                              
+                              {section.subsections && section.subsections.length > 0 && (
+                                <div className="mt-3">
+                                  <h6 className="text-primary mb-3">Subsections:</h6>
+                                  {section.subsections.map((subsection, subIndex) => (
+                                    <div key={subIndex} className="border-start border-3 border-primary ps-3 mb-4">
+                                      <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 className="mb-1">{subsection.subsection_title}</h6>
+                                        <div className="d-flex gap-1">
+                                          <button
+                                            className="btn btn-sm btn-outline-info"
+                                            onClick={() => generateQuestions(sectionIndex, subIndex)}
+                                            disabled={loadingQuestions[`${sectionIndex}-${subIndex}`]}
+                                          >
+                                            <FaQuestionCircle 
+                                              className={loadingQuestions[`${sectionIndex}-${subIndex}`] ? 'fa-spin' : ''}
+                                            />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <p className="text-muted small mb-3">{subsection.subsection_context}</p>
+                                      
+                                      {subsection.questions && subsection.questions.length > 0 && (
+                                        <div className="mt-2">
+                                          <strong className="small text-info">Questions:</strong>
+                                          {subsection.questions.map((question, questionIndex) => (
+                                            <div key={questionIndex} className="mt-2 p-2 bg-light rounded">
+                                              <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <p className="mb-1 small">{question.question}</p>
+                                                <button
+                                                  className="btn btn-sm btn-outline-warning"
+                                                  onClick={() => generateCitations(sectionIndex, subIndex, questionIndex)}
+                                                  disabled={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`]}
+                                                >
+                                                  <FaBookOpen 
+                                                    className={loadingCitations[`${sectionIndex}-${subIndex}-${questionIndex}`] ? 'fa-spin' : ''}
+                                                  />
+                                                </button>
+                                              </div>
 
-                    <div className="mt-4 p-3 bg-light rounded">
-                      <h6 className="mb-3">Batch Generation</h6>
-                      <div className="d-flex gap-2">
-                        {hasQuestionsToGenerate() && (
-                          <button 
-                            className="btn btn-info"
-                            onClick={generateAllQuestions}
-                            disabled={batchLoadingQuestions}
-                          >
-                            <FaQuestionCircle className="me-1" />
-                            {batchLoadingQuestions ? 'Generating All Questions...' : 'Generate All Questions'}
-                          </button>
-                        )}
-                        
-                        {hasCitationsToGenerate() && (
-                          <button 
-                            className="btn btn-info"
-                            onClick={generateAllCitations}
-                            disabled={batchLoadingCitations}
-                          >
-                            <FaBookOpen className="me-1" />
-                            {batchLoadingCitations ? 'Generating All Citations...' : 'Generate All Citations'}
-                          </button>
-                        )}
-                      </div>
-                      <small className="text-muted mt-2 d-block">
-                        Use batch generation to automatically populate questions and citations for all subsections.
-                      </small>
-                    </div>
+                                              <CitationViewer
+                                                citations={question.citations || []}
+                                                onAddCitation={(newCitation) => handleAddCitation(sectionIndex, subIndex, questionIndex, newCitation)}
+                                                onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
+                                                finalThesis={finalThesis}
+                                                methodology={methodology}
+                                                paperLength={paperLength}
+                                                sourceCategories={sourceCategories}
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
 
-                    <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
-                      <h6 className="text-success mb-3">Complete Research Framework Ready</h6>
-                      <p className="mb-3">
-                        Your complete research framework with detailed sections, subsections, questions, and citations is ready. 
-                        Transfer it to the Outline Draft to begin generating responses.
-                      </p>
-                      <button 
-                        className="btn btn-success"
-                        onClick={() => {
-                          handleFrameworkComplete();
-                          onTransferToOutlineDraft();
-                        }}
-                      >
-                        Transfer to Outline Draft
-                      </button>
+                      <div className="mt-4 p-3 bg-light rounded">
+                        <h6 className="mb-3">Batch Generation</h6>
+                        <div className="d-flex gap-2">
+                          {hasQuestionsToGenerate() && (
+                            <button 
+                              className="btn btn-info"
+                              onClick={generateAllQuestions}
+                              disabled={batchLoadingQuestions}
+                            >
+                              <FaQuestionCircle className="me-1" />
+                              {batchLoadingQuestions ? 'Generating All Questions...' : 'Generate All Questions'}
+                            </button>
+                          )}
+                          
+                          {hasCitationsToGenerate() && (
+                            <button 
+                              className="btn btn-info"
+                              onClick={generateAllCitations}
+                              disabled={batchLoadingCitations}
+                            >
+                              <FaBookOpen className="me-1" />
+                              {batchLoadingCitations ? 'Generating All Citations...' : 'Generate All Citations'}
+                            </button>
+                          )}
+                        </div>
+                        <small className="text-muted mt-2 d-block">
+                          Use batch generation to automatically populate questions and citations for all subsections.
+                        </small>
+                      </div>
+
+                      <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
+                        <h6 className="text-success mb-3">Complete Research Framework Ready</h6>
+                        <p className="mb-3">
+                          Your complete research framework with detailed sections, subsections, questions, and citations is ready. 
+                          Transfer it to the Outline Draft to begin generating responses.
+                        </p>
+                        <button 
+                          className="btn btn-success"
+                          onClick={() => {
+                            handleFrameworkComplete();
+                            onTransferToOutlineDraft();
+                          }}
+                        >
+                          Transfer to Outline Draft
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

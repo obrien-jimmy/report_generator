@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaList, FaEye, FaEyeSlash, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import { FaList, FaEye, FaEyeSlash, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaArrowUp, FaArrowDown, FaSpinner, FaCheck } from 'react-icons/fa';
 
-const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLength, onStructureChange }) => {
+const PaperStructurePreview = ({ 
+  paperType, 
+  methodology, 
+  subMethodology, 
+  paperLength, 
+  onStructureChange,
+  onGenerateOutline, // Add this prop
+  loading, // Add this prop  
+  hasGenerated // Add this prop
+}) => {
   const [structureData, setStructureData] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [editableStructure, setEditableStructure] = useState([]);
@@ -37,7 +45,6 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
   }, [paperLength]);
 
   const fetchStructure = async () => {
-    setLoading(true);
     setError(null);
     
     try {
@@ -67,7 +74,6 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
       setError('Failed to load paper structure');
       console.error('Structure fetch error:', err);
     }
-    setLoading(false);
   };
 
   const initializeEditableStructure = (data) => {
@@ -538,6 +544,29 @@ const PaperStructurePreview = ({ paperType, methodology, subMethodology, paperLe
                 </small>
               </div>
             </div>
+          </div>
+
+          {/* Add the Generate Outline button at the bottom */}
+          <div className="mt-4 d-flex justify-content-center">
+            <button 
+              className="btn btn-primary btn-lg"
+              onClick={onGenerateOutline}
+              disabled={loading || hasGenerated}
+            >
+              {loading ? (
+                <>
+                  <FaSpinner className="fa-spin me-2" />
+                  Generating Framework...
+                </>
+              ) : hasGenerated ? (
+                <>
+                  <FaCheck className="me-2" />
+                  Framework Generated
+                </>
+              ) : (
+                'Generate Outline'
+              )}
+            </button>
           </div>
         </div>
       )}
