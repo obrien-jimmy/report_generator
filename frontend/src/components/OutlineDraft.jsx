@@ -10,46 +10,11 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
   const [showModal, setShowModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
 
-  // Helper to build LLM prompt for a single citation
-  const buildCitationPrompt = (questionObj, citation, sectionContext, subsectionContext) => `
-You are an expert on the works of ${citation.author || "the cited author"}.
-Answer the following question using ONLY the cited work, quoting exactly and providing a detailed, multi-tiered outline (I, 1, A, a, bullets) with slight indentations for each hierarchy.
-Be exact in quoting the author from the cited text.
+  // Safe stringify for methodology and thesis
+  const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
+  const safeThesis = typeof finalThesis === "string" ? finalThesis : JSON.stringify(finalThesis);
 
-Thesis: ${finalThesis}
-Methodology: ${methodology}
-Section Context: ${sectionContext || ''}
-Subsection Context: ${subsectionContext || ''}
 
-Question: ${questionObj.question}
-
-Citation: ${citation.apa || citation.title || citation.source || JSON.stringify(citation)}
-
-In your outline, clearly indicate which citation this information comes from (e.g., [${citation.apa || citation.title || citation.source}]).
-`;
-
-  // Helper to build LLM prompt for the fused/master outline
-  const buildFusedPrompt = (questionObj, citationResponses, sectionContext, subsectionContext) => `
-You are an expert academic analyst.
-Given the following detailed outlines (one per citation) answering the question, create a master outline that:
-- Combines the arguments of each citation
-- Groups supporting factors
-- Calls out contradictions between citations
-- Presents the result in a detailed, multi-tiered outline (I, 1, A, a, bullets)
-- Identifies any additional resources the analyst might want to consider
-
-Thesis: ${finalThesis}
-Methodology: ${methodology}
-Section Context: ${sectionContext || ''}
-Subsection Context: ${subsectionContext || ''}
-
-Question: ${questionObj.question}
-
-Citation Outlines:
-${citationResponses.map((resp, i) => `Citation ${i + 1}: \n${resp}`).join('\n\n')}
-
-Master Outline:
-`;
 
   // Generate all responses for a question: one per citation, then fused
   const generateAllQuestionResponses = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
@@ -60,19 +25,30 @@ Master Outline:
       const sectionContext = outlineData[sectionIndex]?.section_context;
       const subsectionContext = outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context;
       const citations = questionObj.citations || [];
+      const questionNum = questionIndex + 1;
 
       // 1. Generate outline for each citation
       const citationResponses = [];
       for (let i = 0; i < citations.length; i++) {
-        const prompt = buildCitationPrompt(questionObj, citations[i], sectionContext, subsectionContext);
-        const response = await axios.post('http://localhost:8000/generate_question_response', {
-          prompt,
-          thesis: finalThesis,
-          methodology: methodology,
+        const c = citations[i] || {};
+        const safeCitation = {
+          apa: typeof c.apa === "string" ? c.apa : null,
+          title: typeof c.title === "string" ? c.title : null,
+          source: typeof c.source === "string" ? c.source : null,
+          author: typeof c.author === "string" ? c.author : null
+        };
+        const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
+        const safeThesis = typeof finalThesis === "string" ? finalThesis : JSON.stringify(finalThesis);
+
+        const response = await axios.post('http://localhost:8000/generate_citation_response', {
           question: questionObj.question,
-          citation: citations[i],
+          citation: safeCitation,
           section_context: sectionContext,
-          subsection_context: subsectionContext
+          subsection_context: subsectionContext,
+          thesis: safeThesis,
+          methodology: safeMethodology,
+          question_number: questionNum,
+          citation_number: i + 1
         });
         citationResponses.push(response.data.response);
       }
@@ -80,20 +56,25 @@ Master Outline:
       // 2. Generate fused/master outline
       let fusedResponse = '';
       if (citationResponses.length > 0) {
-        const fusedPrompt = buildFusedPrompt(questionObj, citationResponses, sectionContext, subsectionContext);
-        const fusedResp = await axios.post('http://localhost:8000/generate_question_response', {
-          prompt: fusedPrompt,
-          thesis: finalThesis,
-          methodology: methodology,
+        const safeCitations = citations.map(c => ({
+          apa: typeof c.apa === "string" ? c.apa : null,
+          title: typeof c.title === "string" ? c.title : null,
+          source: typeof c.source === "string" ? c.source : null,
+          author: typeof c.author === "string" ? c.author : null
+        }));
+        const fusedResp = await axios.post('http://localhost:8000/generate_fused_response', {
           question: questionObj.question,
-          citations: citations,
+          citation_responses: citationResponses,
+          citations: safeCitations,
           section_context: sectionContext,
-          subsection_context: subsectionContext
+          subsection_context: subsectionContext,
+          thesis: safeThesis,
+          methodology: safeMethodology,
+          question_number: questionNum
         });
         fusedResponse = fusedResp.data.response;
       }
 
-      // 3. Store all responses (one per citation, then fused)
       setResponses(prev => ({
         ...prev,
         [key]: [...citationResponses, fusedResponse]
@@ -308,6 +289,7 @@ Master Outline:
                                     {/* Fused/master outline */}
                                     {citations.length > 0 && (
                                       <li
+                                        key="fused-master-outline"
                                         style={{
                                           fontSize: '0.95em',
                                           cursor: 'pointer',

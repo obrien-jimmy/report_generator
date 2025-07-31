@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from schemas.outlinedraft import (
-    Citation,
     CitationResponseRequest,
     FusedResponseRequest,
     LLMResponse
