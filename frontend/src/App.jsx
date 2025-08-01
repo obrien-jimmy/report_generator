@@ -328,6 +328,7 @@ function App() {
                 onOutlineDraftComplete={handleOutlineDraftComplete}
                 autoSave={autoSave}
                 onAutoSaveDraft={handleAutoSaveDraft}
+                draftData={draftData} // <-- add this line
               />
             </div>
           )}

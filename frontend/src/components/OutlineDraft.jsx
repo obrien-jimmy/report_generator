@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckCircle, FaSpinner } from 'react-icons/fa';
 import axios from 'axios';
+import Modal from './Modal';
 
 const OutlineDraft = ({
   outlineData,
@@ -8,7 +9,8 @@ const OutlineDraft = ({
   methodology,
   onOutlineDraftComplete,
   autoSave,
-  onAutoSaveDraft
+  onAutoSaveDraft,
+  draftData // <-- receive as prop
 }) => {
   const [responses, setResponses] = useState({}); // { questionKey: [resp1, resp2, ..., fusedResp] }
   const [loading, setLoading] = useState({});
@@ -21,7 +23,12 @@ const OutlineDraft = ({
   const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
   const safeThesis = typeof finalThesis === "string" ? finalThesis : JSON.stringify(finalThesis);
 
-
+  // Hydrate responses from draftData when it changes
+  useEffect(() => {
+    if (draftData && draftData.responses) {
+      setResponses(draftData.responses);
+    }
+  }, [draftData]);
 
   // Generate all responses for a question: one per citation, then fused
   const generateAllQuestionResponses = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
@@ -92,6 +99,7 @@ const OutlineDraft = ({
           ...idxPrev,
           [key]: 0
         }));
+        // Auto-save with the latest responses
         if (autoSave && onAutoSaveDraft) {
           onAutoSaveDraft({
             outline: outlineData,
@@ -449,40 +457,30 @@ const OutlineDraft = ({
 
       {/* Response Modal */}
       {showModal && selectedResponse && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content-large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Question Response</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={closeModal}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <h6 className="text-primary mb-3">Question:</h6>
-              <p className="mb-4 bg-light p-3 rounded">{selectedResponse.question}</p>
-              <h6 className="text-success mb-3">Response:</h6>
-              <div className="bg-light p-3 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <pre className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-                  {selectedResponse.response}
-                </pre>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={closeModal}
-              >
-                Close
-              </button>
-            </div>
+        <Modal
+          show={showModal}
+          onClose={closeModal}
+          title="Question Response"
+          large
+          footer={
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={closeModal}
+            >
+              Close
+            </button>
+          }
+        >
+          <h6 className="text-primary mb-3">Question:</h6>
+          <p className="mb-4 bg-light p-3 rounded">{selectedResponse.question}</p>
+          <h6 className="text-success mb-3">Response:</h6>
+          <div className="bg-light p-3 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <pre className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+              {selectedResponse.response}
+            </pre>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
