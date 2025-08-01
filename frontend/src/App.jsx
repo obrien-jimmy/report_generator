@@ -43,6 +43,8 @@ function App() {
   // Hidden debug sections
   const [showDebugSections, setShowDebugSections] = useState(false);
 
+  const [autoSave, setAutoSave] = useState(true);
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -117,6 +119,8 @@ function App() {
     setDraftData(draftData);
   };
 
+  const handleAutoSaveDraft = (draft) => setDraftData(draft);
+
   // Project management functions
   const handleLoadProject = (project) => {
     const data = project.data;
@@ -180,9 +184,16 @@ function App() {
           <h6 className="mb-0">Project Management</h6>
         </div>
         <div className="card-body">
+          {/* Auto-save toggle button */}
+          <button
+            className={`btn btn-sm mb-3 ${autoSave ? 'btn-success' : 'btn-outline-secondary'}`}
+            onClick={() => setAutoSave(!autoSave)}
+          >
+            {autoSave ? 'Auto-Save ON' : 'Auto-Save OFF'}
+          </button>
           <ProjectManager
             currentProject={currentProject}
-            setCurrentProject={setCurrentProject} // Add this line
+            setCurrentProject={setCurrentProject}
             onLoadProject={handleLoadProject}
             onNewProject={handleNewProject}
             finalThesis={finalThesis}
@@ -315,6 +326,8 @@ function App() {
                 finalThesis={finalThesis}
                 methodology={methodology}
                 onOutlineDraftComplete={handleOutlineDraftComplete}
+                autoSave={autoSave}
+                onAutoSaveDraft={handleAutoSaveDraft}
               />
             </div>
           )}

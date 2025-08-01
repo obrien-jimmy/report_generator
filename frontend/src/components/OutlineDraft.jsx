@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckCircle, FaSpinner } from 'react-icons/fa';
 import axios from 'axios';
 
-const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftComplete }) => {
+const OutlineDraft = ({
+  outlineData,
+  finalThesis,
+  methodology,
+  onOutlineDraftComplete,
+  autoSave,
+  onAutoSaveDraft
+}) => {
   const [responses, setResponses] = useState({}); // { questionKey: [resp1, resp2, ..., fusedResp] }
   const [loading, setLoading] = useState({});
   const [currentResponseIdx, setCurrentResponseIdx] = useState({}); // { questionKey: idx }
@@ -75,14 +82,27 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
         fusedResponse = fusedResp.data.response;
       }
 
-      setResponses(prev => ({
-        ...prev,
-        [key]: [...citationResponses, fusedResponse]
-      }));
-      setCurrentResponseIdx(prev => ({
-        ...prev,
-        [key]: 0
-      }));
+      // Update responses and auto-save with the latest state
+      setResponses(prev => {
+        const updated = {
+          ...prev,
+          [key]: [...citationResponses, fusedResponse]
+        };
+        setCurrentResponseIdx(idxPrev => ({
+          ...idxPrev,
+          [key]: 0
+        }));
+        if (autoSave && onAutoSaveDraft) {
+          onAutoSaveDraft({
+            outline: outlineData,
+            responses: updated,
+            thesis: finalThesis,
+            methodology
+          });
+        }
+        return updated;
+      });
+
     } catch (error) {
       console.error('Error generating responses:', error);
       alert('Failed to generate responses. Please try again.');
@@ -157,6 +177,14 @@ const OutlineDraft = ({ outlineData, finalThesis, methodology, onOutlineDraftCom
   const handleCompleteOutlineDraft = () => {
     if (onOutlineDraftComplete) {
       onOutlineDraftComplete({
+        outline: outlineData,
+        responses: responses,
+        thesis: finalThesis,
+        methodology: methodology
+      });
+    }
+    if (onAutoSaveDraft) {
+      onAutoSaveDraft({
         outline: outlineData,
         responses: responses,
         thesis: finalThesis,
