@@ -66,7 +66,7 @@ const ProjectManager = ({
         finalThesis,
         paperLength,
         sourceCategories,
-        methodology,
+        methodology, // <-- should be the full object, not a string
         selectedPaperType,
         
         // State flags
@@ -125,7 +125,7 @@ const ProjectManager = ({
         finalThesis,
         paperLength,
         sourceCategories,
-        methodology,
+        methodology, // <-- should be the full object, not a string
         selectedPaperType,
         thesisFinalized,
         categoriesFinalized,

@@ -36,8 +36,15 @@ const MethodologyGenerator = ({
 
   // Hydrate from saved methodology when it changes (e.g., after loading a project)
   useEffect(() => {
-    if (methodology && typeof methodology === 'object' && Object.keys(methodology).length > 0) {
-      // Hydrate all fields from saved methodology
+    // Debug: See what is being loaded
+    // console.log('Loaded methodology:', methodology);
+
+    if (
+      methodology &&
+      typeof methodology === 'object' &&
+      Object.keys(methodology).length > 0 &&
+      methodology.description && methodology.approach && methodology.source_focus && methodology.structure_alignment
+    ) {
       setCustomMethodology(methodology.description || '');
       setCustomApproach(methodology.approach || '');
       setCustomSourceFocus(methodology.source_focus || '');
@@ -47,7 +54,7 @@ const MethodologyGenerator = ({
       setSelectedSubMethodology(methodology.subMethodology || '');
       setIsCustomMethodology(!!methodology.isCustom);
 
-      // Ensure finalized state is shown
+      // Mark as finalized and show the finalized UI
       setFinalized(true);
       setCollapsed(false); // or true if you want it collapsed by default
       setShowMethodologySelection(false);

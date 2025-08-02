@@ -88,7 +88,6 @@ function App() {
   };
 
   const proceedToOutline = () => setReadyForOutline(true);
-  const resetOutline = () => setOutlineVersion(prev => prev + 1);
 
   const handleFrameworkComplete = (outlineData) => {
     console.log('=== App.jsx: handleFrameworkComplete called ===');
@@ -299,9 +298,9 @@ function App() {
                   <MethodologyGenerator
                     finalThesis={finalThesis}
                     sourceCategories={sourceCategories}
+                    methodology={methodology} // <-- should be the full object
                     setMethodology={setMethodology}
                     proceedToOutline={proceedToOutline}
-                    resetOutline={resetOutline}
                     selectedPaperType={selectedPaperType}
                     pageCount={paperLength}
                   />
