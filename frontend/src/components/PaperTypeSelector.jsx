@@ -1,10 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const PaperTypeSelector = ({ onPaperTypeSelected }) => {
-  const [selectedType, setSelectedType] = useState('');
-  const [pageCount, setPageCount] = useState('');
+const PaperTypeSelector = ({
+  selectedPaperType,
+  setSelectedPaperType,
+  paperLength,
+  setPaperLength,
+  onPaperTypeSelected
+}) => {
+  const [selectedType, setSelectedType] = useState(selectedPaperType ? selectedPaperType.id : '');
+  const [pageCount, setPageCount] = useState(paperLength === null ? '' : paperLength);
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Sync local state with props when they change (e.g., after loading a project)
+  useEffect(() => {
+    setSelectedType(selectedPaperType ? selectedPaperType.id : '');
+    setPageCount(paperLength === null ? '' : paperLength);
+  }, [selectedPaperType, paperLength]);
 
   const paperTypes = [
     {
@@ -178,6 +190,8 @@ const PaperTypeSelector = ({ onPaperTypeSelected }) => {
     
     setFinalized(true);
     setCollapsed(true);
+    setSelectedPaperType(selectedPaper);
+    setPaperLength(pageLengthValue);
     onPaperTypeSelected(selectedPaper, pageLengthValue);
   };
 

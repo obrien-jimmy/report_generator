@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaQuestionCircle } from 'react-icons/fa';
 
-const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
-  const [initialThesis, setInitialThesis] = useState('');
+const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPaperType }) => {
+  const [initialThesis, setInitialThesis] = useState(finalThesis || '');
   const [refinedThesis, setRefinedThesis] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,6 +16,11 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
   const [probingAnswers, setProbingAnswers] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [processingAnswers, setProcessingAnswers] = useState(false);
+
+  // Sync local state with prop when it changes (e.g., after loading a project)
+  useEffect(() => {
+    setInitialThesis(finalThesis || '');
+  }, [finalThesis]);
 
   const handleRefineThesis = async () => {
     if (!initialThesis.trim()) {
@@ -105,15 +110,15 @@ const ThesisRefinement = ({ onFinalize, selectedPaperType }) => {
     setProbingAnswers([]);
   };
 
+  // When finalizing, update the app state as well
   const handleFinalize = () => {
     if (!refinedThesis.trim()) {
       alert('Please refine your thesis before finalizing.');
       return;
     }
-    
     setFinalized(true);
     setCollapsed(true);
-    // Pass the thesis to trigger the next section
+    setFinalThesis(refinedThesis); // <-- update app state
     onFinalize(refinedThesis);
   };
 

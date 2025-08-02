@@ -127,7 +127,7 @@ function App() {
     
     // Restore all state
     setFinalThesis(data.finalThesis || '');
-    setPaperLength(data.paperLength || null);
+    setPaperLength(data.paperLength ?? '');
     setSourceCategories(data.sourceCategories || []);
     setMethodology(data.methodology || '');
     setSelectedPaperType(data.selectedPaperType || null);
@@ -260,13 +260,21 @@ function App() {
             <div className="tab-pane fade show active">
               {/* Paper Type & Length Selector */}
               <div className="card p-3 mb-4">
-                <PaperTypeSelector onPaperTypeSelected={handlePaperTypeSelected} />
+                <PaperTypeSelector
+                  selectedPaperType={selectedPaperType}
+                  setSelectedPaperType={setSelectedPaperType}
+                  paperLength={paperLength}
+                  setPaperLength={setPaperLength}
+                  onPaperTypeSelected={handlePaperTypeSelected}
+                />
               </div>
 
               {/* Thesis Refinement Section */}
               {selectedPaperType && paperLength !== null && (
                 <div className="card p-3 mb-4">
                   <ThesisRefinement 
+                    finalThesis={finalThesis}
+                    setFinalThesis={setFinalThesis}
                     onFinalize={handleThesisFinalized} 
                     selectedPaperType={selectedPaperType}
                   />
