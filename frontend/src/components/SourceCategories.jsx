@@ -1,8 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) => {
-  const [categories, setCategories] = useState([]);
+const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, savedCategories }) => {
+  const [categories, setCategories] = useState(savedCategories && savedCategories.length > 0
+    ? savedCategories.map((name, idx) => ({
+        name,
+        selected: true,
+        number: idx + 1
+      }))
+    : []);
   const [customCategory, setCustomCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [finalized, setFinalized] = useState(false);
@@ -11,6 +17,18 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingRef = useRef(false); // Prevent double loading
+
+  // Hydrate from savedCategories on mount or when it changes
+  useEffect(() => {
+    if (savedCategories && savedCategories.length > 0) {
+      setCategories(savedCategories.map((name, idx) => ({
+        name,
+        selected: true,
+        number: idx + 1
+      })));
+      setHasLoaded(true);
+    }
+  }, [savedCategories]);
 
   const recommendSources = async () => {
     // Prevent multiple simultaneous loads
@@ -131,20 +149,19 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected }) =>
     loadingRef.current = false;
   };
 
-  // Auto-load when component is first mounted - ONLY loading mechanism
+  // Only auto-load if there are no saved categories and we haven't loaded yet
   useEffect(() => {
-    if (finalThesis && paperLength !== null && !hasLoaded && !loading) {
+    if (
+      (!savedCategories || savedCategories.length === 0) &&
+      finalThesis &&
+      paperLength !== null &&
+      !hasLoaded &&
+      !loading
+    ) {
       recommendSources();
     }
-  }, []); // Empty dependency array - only run once on mount
-
-  // Separate effect to handle prop changes after initial load
-  useEffect(() => {
-    if (hasLoaded && finalThesis && paperLength !== null) {
-      // Props changed after initial load - reset if needed
-      // This won't auto-reload, user needs to manually refresh
-    }
-  }, [finalThesis, paperLength, hasLoaded]);
+    // eslint-disable-next-line
+  }, [savedCategories, finalThesis, paperLength, hasLoaded, loading]);
 
   const handleManualLoad = () => {
     if (!finalThesis || paperLength === null) {

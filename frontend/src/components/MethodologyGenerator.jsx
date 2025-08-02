@@ -2,7 +2,15 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaEdit, FaSave, FaTimes, FaInfoCircle, FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
 
-const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, proceedToOutline, selectedPaperType, pageCount }) => {
+const MethodologyGenerator = ({
+  finalThesis,
+  sourceCategories,
+  methodology, // <-- receive saved methodology as prop
+  setMethodology,
+  proceedToOutline,
+  selectedPaperType,
+  pageCount
+}) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
   const [selectedSubMethodology, setSelectedSubMethodology] = useState('');
@@ -25,6 +33,51 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
   const [outlineNeedsRerun, setOutlineNeedsRerun] = useState(false);
   const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
   const [isCustomMethodology, setIsCustomMethodology] = useState(false);
+
+  // Hydrate from saved methodology when it changes (e.g., after loading a project)
+  useEffect(() => {
+    if (methodology && typeof methodology === 'object' && Object.keys(methodology).length > 0) {
+      // Hydrate all fields from saved methodology
+      setCustomMethodology(methodology.description || '');
+      setCustomApproach(methodology.approach || '');
+      setCustomSourceFocus(methodology.source_focus || '');
+      setCustomStructureAlignment(methodology.structure_alignment || '');
+      setSelectedMethodologyDetails(methodology.details || null);
+      setSelectedMethodology(methodology.methodologyType || '');
+      setSelectedSubMethodology(methodology.subMethodology || '');
+      setIsCustomMethodology(!!methodology.isCustom);
+
+      // Ensure finalized state is shown
+      setFinalized(true);
+      setCollapsed(false); // or true if you want it collapsed by default
+      setShowMethodologySelection(false);
+
+      // Optionally, clear out any selection UI state
+      setSelectedMethodologyIndex(null);
+      setSelectedSetIndex(null);
+      setGeneratedMethodologies([]);
+      setMethodologySets([]);
+      setCurrentSetIndex(0);
+    } else {
+      // If no saved methodology, reset to initial state
+      setCustomMethodology('');
+      setCustomApproach('');
+      setCustomSourceFocus('');
+      setCustomStructureAlignment('');
+      setSelectedMethodologyDetails(null);
+      setSelectedMethodology('');
+      setSelectedSubMethodology('');
+      setIsCustomMethodology(false);
+      setFinalized(false);
+      setCollapsed(false);
+      setShowMethodologySelection(true);
+      setSelectedMethodologyIndex(null);
+      setSelectedSetIndex(null);
+      setGeneratedMethodologies([]);
+      setMethodologySets([]);
+      setCurrentSetIndex(0);
+    }
+  }, [methodology]);
 
   const loadMethodologyOptions = async () => {
     if (hasLoadedOptions) return;
@@ -665,7 +718,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                 <div className="mt-2" style={{ whiteSpace: 'pre-wrap' }}>
                   {customMethodology}
                 </div>
-                
                 <div className="mt-3">
                   <h6><strong>Methodology Details:</strong></h6>
                   <div className="row">
@@ -689,8 +741,20 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                     </div>
                   </div>
                 </div>
+                {selectedMethodology && (
+                  <div className="mt-3">
+                    <small className="text-muted">
+                      <strong>Selected Methodology:</strong> {selectedMethodology}
+                      {selectedSubMethodology && (
+                        <>
+                          <br />
+                          <strong>Sub-Methodology:</strong> {selectedSubMethodology}
+                        </>
+                      )}
+                    </small>
+                  </div>
+                )}
               </div>
-              
               <div className="d-flex gap-2">
                 <button
                   className="btn btn-secondary"
@@ -698,7 +762,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                 >
                   Edit Methodology
                 </button>
-
                 {!outlineActivated && (
                   <button 
                     className="btn btn-primary" 
@@ -712,7 +775,6 @@ const MethodologyGenerator = ({ finalThesis, sourceCategories, setMethodology, p
                     Proceed to Outline
                   </button>
                 )}
-
                 {outlineActivated && outlineNeedsRerun && (
                   <button 
                     className="btn btn-primary" 

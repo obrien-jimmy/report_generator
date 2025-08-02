@@ -288,6 +288,7 @@ function App() {
                     finalThesis={finalThesis}
                     paperLength={paperLength || 0}
                     onCategoriesSelected={handleCategoriesSelected}
+                    savedCategories={sourceCategories} // <-- add this line
                   />
                 </div>
               )}
