@@ -20,6 +20,16 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
   // Sync local state with prop when it changes (e.g., after loading a project)
   useEffect(() => {
     setInitialThesis(finalThesis || '');
+    // Set finalized if finalThesis is present (completed)
+    if (finalThesis && finalThesis.trim() !== '') {
+      setFinalized(true);
+      setCollapsed(true);
+      setRefinedThesis(finalThesis);
+    } else {
+      setFinalized(false);
+      setCollapsed(false);
+      setRefinedThesis('');
+    }
   }, [finalThesis]);
 
   const handleRefineThesis = async () => {

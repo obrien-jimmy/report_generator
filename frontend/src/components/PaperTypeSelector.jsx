@@ -16,6 +16,14 @@ const PaperTypeSelector = ({
   useEffect(() => {
     setSelectedType(selectedPaperType ? selectedPaperType.id : '');
     setPageCount(paperLength === null ? '' : paperLength);
+    // Set finalized if both are present (completed)
+    if (selectedPaperType && paperLength !== null && paperLength !== undefined) {
+      setFinalized(true);
+      setCollapsed(true);
+    } else {
+      setFinalized(false);
+      setCollapsed(false);
+    }
   }, [selectedPaperType, paperLength]);
 
   const paperTypes = [

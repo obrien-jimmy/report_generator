@@ -27,6 +27,11 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
         number: idx + 1
       })));
       setHasLoaded(true);
+      setFinalized(true);
+      setCollapsed(true);
+    } else {
+      setFinalized(false);
+      setCollapsed(false);
     }
   }, [savedCategories]);
 
