@@ -472,13 +472,28 @@ const OutlineDraft = ({
             </button>
           }
         >
-          <h6 className="text-primary mb-3">Question:</h6>
-          <p className="mb-4 bg-light p-3 rounded">{selectedResponse.question}</p>
-          <h6 className="text-success mb-3">Response:</h6>
-          <div className="bg-light p-3 rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            <pre className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-              {selectedResponse.response}
-            </pre>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '60vh' }}>
+            <h6 className="text-primary mb-3">Question:</h6>
+            <p className="mb-4 bg-light p-3 rounded">{selectedResponse.question}</p>
+            <h6 className="text-success mb-3">Response:</h6>
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              margin: 0,
+              padding: 0,
+              background: 'none'
+            }}>
+              <pre className="mb-0" style={{
+                whiteSpace: 'pre-wrap',
+                lineHeight: '1.6',
+                background: 'none',
+                margin: 0,
+                padding: 0,
+                fontFamily: 'inherit'
+              }}>
+                {selectedResponse.response}
+              </pre>
+            </div>
           </div>
         </Modal>
       )}
