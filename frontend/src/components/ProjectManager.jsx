@@ -292,7 +292,7 @@ const ProjectManager = ({
             </button>
             
             <label className="btn btn-outline-secondary btn-sm">
-              <FaUpload className="me-1" />
+              <FaDownload className="me-1" /> {/* <-- Download for Import */}
               Import
               <input 
                 type="file" 
@@ -301,6 +301,21 @@ const ProjectManager = ({
                 style={{ display: 'none' }}
               />
             </label>
+
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => {
+                if (currentProject) {
+                  exportProject(currentProject);
+                } else {
+                  alert('No project selected to export.');
+                }
+              }}
+              title="Export Current Project"
+            >
+              <FaUpload className="me-1" /> {/* <-- Upload for Export */}
+              Export
+            </button>
           </div>
         </div>
         
