@@ -288,7 +288,7 @@ const PaperStructurePreview = ({
     <div className="card mb-4">
       <div className="card-header d-flex justify-content-between align-items-center">
         <div className="d-flex align-items-center">
-          <h6 className="mb-0">Paper Structure Preview</h6>
+          <h5 className="mb-0">Paper Structure Preview</h5>
           <span className="badge bg-info ms-2">
             {editableStructure.length} sections
           </span>

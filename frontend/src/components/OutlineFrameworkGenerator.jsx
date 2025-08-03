@@ -53,6 +53,7 @@ const OutlineGenerator = ({
   }, [hasGenerated, outline, onFrameworkComplete]);
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
+  const [outlineFrameworkCollapsed, setOutlineFrameworkCollapsed] = useState(false);
 
   const handleStructureChange = (structure) => {
     setCustomStructure(structure);
@@ -480,8 +481,7 @@ const OutlineGenerator = ({
           className="btn btn-sm btn-outline-secondary"
           onClick={toggleCollapse}
         >
-          {collapsed ? <FaEye /> : <FaEyeSlash />}
-          {collapsed ? ' Show' : ' Hide'}
+          {collapsed ? 'Expand' : 'Collapse'}
         </button>
       </div>
 
@@ -547,51 +547,84 @@ const OutlineGenerator = ({
 
           {(structureApproved || hasGenerated) && (
             <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">Generate Complete Research Framework</h5>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Generate Outline Framework</h5>
+                <div className="d-flex gap-2">
+                  {/* Collapse/Expand All Sections Button */}
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => {
+                      if (
+                        outline.some((_, idx) => !collapsedSections[idx])
+                      ) {
+                        setCollapsedSections(
+                          outline.reduce((acc, _, idx) => ({ ...acc, [idx]: true }), {})
+                        );
+                      } else {
+                        setCollapsedSections(
+                          outline.reduce((acc, _, idx) => ({ ...acc, [idx]: false }), {})
+                        );
+                      }
+                    }}
+                    title={
+                      outline.some((_, idx) => !collapsedSections[idx])
+                        ? 'Collapse All Sections'
+                        : 'Expand All Sections'
+                    }
+                  >
+                    {outline.some((_, idx) => !collapsedSections[idx])
+                      ? 'Collapse Sections'
+                      : 'Expand Sections'}
+                  </button>
+                  {/* Collapse/Expand Generate Outline Framework section only, using eye icon */}
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setOutlineFrameworkCollapsed(prev => !prev)}
+                    title={outlineFrameworkCollapsed ? 'Expand Generate Outline Framework' : 'Collapse Generate Outline Framework'}
+                  >
+                    {outlineFrameworkCollapsed ? <FaEye /> : <FaEyeSlash />}
+                  </button>
+                </div>
               </div>
-              <div className="card-body">
-                {!hasGenerated && (
-                  <div className="mb-3">
-                    <p className="text-muted">
-                      Generate a complete research framework including sections, subsections, questions, and citations.
-                    </p>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => generateOutline(false)}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <FaSpinner className="fa-spin me-2" />
-                          Generating Complete Framework...
-                        </>
-                      ) : (
-                        'Generate Complete Research Framework'
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {loading && generationProgress && (
-                  <div className="alert alert-info">
-                    <FaSpinner className="fa-spin me-2" />
-                    {generationProgress}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="alert alert-danger">
-                    <strong>Error:</strong> {error}
-                  </div>
-                )}
-
-                {hasGenerated && outline.length > 0 && (
-                  <div className="card">
-                    <div className="card-header">
-                      <h5 className="mb-0">Generated Research Framework</h5>
+              {!outlineFrameworkCollapsed && (
+                <div className="card-body">
+                  {!hasGenerated && (
+                    <div className="mb-3">
+                      <p className="text-muted">
+                        Generate a complete outline framework including sections, subsections, questions, and citations.
+                      </p>
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => generateOutline(false)}
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <FaSpinner className="fa-spin me-2" />
+                            Generating Complete Outline Framework...
+                          </>
+                        ) : (
+                          'Generate Outline Framework'
+                        )}
+                      </button>
                     </div>
-                    <div className="card-body">
+                  )}
+
+                  {loading && generationProgress && (
+                    <div className="alert alert-info">
+                      <FaSpinner className="fa-spin me-2" />
+                      {generationProgress}
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="alert alert-danger">
+                      <strong>Error:</strong> {error}
+                    </div>
+                  )}
+
+                  {hasGenerated && outline.length > 0 && (
+                    <>
                       {loading && generationProgress && (
                         <div className="alert alert-info">
                           <FaSpinner className="fa-spin me-2" />
@@ -725,9 +758,9 @@ const OutlineGenerator = ({
                       </div>
 
                       <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
-                        <h6 className="text-success mb-3">Complete Research Framework Ready</h6>
+                        <h6 className="text-success mb-3">Complete Outline Framework Ready</h6>
                         <p className="mb-3">
-                          Your complete research framework with detailed sections, subsections, questions, and citations is ready. 
+                          Your complete outline framework with detailed sections, subsections, questions, and citations is ready. 
                           Transfer it to the Outline Draft to begin generating responses.
                         </p>
                         <button 
@@ -740,10 +773,10 @@ const OutlineGenerator = ({
                           Transfer to Outline Draft
                         </button>
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

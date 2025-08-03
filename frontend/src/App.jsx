@@ -4,7 +4,7 @@ import socratesIcon from './assets/socrates.png';
 import ThesisRefinement from './components/ThesisRefinement';
 import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
-import OutlineGenerator from './components/OutlineGenerator';
+import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
 import OutlineDraft from './components/OutlineDraft';
 import InitialDraft from './components/InitialDraft';
