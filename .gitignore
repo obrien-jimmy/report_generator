@@ -9,3 +9,4 @@ frontend/dist/
 *.pyd
 .Python
 .DS_Store
+backend/venv/
