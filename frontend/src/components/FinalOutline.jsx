@@ -1,15 +1,35 @@
 import { useState } from 'react';
-import { FaDownload, FaEdit, FaEye, FaEyeSlash, FaStickyNote, FaMagic, FaListOl, FaParagraph, FaRandom, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import {
+  FaDownload, FaEdit, FaEye, FaEyeSlash, FaStickyNote, FaMagic,
+  FaListOl, FaParagraph, FaRandom, FaChevronDown, FaChevronRight
+} from 'react-icons/fa';
 import FinalOutlineModal from './FinalOutlineModal';
 import './FinalOutline.css';
 
+// Outline numbering helpers
 const romanNumeral = n => ['I','II','III','IV','V','VI','VII','VIII','IX','X'][n] || n+1;
 const alpha = n => String.fromCharCode(65 + n);
 const lowerAlpha = n => String.fromCharCode(97 + n);
+const roman = n => ['i','ii','iii','iv','v','vi','vii','viii','ix','x'][n] || n+1;
+const parenNum = n => `${n+1})`;
+const parenAlpha = n => `${String.fromCharCode(97 + n)})`;
+
+const getNumberForLevel = (level, idx) => {
+  switch (level) {
+    case 1: return `${romanNumeral(idx)}.`;
+    case 2: return `${alpha(idx)}.`;
+    case 3: return `${idx + 1}.`;
+    case 4: return `${lowerAlpha(idx)}.`;
+    case 5: return `${roman(idx)}.`;
+    case 6: return parenNum(idx);
+    case 7: return parenAlpha(idx);
+    default: return '';
+  }
+};
 
 const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [level, setLevel] = useState(4); // 1=I, 2=A, 3=1, 4=a
+  const [level, setLevel] = useState(7); // Show all levels by default
   const [expandedSections, setExpandedSections] = useState({});
   const [noteModal, setNoteModal] = useState({ show: false, note: '' });
   const [showTransitions, setShowTransitions] = useState(false);
@@ -17,30 +37,35 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   const [conclusionText, setConclusionText] = useState('');
   const [abstractText, setAbstractText] = useState('');
   const [transitions, setTransitions] = useState({});
+  const [refinedOutline, setRefinedOutline] = useState('');
+  const [refining, setRefining] = useState(false);
 
-  // Helper to toggle section expansion
-  const toggleSection = idx => setExpandedSections(prev => ({ ...prev, [idx]: !prev[idx] }));
-
-  // Helper to show notes
-  const handleShowNote = note => setNoteModal({ show: true, note });
-  const handleCloseNote = () => setNoteModal({ show: false, note: '' });
-
-  // Level selector
+  // Level selector options
   const levelOptions = [
     { label: 'Level 1 (I, II, ...)', value: 1 },
     { label: 'Level 2 (A, B, ...)', value: 2 },
     { label: 'Level 3 (1, 2, ...)', value: 3 },
-    { label: 'Level 4 (a, b, ...)', value: 4 }
+    { label: 'Level 4 (a, b, ...)', value: 4 },
+    { label: 'Level 5 (i, ii, ...)', value: 5 },
+    { label: 'Level 6 (1), 2), ...)', value: 6 },
+    { label: 'Level 7 (a), b), ...)', value: 7 }
   ];
+
+  // Toggle section expansion
+  const toggleSection = idx => setExpandedSections(prev => ({ ...prev, [idx]: !prev[idx] }));
+
+  // Show/hide notes
+  const handleShowNote = note => setNoteModal({ show: true, note });
+  const handleCloseNote = () => setNoteModal({ show: false, note: '' });
 
   // Generate Methodology/Conclusion/Abstract/Transitions (calls backend)
   const generateSectionText = async (type) => {
-    const res = await fetch(`/api/finaloutline/generate_${type}`, {
+    const res = await fetch(`http://localhost:8000/api/finaloutline/generate_${type}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         outline: draftData.outline,
-        responses: draftData.responses,
+        responses: getStringResponses(draftData.responses),
         thesis: finalThesis,
         methodology
       })
@@ -52,6 +77,27 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     if (type === 'transitions') setTransitions(data.transitions);
   };
 
+  // Refine Outline
+  const handleRefineOutline = async () => {
+    setRefining(true);
+    const payload = {
+      outline: draftData.outline,
+      responses: getStringResponses(draftData.responses),
+      thesis: finalThesis,
+      methodology: methodology !== undefined ? methodology : null // or ''
+    };
+    console.log("Refine Outline Payload:", payload);
+
+    const res = await fetch('http://localhost:8000/api/finaloutline/refine_outline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    setRefinedOutline(data.text);
+    setRefining(false);
+  };
+
   // Download as text
   const downloadOutline = () => {
     let text = `Thesis: ${finalThesis}\n\n`;
@@ -61,7 +107,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
         text += `  ${alpha(subIdx)}. ${sub.subsection_title}\n`;
         sub.questions?.forEach((q, qIdx) => {
           const key = `${sIdx}-${subIdx}-${qIdx}`;
-          const resp = draftData.responses[key];
+          const resp = getStringResponses(draftData.responses)[key];
           if (resp) text += `    ${qIdx + 1}. ${resp}\n`;
         });
       });
@@ -77,10 +123,27 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     URL.revokeObjectURL(url);
   };
 
-  // Render outline recursively
+  // Helper to convert responses to Dict[str, str]
+  function getStringResponses(responses) {
+    const stringResponses = {};
+    Object.entries(responses).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        stringResponses[key] = value.map(v => v.raw || v).join('\n');
+      } else if (typeof value === 'object' && value.raw) {
+        stringResponses[key] = value.raw;
+      } else {
+        stringResponses[key] = value;
+      }
+    });
+    return stringResponses;
+  }
+
+  // Render outline recursively (with continuous numbering and notes)
   const renderOutline = () => (
     <div className="final-outline-content">
-      <h1 className="final-outline-thesis">{finalThesis}</h1>
+      <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
+        Thesis: <span style={{ fontWeight: 'normal' }}>{finalThesis}</span>
+      </div>
       {draftData.outline?.map((section, sIdx) => {
         if (level < 1) return null;
         const secNum = romanNumeral(sIdx);
@@ -110,7 +173,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
                     if (level < 3) return null;
                     const qNum = qIdx + 1;
                     const key = `${sIdx}-${subIdx}-${qIdx}`;
-                    const resp = draftData.responses[key];
+                    const resp = getStringResponses(draftData.responses)[key];
                     return (
                       <div key={qIdx} className="final-outline-question">
                         <span className="final-outline-question-num">{qNum}.</span>
@@ -118,19 +181,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
                         {q.note && (
                           <FaStickyNote className="final-outline-note-icon" onClick={() => handleShowNote(q.note)} />
                         )}
-                        {(expandedSections[sIdx] || level > 3) && q.subpoints?.map((sp, spIdx) => {
-                          if (level < 4) return null;
-                          const spNum = lowerAlpha(spIdx);
-                          return (
-                            <div key={spIdx} className="final-outline-subpoint">
-                              <span className="final-outline-subpoint-num">{spNum}.</span>
-                              <span className="final-outline-subpoint-text">{sp.text}</span>
-                              {sp.note && (
-                                <FaStickyNote className="final-outline-note-icon" onClick={() => handleShowNote(sp.note)} />
-                              )}
-                            </div>
-                          );
-                        })}
+                        {/* You can add further subpoints rendering here if needed */}
                       </div>
                     );
                   })}
@@ -185,6 +236,14 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
 
       {/* Generate buttons */}
       <div className="mb-3 d-flex gap-2 align-items-center">
+        <button
+          className="btn btn-warning"
+          onClick={handleRefineOutline}
+          disabled={refining}
+          style={{ marginRight: '1.5rem' }}
+        >
+          {refining ? 'Refining...' : 'Refine Outline'}
+        </button>
         <button className="btn btn-outline-secondary" onClick={() => generateSectionText('methodology')}>
           <FaMagic className="me-1" /> Generate Methodology
         </button>
@@ -222,6 +281,18 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
               <li key={key}><strong>{key}:</strong> {value}</li>
             ))}
           </ul>
+        </div>
+      )}
+      {refinedOutline && (
+        <div className="card mb-4">
+          <div className="card-body">
+            <div style={{ fontFamily: 'monospace', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
+                Thesis: <span style={{ fontWeight: 'normal' }}>{finalThesis}</span>
+              </div>
+              {refinedOutline}
+            </div>
+          </div>
         </div>
       )}
 

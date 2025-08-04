@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body
-from .schemas import FinalOutlineRequest, FinalOutlineTransitionsResponse, FinalOutlineTextResponse
+from schemas.finaloutline import FinalOutlineRequest, FinalOutlineTransitionsResponse, FinalOutlineTextResponse
 
 router = APIRouter(prefix="/api/finaloutline", tags=["finaloutline"])
 
@@ -22,3 +22,8 @@ async def generate_abstract(data: FinalOutlineRequest = Body(...)):
 async def generate_transitions(data: FinalOutlineRequest = Body(...)):
     # LLM logic here
     return {"transitions": {"I.A": "Transition from I to A...", "A.1": "Transition from A to 1..."}}
+
+@router.post("/refine_outline", response_model=FinalOutlineTextResponse)
+async def refine_outline(data: FinalOutlineRequest = Body(...)):
+    # LLM logic here
+    return {"text": "Refined outline with 7 levels, clean formatting, and improved flow."}
