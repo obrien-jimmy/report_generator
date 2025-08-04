@@ -27,6 +27,9 @@ const ProjectManager = ({
   const [showSaveAsModal, setShowSaveAsModal] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
+  const [editingProject, setEditingProject] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   useEffect(() => {
     loadProjectsList();
@@ -34,7 +37,7 @@ const ProjectManager = ({
 
   const loadProjectsList = () => {
     try {
-      const savedProjects = localStorage.getItem('socraticai_projects');
+      const savedProjects = localStorage.getItem('report_generator_projects');
       console.log('Raw saved projects:', savedProjects); // Debug log
       if (savedProjects) {
         const parsedProjects = JSON.parse(savedProjects);
@@ -93,7 +96,7 @@ const ProjectManager = ({
     }
 
     setProjects(existingProjects);
-    localStorage.setItem('socraticai_projects', JSON.stringify(existingProjects));
+    localStorage.setItem('report_generator_projects', JSON.stringify(existingProjects));
     
     // Update current project reference - but don't trigger the "loaded" message
     const updatedProject = existingProjects.find(p => p.id === projectData.id);
@@ -144,7 +147,7 @@ const ProjectManager = ({
     if (existingIndex >= 0) {
       existingProjects[existingIndex] = projectData;
       setProjects(existingProjects);
-      localStorage.setItem('socraticai_projects', JSON.stringify(existingProjects));
+      localStorage.setItem('report_generator_projects', JSON.stringify(existingProjects));
       
       // Update the current project reference without triggering load message
       window.currentProjectRef = projectData;
@@ -165,9 +168,52 @@ const ProjectManager = ({
     if (window.confirm('Are you sure you want to delete this project?')) {
       const updatedProjects = projects.filter(p => p.id !== projectId);
       setProjects(updatedProjects);
-      localStorage.setItem('socraticai_projects', JSON.stringify(updatedProjects));
+      localStorage.setItem('report_generator_projects', JSON.stringify(updatedProjects));
       loadProjectsList(); // Refresh the list
     }
+  };
+
+  const startEditProject = (project) => {
+    setEditingProject(project.id);
+    setEditName(project.name);
+    setEditDescription(project.description || '');
+  };
+
+  const cancelEditProject = () => {
+    setEditingProject(null);
+    setEditName('');
+    setEditDescription('');
+  };
+
+  const saveEditProject = (projectId) => {
+    if (!editName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+
+    const updatedProjects = projects.map(project => {
+      if (project.id === projectId) {
+        return {
+          ...project,
+          name: editName,
+          description: editDescription,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return project;
+    });
+
+    setProjects(updatedProjects);
+    localStorage.setItem('report_generator_projects', JSON.stringify(updatedProjects));
+    
+    // Update current project if it's the one being edited
+    if (currentProject && currentProject.id === projectId) {
+      window.currentProjectRef = updatedProjects.find(p => p.id === projectId);
+    }
+    
+    setEditingProject(null);
+    setEditName('');
+    setEditDescription('');
   };
 
   const exportProject = (project) => {
@@ -195,7 +241,7 @@ const ProjectManager = ({
           
           const updatedProjects = [...projects, projectData];
           setProjects(updatedProjects);
-          localStorage.setItem('socraticai_projects', JSON.stringify(updatedProjects));
+          localStorage.setItem('report_generator_projects', JSON.stringify(updatedProjects));
           
           alert('Project imported successfully!');
           loadProjectsList(); // Refresh the list
@@ -356,9 +402,7 @@ const ProjectManager = ({
                 className="btn-close"
                 onClick={() => setShowSaveModal(false)}
                 aria-label="Close"
-              >
-                ×
-              </button>
+              ></button>
             </div>
             
             <div className="modal-body">
@@ -416,9 +460,7 @@ const ProjectManager = ({
                 className="btn-close"
                 onClick={() => setShowSaveAsModal(false)}
                 aria-label="Close"
-              >
-                ×
-              </button>
+              ></button>
             </div>
             
             <div className="modal-body">
@@ -476,9 +518,7 @@ const ProjectManager = ({
                 className="btn-close"
                 onClick={() => setShowLoadModal(false)}
                 aria-label="Close"
-              >
-                ×
-              </button>
+              ></button>
             </div>
             
             <div className="modal-body">
@@ -501,16 +541,54 @@ const ProjectManager = ({
                     <div key={project.id} className="card mb-3">
                       <div className="card-body">
                         <div className="d-flex justify-content-between align-items-start">
-                          <div className="flex-grow-1">
-                            <h6 className="card-title mb-1">
-                              {project.name}
-                              {currentProject && currentProject.id === project.id && (
-                                <span className="badge bg-success ms-2">Active</span>
-                              )}
-                            </h6>
-                            {project.description && (
-                              <p className="card-text text-muted small mb-2">{project.description}</p>
+                          <div className="flex-grow-1 me-3">
+                            {editingProject === project.id ? (
+                              // Edit mode
+                              <div className="mb-3">
+                                <input
+                                  type="text"
+                                  className="form-control mb-2"
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  placeholder="Project name"
+                                />
+                                <textarea
+                                  className="form-control mb-2"
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  placeholder="Description (optional)"
+                                  rows="2"
+                                />
+                                <div className="d-flex gap-2">
+                                  <button
+                                    className="btn btn-sm btn-success"
+                                    onClick={() => saveEditProject(project.id)}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    onClick={cancelEditProject}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              // View mode
+                              <>
+                                <h6 className="card-title mb-1">
+                                  {project.name}
+                                  {currentProject && currentProject.id === project.id && (
+                                    <span className="badge bg-success ms-2">Active</span>
+                                  )}
+                                </h6>
+                                {project.description && (
+                                  <p className="card-text text-muted small mb-2">{project.description}</p>
+                                )}
+                              </>
                             )}
+                            
                             <div className="small text-muted">
                               <div>Created: {new Date(project.createdAt).toLocaleDateString()}</div>
                               <div>Updated: {new Date(project.updatedAt).toLocaleDateString()}</div>
@@ -522,24 +600,34 @@ const ProjectManager = ({
                             </div>
                           </div>
                           <div className="d-flex flex-column gap-1">
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => loadProject(project)}
-                            >
-                              Load
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-info"
-                              onClick={() => exportProject(project)}
-                            >
-                              <FaDownload />
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => deleteProject(project.id)}
-                            >
-                              <FaTrash />
-                            </button>
+                            {editingProject !== project.id && (
+                              <>
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => loadProject(project)}
+                                >
+                                  Load
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  onClick={() => startEditProject(project)}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => exportProject(project)}
+                                >
+                                  <FaUpload />
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => deleteProject(project.id)}
+                                >
+                                  <FaTrash />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

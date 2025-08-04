@@ -1,4 +1,4 @@
-# SocraticAI Development
+# Report Generator
 
 This directory contains the React frontend built with Vite. The FastAPI backend lives in `../backend`.
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import './App.css';
 import socratesIcon from './assets/socrates.png';
 import ThesisRefinement from './components/ThesisRefinement';
 import SourceCategories from './components/SourceCategories';
@@ -173,8 +174,7 @@ function App() {
   return (
     <div className="container py-5">
       <div className="d-flex align-items-center mb-4" style={{ minWidth: '100vw' }}>
-        <h1>Socratic AI Assistant</h1>
-        <img src={socratesIcon} alt="Socrates Icon" width={70} height={70} className="ms-3" />
+        <h1>Report Generator</h1>
       </div>
 
       {/* Project Management */}
