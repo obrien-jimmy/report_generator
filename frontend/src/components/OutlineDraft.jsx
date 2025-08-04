@@ -213,11 +213,13 @@ const OutlineDraft = ({
   return (
     <div className="outline-draft">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3>Outline Draft</h3>
-        <div className="d-flex gap-2 align-items-center">
+        <div className="d-flex align-items-center gap-3">
+          <h3 className="mb-0">Outline Draft</h3>
           <span className="badge bg-info">
             {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
           </span>
+        </div>
+        <div className="d-flex gap-2 align-items-center">
           <button
             className="btn btn-primary"
             onClick={generateAllResponses}

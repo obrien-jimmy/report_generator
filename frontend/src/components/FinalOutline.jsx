@@ -52,7 +52,7 @@ const FinalOutline = ({ draftData, finalThesis }) => {
   return (
     <div className="initial-draft">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3>Initial Draft</h3>
+        <h3>Final Outline</h3>
         <div className="d-flex gap-2">
           <button
             className="btn btn-outline-secondary"
