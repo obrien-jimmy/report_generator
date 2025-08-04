@@ -38,7 +38,10 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   const [abstractText, setAbstractText] = useState('');
   const [transitions, setTransitions] = useState({});
   const [refinedOutline, setRefinedOutline] = useState('');
+  const [refinedOutlineSections, setRefinedOutlineSections] = useState([]); // [{sectionTitle, subsections: [{subsectionTitle, text}]}]
   const [refining, setRefining] = useState(false);
+  const [refineProgress, setRefineProgress] = useState({section: null, subsection: null, idx: 0, total: 0});
+  const [showRefined, setShowRefined] = useState(false);
 
   // Level selector options
   const levelOptions = [
@@ -80,22 +83,76 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   // Refine Outline
   const handleRefineOutline = async () => {
     setRefining(true);
-    const payload = {
-      outline: draftData.outline,
-      responses: getStringResponses(draftData.responses),
-      thesis: finalThesis,
-      methodology: methodology !== undefined ? methodology : null // or ''
-    };
-    console.log("Refine Outline Payload:", payload);
+    setRefinedOutlineSections([]); // Reset
+    const outline = draftData.outline || [];
+    const total = outline.reduce((sum, sec) => sum + (sec.subsections?.length || 0), 0);
+    let idx = 0;
+    const newSections = [];
 
-    const res = await fetch('http://localhost:8000/api/finaloutline/refine_outline', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    setRefinedOutline(data.text);
+    for (let sIdx = 0; sIdx < outline.length; sIdx++) {
+      const section = outline[sIdx];
+      const sectionTitle = section.section_title;
+      const newSubsections = [];
+      for (let subIdx = 0; subIdx < (section.subsections?.length || 0); subIdx++) {
+        const subsection = section.subsections[subIdx];
+        const subsectionTitle = subsection.subsection_title;
+        // Gather responses for this subsection
+        const responsesArr = [];
+        for (let qIdx = 0; qIdx < (subsection.questions?.length || 0); qIdx++) {
+          const key = `${sIdx}-${subIdx}-${qIdx}`;
+          const resp = getStringResponses(draftData.responses)[key];
+          if (resp) responsesArr.push(resp);
+        }
+        idx++;
+        setRefineProgress({
+          section: sIdx + 1,
+          subsection: subIdx + 1,
+          idx,
+          total
+        });
+        console.log(`Refining Section ${sIdx + 1} (${sectionTitle}), Subsection ${subIdx + 1} (${subsectionTitle})...`);
+        // POST to backend for this subsection
+        const safeSectionTitle = sectionTitle || "";
+        const safeSubsectionTitle = subsectionTitle || "";
+        const safeThesis = finalThesis || "";
+        const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology || "");
+        const safeResponses = Array.isArray(responsesArr) ? responsesArr.map(r => String(r)) : [];
+
+        console.log("Refine subsection payload", {
+          section_title: safeSectionTitle,
+          subsection_title: safeSubsectionTitle,
+          thesis: safeThesis,
+          methodology: safeMethodology,
+          responses: safeResponses
+        });
+
+        const res = await fetch('http://localhost:8000/api/finaloutline/refine_subsection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            section_title: safeSectionTitle,
+            subsection_title: safeSubsectionTitle,
+            thesis: safeThesis,
+            methodology: safeMethodology,
+            responses: safeResponses
+          })
+        });
+        const data = await res.json();
+        newSubsections.push({ subsectionTitle, text: data.text });
+        // Update UI live
+        setRefinedOutlineSections(prev => {
+          const updated = [...prev];
+          updated[sIdx] = updated[sIdx] || { sectionTitle, subsections: [] };
+          updated[sIdx].subsections = [...(updated[sIdx].subsections || [])];
+          updated[sIdx].subsections[subIdx] = { subsectionTitle, text: data.text };
+          return updated;
+        });
+      }
+      newSections[sIdx] = { sectionTitle, subsections: newSubsections };
+    }
     setRefining(false);
+    setRefinedOutlineSections(newSections);
+    setRefineProgress({section: null, subsection: null, idx: total, total});
   };
 
   // Download as text
@@ -282,20 +339,67 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
           </ul>
         </div>
       )}
-      {refinedOutline && (
+
+      {/* Refined Outline toggle */}
+      <div className="mb-3 d-flex gap-2 align-items-center">
+        <button
+          className={`btn btn-sm ${showRefined ? 'btn-primary' : 'btn-outline-primary'}`}
+          onClick={() => setShowRefined(!showRefined)}
+        >
+          {showRefined ? 'Show Raw Outline' : 'Show Refined Outline'}
+        </button>
+      </div>
+
+      {/* Outline display */}
+      {showRefined ? (
         <div className="card mb-4">
           <div className="card-body">
             <div style={{ fontFamily: 'monospace', fontSize: '1rem', whiteSpace: 'pre-wrap' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
                 Thesis: <span style={{ fontWeight: 'normal' }}>{finalThesis}</span>
               </div>
-              {refinedOutline}
+              {draftData.outline?.map((section, sIdx) => (
+                <div key={sIdx}>
+                  <div style={{ fontWeight: 'bold' }}>{romanNumeral(sIdx)}. {section.section_title}</div>
+                  {section.subsections?.map((sub, subIdx) => {
+                    const refinedSub = refinedOutlineSections[sIdx]?.subsections?.[subIdx]?.text;
+                    const isCurrent =
+                      refining &&
+                      refineProgress.section === sIdx + 1 &&
+                      refineProgress.subsection === subIdx + 1;
+
+                    return (
+                      <div key={subIdx} style={{ marginLeft: 16 }}>
+                        <div style={{ fontWeight: 'bold' }}>{alpha(subIdx)}. {sub.subsection_title}</div>
+                        <div style={{ marginLeft: 16, color: '#888' }}>
+                          {refinedSub !== undefined
+                            ? refinedSub || <span style={{ color: '#aaa' }}>No details yet.</span>
+                            : isCurrent
+                              ? <span className="generating-outline-pulse">Generating Outline...</span>
+                              : <span style={{ color: '#aaa' }}>Pending...</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
+            {refining && (
+              <div className="progress mb-2" style={{ height: 6 }}>
+                <div
+                  className="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                  role="progressbar"
+                  style={{
+                    width: `${Math.round((refineProgress.idx / refineProgress.total) * 100)}%`
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
+      ) : (
+        !collapsed && renderOutline()
       )}
-
-      {!collapsed && renderOutline()}
 
       {/* Notes Modal */}
       <FinalOutlineModal show={noteModal.show} onClose={handleCloseNote} note={noteModal.note} />

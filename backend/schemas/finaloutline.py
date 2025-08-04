@@ -12,3 +12,10 @@ class FinalOutlineTextResponse(BaseModel):
 
 class FinalOutlineTransitionsResponse(BaseModel):
     transitions: Dict[str, str]
+
+class RefineSubsectionRequest(BaseModel):
+    section_title: str
+    subsection_title: str
+    thesis: str
+    methodology: str
+    responses: list[str]
