@@ -237,24 +237,23 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
       {/* Generate buttons */}
       <div className="mb-3 d-flex gap-2 align-items-center">
         <button
-          className="btn btn-warning"
+          className="btn btn-outline-secondary"
           onClick={handleRefineOutline}
           disabled={refining}
-          style={{ marginRight: '1.5rem' }}
         >
           {refining ? 'Refining...' : 'Refine Outline'}
         </button>
         <button className="btn btn-outline-secondary" onClick={() => generateSectionText('methodology')}>
-          <FaMagic className="me-1" /> Generate Methodology
+          Generate Methodology
         </button>
         <button className="btn btn-outline-secondary" onClick={() => generateSectionText('conclusion')}>
-          <FaParagraph className="me-1" /> Generate Conclusion
+          Generate Conclusion
         </button>
         <button className="btn btn-outline-secondary" onClick={() => generateSectionText('abstract')}>
-          <FaListOl className="me-1" /> Generate Abstract
+          Generate Abstract
         </button>
         <button className="btn btn-outline-secondary" onClick={() => { generateSectionText('transitions'); setShowTransitions(true); }}>
-          <FaRandom className="me-1" /> Generate Transitions
+          Generate Transitions
         </button>
         {showTransitions && (
           <button className="btn btn-outline-info" onClick={() => setShowTransitions(false)}>
