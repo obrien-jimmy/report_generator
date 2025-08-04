@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FaDownload, FaEdit, FaEye, FaEyeSlash } from 'react-icons/fa';
 
-const InitialDraft = ({ draftData, finalThesis }) => {
+const FinalOutline = ({ draftData, finalThesis }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   const generateFullDraft = () => {
@@ -115,4 +115,4 @@ const InitialDraft = ({ draftData, finalThesis }) => {
   );
 };
 
-export default InitialDraft;
+export default FinalOutline;

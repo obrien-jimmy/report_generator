@@ -7,7 +7,7 @@ import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
 import OutlineDraft from './components/OutlineDraft';
-import InitialDraft from './components/InitialDraft';
+import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
 
 function App() {
@@ -247,7 +247,7 @@ function App() {
                 role="tab"
                 disabled={!draftData}
               >
-                Initial Draft
+                Final Outline
               </button>
             </li>
           </ul>
@@ -341,10 +341,10 @@ function App() {
             </div>
           )}
 
-          {/* Initial Draft Tab */}
+          {/* Final Outline Tab */}
           {activeTab === 'initial' && (
             <div className="tab-pane fade show active">
-              <InitialDraft
+              <FinalOutline
                 draftData={draftData}
                 finalThesis={finalThesis}
               />
