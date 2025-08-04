@@ -1,0 +1,37 @@
+.final-outline-thesis {
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.final-outline-section-header {
+  font-size: 1.4rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+.final-outline-section-num { font-size: 1.2rem; font-weight: bold; }
+.final-outline-section-title { font-size: 1.2rem; font-weight: bold; }
+.final-outline-subsection { margin-left: 2rem; font-size: 1.1rem; font-weight: 600; }
+.final-outline-subsection-num { font-weight: bold; }
+.final-outline-subsection-title { font-weight: bold; }
+.final-outline-question { margin-left: 3.5rem; font-size: 1rem; }
+.final-outline-question-num { font-weight: bold; }
+.final-outline-question-text { }
+.final-outline-subpoint { margin-left: 2rem; font-size: 0.95rem; }
+.final-outline-subpoint-num { font-weight: bold; }
+.final-outline-note-icon { color: #f0ad4e; margin-left: 0.5rem; cursor: pointer; }
+.final-outline-expand-btn { background: none; border: none; cursor: pointer; margin-left: 0.5rem; }
+.final-outline-modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 9999;
+}
+.final-outline-modal {
+  background: #fff; padding: 2rem; border-radius: 8px; min-width: 300px; max-width: 500px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+.final-outline-modal .close {
+  position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer;
+}
