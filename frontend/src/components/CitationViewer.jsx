@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaSearch, FaTrash, FaTimes } from 'react-icons/fa';
 import axios from 'axios';
+import './CitationViewer.css';
 
 const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesis, methodology, paperLength, sourceCategories }) => {
   const [expanded, setExpanded] = useState(false);

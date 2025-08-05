@@ -303,7 +303,7 @@ const PaperTypeSelector = ({
             </>
           ) : (
             <div className="mt-3">
-              <div className="alert alert-info">
+              <div className="alert alert-success">
                 <strong>Selected Paper Type:</strong> {selectedPaper.name}
                 <br />
                 <strong>Paper Length:</strong> {pageCount ? `${pageCount} pages` : 'Auto-adjusted based on thesis scope'}

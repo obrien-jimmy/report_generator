@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaEdit, FaSave, FaTimes, FaInfoCircle, FaChevronLeft, FaChevronRight, FaPlus } from 'react-icons/fa';
+import './ComponentStyles.css';
 
 const MethodologyGenerator = ({
   finalThesis,
@@ -356,13 +357,15 @@ const MethodologyGenerator = ({
   return (
     <div className="mb-4 position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
-        <button
-          className="btn btn-sm btn-outline-secondary me-2"
-          onClick={handleRegenerate}
-          title="Regenerate methodology"
-        >
-          Refresh
-        </button>
+        {!finalized && (
+          <button
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={handleRegenerate}
+            title="Regenerate methodology"
+          >
+            Refresh
+          </button>
+        )}
         <button
           className="btn btn-sm btn-outline-secondary"
           onClick={toggleCollapse}
@@ -769,19 +772,6 @@ const MethodologyGenerator = ({
                 >
                   Edit Methodology
                 </button>
-                {!outlineActivated && (
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => {
-                      if (proceedToOutline) {
-                        proceedToOutline();
-                        setOutlineActivated(true);
-                      }
-                    }}
-                  >
-                    Proceed to Outline
-                  </button>
-                )}
                 {outlineActivated && outlineNeedsRerun && (
                   <button 
                     className="btn btn-primary" 

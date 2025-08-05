@@ -260,21 +260,25 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
   return (
     <div className="mb-4 position-relative w-100">
       <div className="d-flex" style={{ position: 'absolute', top: 0, right: 0 }}>
-        <button
-          className="btn btn-sm btn-outline-primary me-2"
-          onClick={handleAddMore}
-          disabled={!hasLoaded || finalized || loadingMore}
-          title="Generate additional source categories"
-        >
-          {loadingMore ? 'Adding...' : 'Add More'}
-        </button>
-        <button
-          className="btn btn-sm btn-outline-secondary me-2"
-          onClick={handleRegenerate}
-          title="Regenerate source categories"
-        >
-          Refresh
-        </button>
+        {!finalized && (
+          <>
+            <button
+              className="btn btn-sm btn-outline-primary me-2"
+              onClick={handleAddMore}
+              disabled={!hasLoaded || finalized || loadingMore}
+              title="Generate additional source categories"
+            >
+              {loadingMore ? 'Adding...' : 'Add More'}
+            </button>
+            <button
+              className="btn btn-sm btn-outline-secondary me-2"
+              onClick={handleRegenerate}
+              title="Regenerate source categories"
+            >
+              Refresh
+            </button>
+          </>
+        )}
         <button
           className="btn btn-sm btn-outline-secondary"
           onClick={toggleCollapse}
@@ -396,7 +400,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
 
           {finalized && (
             <div className="mt-3">
-              <div className="alert alert-info">
+              <div className="alert alert-success">
                 <strong>Finalized Selection:</strong> {selectedCount} source categories will be used for research analysis.
                 {totalCount - selectedCount > 0 && (
                   <div><small>{totalCount - selectedCount} categories have been excluded from analysis.</small></div>
