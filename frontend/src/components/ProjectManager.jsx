@@ -121,11 +121,60 @@ const ProjectManager = forwardRef(({
 
   const quickSave = (silent = false) => {
     if (!currentProject) {
-      // No current project, open save modal
+      // No current project
       if (!silent) {
+        // Manual save - open save modal
         openSaveModal();
+        return;
+      } else {
+        // Auto-save - only create new project if there's meaningful data
+        const hasData = finalThesis || 
+                       (sourceCategories && sourceCategories.length > 0) || 
+                       methodology || 
+                       selectedPaperType || 
+                       (outlineData && outlineData.length > 0) || 
+                       draftData;
+        
+        if (!hasData) {
+          // No meaningful data to save yet
+          return;
+        }
+
+        // Create new project automatically with default name
+        const timestamp = new Date().toLocaleString();
+        const autoProjectData = {
+          id: Date.now().toString(),
+          name: `Auto-saved Project - ${timestamp}`,
+          description: 'Automatically created project',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          data: {
+            finalThesis,
+            paperLength,
+            sourceCategories,
+            methodology,
+            selectedPaperType,
+            thesisFinalized,
+            categoriesFinalized,
+            sourceCategoriesActivated,
+            readyForOutline,
+            frameworkComplete,
+            activeTab,
+            outlineData,
+            draftData
+          }
+        };
+
+        const existingProjects = [...projects];
+        existingProjects.push(autoProjectData);
+        
+        setProjects(existingProjects);
+        localStorage.setItem('report_generator_projects', JSON.stringify(existingProjects));
+        
+        // Set as current project
+        setCurrentProject(autoProjectData);
+        return;
       }
-      return;
     }
 
     // Quick save to existing project
