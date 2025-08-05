@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaCheck, FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa';
+import { FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa';
 import CitationViewer from './CitationViewer';
 import './CitationViewer.css';
 import PaperStructurePreview from './PaperStructurePreview';
@@ -26,7 +26,6 @@ const OutlineGenerator = ({
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
-  const [structureApproved, setStructureApproved] = useState(false);
 
   // Question and Citation States
   const [loadingQuestions, setLoadingQuestions] = useState({});
@@ -40,7 +39,6 @@ const OutlineGenerator = ({
       console.log('OutlineGenerator: Restoring saved outline data:', savedOutlineData);
       setOutline(savedOutlineData);
       setHasGenerated(true);
-      setStructureApproved(true);
     }
   }, [savedOutlineData]);
 
@@ -57,26 +55,15 @@ const OutlineGenerator = ({
 
   const handleStructureChange = (structure) => {
     setCustomStructure(structure);
-    setStructureApproved(false);
-  };
-
-  const approveStructure = () => {
-    setStructureApproved(true);
   };
 
   const editStructure = () => {
-    setStructureApproved(false);
     setOutline([]);
     setHasGenerated(false);
     setError(null);
   };
 
   const generateOutline = async (isRegeneration = false) => {
-    if (!structureApproved) {
-      setError('Please approve the paper structure first');
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setGenerationProgress('Generating initial outline structure...');
@@ -500,52 +487,7 @@ const OutlineGenerator = ({
             hasGenerated={hasGenerated}
           />
 
-          {customStructure && !hasGenerated && (
-            <div className="card mb-3">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <div className="d-flex align-items-center">
-                  <h6 className="mb-0">Structure Approval</h6>
-                  {structureApproved && (
-                    <span className="badge bg-success ms-2">
-                      <FaCheck className="me-1" />
-                      Approved
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="card-body">
-                {!structureApproved ? (
-                  <div>
-                    <p className="text-muted mb-3">
-                      Review the paper structure above and approve it to proceed with detailed outline generation.
-                    </p>
-                    <button 
-                      className="btn btn-success"
-                      onClick={approveStructure}
-                    >
-                      <FaCheck className="me-1" />
-                      Approve Structure
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-success mb-3">
-                      ✓ Structure approved! You can now generate the detailed outline with subsections, questions, and citations.
-                    </p>
-                    <button 
-                      className="btn btn-outline-secondary"
-                      onClick={editStructure}
-                    >
-                      <FaEdit className="me-1" />
-                      Edit Structure
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {(structureApproved || hasGenerated) && (
+          {customStructure && (
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">Generate Outline Framework</h5>
@@ -588,28 +530,6 @@ const OutlineGenerator = ({
               </div>
               {!outlineFrameworkCollapsed && (
                 <div className="card-body">
-                  {!hasGenerated && (
-                    <div className="mb-3">
-                      <p className="text-muted">
-                        Generate a complete outline framework including sections, subsections, questions, and citations.
-                      </p>
-                      <button 
-                        className="btn btn-primary"
-                        onClick={() => generateOutline(false)}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <>
-                            <FaSpinner className="fa-spin me-2" />
-                            Generating Complete Outline Framework...
-                          </>
-                        ) : (
-                          'Generate Outline Framework'
-                        )}
-                      </button>
-                    </div>
-                  )}
-
                   {loading && generationProgress && (
                     <div className="alert alert-info">
                       <FaSpinner className="fa-spin me-2" />

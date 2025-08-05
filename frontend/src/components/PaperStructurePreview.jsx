@@ -546,10 +546,10 @@ const PaperStructurePreview = ({
             </div>
           </div>
 
-          {/* Add the Generate Outline button at the bottom */}
-          <div className="mt-4 d-flex justify-content-center">
+          {/* Add the Generate Outline Framework button at the bottom */}
+          <div className="mt-4">
             <button 
-              className="btn btn-primary btn-lg"
+              className="btn btn-primary"
               onClick={onGenerateOutline}
               disabled={loading || hasGenerated}
             >
@@ -564,7 +564,7 @@ const PaperStructurePreview = ({
                   Framework Generated
                 </>
               ) : (
-                'Generate Outline'
+                'Generate Outline Framework'
               )}
             </button>
           </div>
