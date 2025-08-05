@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 import socratesIcon from './assets/socrates.png';
@@ -48,16 +48,40 @@ function App() {
 
   // Ref for accessing ProjectManager's quickSave function
   const projectManagerRef = useRef(null);
+  
+  // Debounced auto-save to prevent excessive saving
+  const autoSaveTimeoutRef = useRef(null);
 
-  // Auto-save function
-  const triggerAutoSave = () => {
-    if (autoSave && projectManagerRef.current && projectManagerRef.current.quickSave) {
-      // Use setTimeout to ensure state updates are complete before saving
-      setTimeout(() => {
+  // Auto-save function with debouncing
+  const triggerAutoSave = (immediate = false) => {
+    if (!autoSave || !projectManagerRef.current || !projectManagerRef.current.quickSave) {
+      return;
+    }
+
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    if (immediate) {
+      // Save immediately
+      projectManagerRef.current.quickSave(true);
+    } else {
+      // Debounced save - wait 2 seconds after last change
+      autoSaveTimeoutRef.current = setTimeout(() => {
         projectManagerRef.current.quickSave(true); // Pass true for silent auto-save
-      }, 100);
+      }, 2000);
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -95,13 +119,13 @@ function App() {
     setFinalThesis(thesis);
     setThesisFinalized(true);
     setSourceCategoriesActivated(true);
-    triggerAutoSave();
+    triggerAutoSave(true); // Immediate save for important milestone
   };
 
   const handleCategoriesSelected = (categories) => {
     setSourceCategories(categories);
     setCategoriesFinalized(true);
-    triggerAutoSave();
+    triggerAutoSave(true); // Immediate save for important milestone
   };
 
   const proceedToOutline = () => {
@@ -124,7 +148,7 @@ function App() {
       setFrameworkComplete(true);
       
       console.log('App.jsx: Framework completion successful');
-      triggerAutoSave();
+      triggerAutoSave(true); // Immediate save for important milestone
     } else {
       console.error('App.jsx: Invalid outline data received:', outlineData);
     }
@@ -143,17 +167,17 @@ function App() {
 
   const handleAutoSaveDraft = (draft) => {
     setDraftData(draft);
-    triggerAutoSave();
+    triggerAutoSave(); // Debounced save for frequent draft updates
   };
 
   const handleMethodologySelected = (methodologyData) => {
     setMethodology(methodologyData);
-    triggerAutoSave();
+    triggerAutoSave(true); // Immediate save for important milestone
   };
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
-    triggerAutoSave();
+    // Don't auto-save on tab changes - this is just UI state
   };
 
   // Project management functions

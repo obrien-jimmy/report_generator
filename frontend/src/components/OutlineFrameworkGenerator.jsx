@@ -112,6 +112,7 @@ const OutlineGenerator = ({
 
       console.log('OutlineGenerator: Initial structure generated:', sections);
       setOutline(sections);
+      setHasGenerated(true); // Set this early so the outline becomes visible
 
       // Step 2: Generate detailed subsections for content sections
       const contentSections = sections.filter(sec => !sec.is_administrative);
@@ -159,6 +160,7 @@ const OutlineGenerator = ({
         });
 
         console.log('OutlineGenerator: Subsections generated, now generating questions...');
+        setOutline(sections); // Update UI to show subsections
         setGenerationProgress('Generating questions for subsections...');
 
         // Step 3: Generate questions for each subsection
@@ -185,6 +187,7 @@ const OutlineGenerator = ({
               }));
 
               sections[sectionIndex].subsections[subsectionIndex].questions = questionObjects;
+              setOutline([...sections]); // Update UI to show new questions
               
               await new Promise(resolve => setTimeout(resolve, 1000));
             } catch (err) {
@@ -224,6 +227,7 @@ const OutlineGenerator = ({
                   
                   // Fix: Use the correct response field name
                   sections[sectionIndex].subsections[subsectionIndex].questions[questionIndex].citations = citationResponse.data.recommended_sources || [];
+                  setOutline([...sections]); // Update UI to show new citations
                   
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 } catch (err) {
@@ -237,7 +241,6 @@ const OutlineGenerator = ({
 
       console.log('OutlineGenerator: Complete detailed outline generated:', sections);
       setOutline(sections);
-      setHasGenerated(true);
       setGenerationProgress('');
 
     } catch (err) {
@@ -483,7 +486,7 @@ const OutlineGenerator = ({
             paperLength={paperLength}
             onStructureChange={handleStructureChange}
             onGenerateOutline={() => generateOutline(false)}
-            loading={loading}
+            loading={false}
             hasGenerated={hasGenerated}
           />
 
@@ -545,18 +548,6 @@ const OutlineGenerator = ({
 
                   {hasGenerated && outline.length > 0 && (
                     <>
-                      {loading && generationProgress && (
-                        <div className="alert alert-info">
-                          <FaSpinner className="fa-spin me-2" />
-                          {generationProgress}
-                        </div>
-                      )}
-
-                      {error && (
-                        <div className="alert alert-danger">
-                          <strong>Error:</strong> {error}
-                        </div>
-                      )}
 
                       {outline.map((section, sectionIndex) => (
                         <div key={sectionIndex} className="card mb-3">
