@@ -51,8 +51,10 @@ const MethodologyGenerator = ({
       setCustomSourceFocus(methodology.source_focus || '');
       setCustomStructureAlignment(methodology.structure_alignment || '');
       setSelectedMethodologyDetails(methodology.details || null);
-      setSelectedMethodology(methodology.methodologyType || '');
-      setSelectedSubMethodology(methodology.subMethodology || '');
+      
+      // Use IDs if available, fallback to names/types for backward compatibility
+      setSelectedMethodology(methodology.methodologyId || methodology.methodologyType || '');
+      setSelectedSubMethodology(methodology.subMethodologyId || methodology.subMethodology || '');
       setIsCustomMethodology(!!methodology.isCustom);
 
       // Mark as finalized and show the finalized UI
@@ -263,14 +265,21 @@ const MethodologyGenerator = ({
     setFinalized(true);
     setCollapsed(true);
     
+    // Get the actual methodology names instead of IDs
+    const selectedMethodologyInfo = getSelectedMethodologyInfo();
+    const mainMethodologyInfo = methodologyOptions.find(m => m.id === selectedMethodology);
+    const subMethodologyInfo = mainMethodologyInfo?.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
+    
     const fullMethodology = {
       description: customMethodology,
       approach: customApproach,
       source_focus: customSourceFocus,
       structure_alignment: customStructureAlignment,
       details: selectedMethodologyDetails,
-      methodologyType: getSelectedMethodologyInfo()?.name || selectedMethodology,
-      subMethodology: selectedSubMethodology,
+      methodologyType: mainMethodologyInfo?.name || selectedMethodology,
+      methodologyId: selectedMethodology,
+      subMethodology: subMethodologyInfo?.name || selectedSubMethodology,
+      subMethodologyId: selectedSubMethodology,
       isCustom: isCustomMethodology
     };
     
@@ -754,11 +763,15 @@ const MethodologyGenerator = ({
                 {selectedMethodology && (
                   <div className="mt-3">
                     <small className="text-muted">
-                      <strong>Selected Methodology:</strong> {selectedMethodology}
+                      <strong>Selected Methodology:</strong> {methodologyOptions.find(m => m.id === selectedMethodology)?.name || selectedMethodology}
                       {selectedSubMethodology && (
                         <>
                           <br />
-                          <strong>Sub-Methodology:</strong> {selectedSubMethodology}
+                          <strong>Sub-Methodology:</strong> {(() => {
+                            const mainMethod = methodologyOptions.find(m => m.id === selectedMethodology);
+                            const subMethod = mainMethod?.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
+                            return subMethod?.name || selectedSubMethodology;
+                          })()}
                         </>
                       )}
                     </small>
