@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { FaSave, FaFolderOpen, FaPlus, FaTrash, FaDownload, FaUpload, FaCopy } from 'react-icons/fa';
 
-const ProjectManager = ({ 
+const ProjectManager = forwardRef(({ 
   currentProject, 
+  setCurrentProject,
   onLoadProject, 
   onNewProject,
   finalThesis,
@@ -20,7 +21,7 @@ const ProjectManager = ({
   activeTab,
   showDebugSections,
   setShowDebugSections
-}) => {
+}, ref) => {
   const [projects, setProjects] = useState([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
@@ -30,6 +31,11 @@ const ProjectManager = ({
   const [editingProject, setEditingProject] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+
+  // Expose quickSave function to parent component
+  useImperativeHandle(ref, () => ({
+    quickSave
+  }));
 
   useEffect(() => {
     loadProjectsList();
@@ -98,11 +104,11 @@ const ProjectManager = ({
     setProjects(existingProjects);
     localStorage.setItem('report_generator_projects', JSON.stringify(existingProjects));
     
-    // Update current project reference - but don't trigger the "loaded" message
+    // Update current project reference and set as active project
     const updatedProject = existingProjects.find(p => p.id === projectData.id);
     if (updatedProject) {
-      // Update the current project without calling onLoadProject to avoid the "loaded" message
-      window.currentProjectRef = updatedProject;
+      // Update the current project state to display in the active project box
+      setCurrentProject(updatedProject);
     }
     
     setShowSaveModal(false);
@@ -113,10 +119,12 @@ const ProjectManager = ({
     alert(`Project ${isNewSave ? 'saved as new project' : 'saved'} successfully!`);
   };
 
-  const quickSave = () => {
+  const quickSave = (silent = false) => {
     if (!currentProject) {
       // No current project, open save modal
-      openSaveModal();
+      if (!silent) {
+        openSaveModal();
+      }
       return;
     }
 
@@ -149,13 +157,17 @@ const ProjectManager = ({
       setProjects(existingProjects);
       localStorage.setItem('report_generator_projects', JSON.stringify(existingProjects));
       
-      // Update the current project reference without triggering load message
-      window.currentProjectRef = projectData;
+      // Update the current project state to display in the active project box
+      setCurrentProject(projectData);
       
-      alert('Project saved successfully!');
+      if (!silent) {
+        alert('Project saved successfully!');
+      }
     } else {
       // Project not found, treat as new save
-      openSaveModal();
+      if (!silent) {
+        openSaveModal();
+      }
     }
   };
 
@@ -208,7 +220,8 @@ const ProjectManager = ({
     
     // Update current project if it's the one being edited
     if (currentProject && currentProject.id === projectId) {
-      window.currentProjectRef = updatedProjects.find(p => p.id === projectId);
+      const updatedCurrentProject = updatedProjects.find(p => p.id === projectId);
+      setCurrentProject(updatedCurrentProject);
     }
     
     setEditingProject(null);
@@ -296,7 +309,7 @@ const ProjectManager = ({
   return (
     <div className="project-manager">
       <div className="row align-items-center mb-3">
-        <div className="col-md-8">
+        <div className="col-md-12">
           <div className="d-flex gap-2 flex-wrap">
             <button 
               className="btn btn-success btn-sm"
@@ -363,15 +376,6 @@ const ProjectManager = ({
               Export
             </button>
           </div>
-        </div>
-        
-        <div className="col-md-4 text-end">
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => setShowDebugSections(!showDebugSections)}
-          >
-            {showDebugSections ? 'Hide' : 'Show'} Debug
-          </button>
         </div>
       </div>
 
@@ -651,6 +655,6 @@ const ProjectManager = ({
       )}
     </div>
   );
-};
+});
 
 export default ProjectManager;

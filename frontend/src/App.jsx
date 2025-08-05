@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 import socratesIcon from './assets/socrates.png';
@@ -46,6 +46,19 @@ function App() {
 
   const [autoSave, setAutoSave] = useState(true);
 
+  // Ref for accessing ProjectManager's quickSave function
+  const projectManagerRef = useRef(null);
+
+  // Auto-save function
+  const triggerAutoSave = () => {
+    if (autoSave && projectManagerRef.current && projectManagerRef.current.quickSave) {
+      // Use setTimeout to ensure state updates are complete before saving
+      setTimeout(() => {
+        projectManagerRef.current.quickSave(true); // Pass true for silent auto-save
+      }, 100);
+    }
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -75,20 +88,26 @@ function App() {
   const handlePaperTypeSelected = (paperType, pageLength) => {
     setSelectedPaperType(paperType);
     setPaperLength(pageLength);
+    triggerAutoSave();
   };
 
   const handleThesisFinalized = (thesis) => {
     setFinalThesis(thesis);
     setThesisFinalized(true);
     setSourceCategoriesActivated(true);
+    triggerAutoSave();
   };
 
   const handleCategoriesSelected = (categories) => {
     setSourceCategories(categories);
     setCategoriesFinalized(true);
+    triggerAutoSave();
   };
 
-  const proceedToOutline = () => setReadyForOutline(true);
+  const proceedToOutline = () => {
+    setReadyForOutline(true);
+    triggerAutoSave();
+  };
 
   const handleFrameworkComplete = (outlineData) => {
     console.log('=== App.jsx: handleFrameworkComplete called ===');
@@ -105,6 +124,7 @@ function App() {
       setFrameworkComplete(true);
       
       console.log('App.jsx: Framework completion successful');
+      triggerAutoSave();
     } else {
       console.error('App.jsx: Invalid outline data received:', outlineData);
     }
@@ -113,13 +133,28 @@ function App() {
   const handleTransferToOutlineDraft = () => {
     console.log('App.jsx: Transferring to outline draft');
     setActiveTab('outline');
+    triggerAutoSave();
   };
 
   const handleOutlineDraftComplete = (draftData) => {
     setDraftData(draftData);
+    triggerAutoSave();
   };
 
-  const handleAutoSaveDraft = (draft) => setDraftData(draft);
+  const handleAutoSaveDraft = (draft) => {
+    setDraftData(draft);
+    triggerAutoSave();
+  };
+
+  const handleMethodologySelected = (methodologyData) => {
+    setMethodology(methodologyData);
+    triggerAutoSave();
+  };
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    triggerAutoSave();
+  };
 
   // Project management functions
   const handleLoadProject = (project) => {
@@ -183,14 +218,23 @@ function App() {
           <h6 className="mb-0">Project Management</h6>
         </div>
         <div className="card-body">
-          {/* Auto-save toggle button */}
-          <button
-            className={`btn btn-sm mb-3 ${autoSave ? 'btn-success' : 'btn-outline-secondary'}`}
-            onClick={() => setAutoSave(!autoSave)}
-          >
-            {autoSave ? 'Auto-Save ON' : 'Auto-Save OFF'}
-          </button>
+          {/* Auto-save toggle and debug toggle buttons */}
+          <div className="d-flex gap-2 mb-3">
+            <button
+              className={`btn btn-sm ${autoSave ? 'btn-success' : 'btn-outline-secondary'}`}
+              onClick={() => setAutoSave(!autoSave)}
+            >
+              {autoSave ? 'Auto-Save ON' : 'Auto-Save OFF'}
+            </button>
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowDebugSections(!showDebugSections)}
+            >
+              {showDebugSections ? 'Hide' : 'Show'} Debug
+            </button>
+          </div>
           <ProjectManager
+            ref={projectManagerRef}
             currentProject={currentProject}
             setCurrentProject={setCurrentProject}
             onLoadProject={handleLoadProject}
@@ -221,7 +265,7 @@ function App() {
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeTab === 'framework' ? 'active' : ''}`}
-                onClick={() => setActiveTab('framework')}
+                onClick={() => handleTabChange('framework')}
                 type="button"
                 role="tab"
               >
@@ -231,7 +275,7 @@ function App() {
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeTab === 'outline' ? 'active' : ''} ${!frameworkComplete ? 'disabled' : ''}`}
-                onClick={() => frameworkComplete && setActiveTab('outline')}
+                onClick={() => frameworkComplete && handleTabChange('outline')}
                 type="button"
                 role="tab"
                 disabled={!frameworkComplete}
@@ -242,7 +286,7 @@ function App() {
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!draftData ? 'disabled' : ''}`}
-                onClick={() => draftData && setActiveTab('initial')}
+                onClick={() => draftData && handleTabChange('initial')}
                 type="button"
                 role="tab"
                 disabled={!draftData}
@@ -299,7 +343,7 @@ function App() {
                     finalThesis={finalThesis}
                     sourceCategories={sourceCategories}
                     methodology={methodology} // <-- should be the full object
-                    setMethodology={setMethodology}
+                    setMethodology={handleMethodologySelected}
                     proceedToOutline={proceedToOutline}
                     selectedPaperType={selectedPaperType}
                     pageCount={paperLength}
