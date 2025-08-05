@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckCircle, FaSpinner, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import Modal from './Modal';
 
@@ -10,7 +10,7 @@ const OutlineDraft = ({
   onOutlineDraftComplete,
   autoSave,
   onAutoSaveDraft,
-  draftData // <-- receive as prop
+  draftData // receives: { responses }
 }) => {
   const [responses, setResponses] = useState({}); // { questionKey: [resp1, resp2, ..., fusedResp] }
   const [loading, setLoading] = useState({});
@@ -29,6 +29,71 @@ const OutlineDraft = ({
       setResponses(draftData.responses);
     }
   }, [draftData]);
+
+  // Function to generate complete hierarchical outline
+  const generateCompleteOutline = () => {
+    const completeOutline = [];
+    
+    outlineData.forEach((section, sectionIndex) => {
+      // Level 1: Section (I, II, III, IV...)
+      const sectionLevel1 = {
+        level: 1,
+        number: toRomanNumeral(sectionIndex + 1),
+        title: section.section_title,
+        content: section.section_context,
+        children: []
+      };
+      
+      if (section.subsections) {
+        section.subsections.forEach((subsection, subsectionIndex) => {
+          // Level 2: Subsection (A, B, C, D...)
+          const subsectionLevel2 = {
+            level: 2,
+            number: toLetter(subsectionIndex),
+            title: subsection.subsection_title,
+            content: subsection.subsection_context,
+            children: []
+          };
+          
+          if (subsection.questions) {
+            subsection.questions.forEach((questionObj, questionIndex) => {
+              const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+              const responseArray = responses[questionKey];
+              
+              // Always use the last response (fused/master outline) if available
+              if (responseArray && responseArray.length > 0) {
+                const fusedResponse = responseArray[responseArray.length - 1]; // Last response is always fused
+                const responseContent = {
+                  level: 3,
+                  question: questionObj.question,
+                  content: fusedResponse,
+                  responseType: 'fused'
+                };
+                
+                subsectionLevel2.children.push(responseContent);
+              }
+            });
+          }
+          
+          sectionLevel1.children.push(subsectionLevel2);
+        });
+      }
+      
+      completeOutline.push(sectionLevel1);
+    });
+    
+    return completeOutline;
+  };
+
+  // Utility functions for numbering
+  const toRomanNumeral = (num) => {
+    const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
+    return romanNumerals[num - 1] || `${num}`;
+  };
+
+  const toLetter = (num) => {
+    return String.fromCharCode(65 + num); // A, B, C, D...
+  };
 
   // Generate all responses for a question: one per citation, then fused
   const generateAllQuestionResponses = async (sectionIndex, subsectionIndex, questionIndex, questionObj) => {
@@ -181,25 +246,6 @@ const OutlineDraft = ({
     return total;
   };
   const getCompletedQuestions = () => Object.keys(responses).length;
-  const isAllComplete = () => getCompletedQuestions() === getTotalQuestions();
-  const handleCompleteOutlineDraft = () => {
-    if (onOutlineDraftComplete) {
-      onOutlineDraftComplete({
-        outline: outlineData,
-        responses: responses,
-        thesis: finalThesis,
-        methodology: methodology
-      });
-    }
-    if (onAutoSaveDraft) {
-      onAutoSaveDraft({
-        outline: outlineData,
-        responses: responses,
-        thesis: finalThesis,
-        methodology: methodology
-      });
-    }
-  };
 
   if (!outlineData || outlineData.length === 0) {
     return (
@@ -212,41 +258,46 @@ const OutlineDraft = ({
 
   return (
     <div className="outline-draft">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div className="d-flex align-items-center gap-3">
-          <h3 className="mb-0">Outline Draft</h3>
-          <span className="badge bg-info">
-            {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
-          </span>
-        </div>
-        <div className="d-flex gap-2 align-items-center">
-          <button
-            className="btn btn-primary"
-            onClick={generateAllResponses}
-            disabled={batchProcessing || isAllComplete()}
-          >
-            {batchProcessing ? (
-              <>
-                <FaSpinner className="fa-spin me-2" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <FaPlayCircle className="me-2" />
-                Generate All Responses
-              </>
-            )}
-          </button>
-          {isAllComplete() && (
-            <button
-              className="btn btn-success"
-              onClick={handleCompleteOutlineDraft}
-            >
-              <FaCheckCircle className="me-2" />
-              Complete Outline Draft
-            </button>
+      <div className="d-flex align-items-center gap-3 mb-3">
+        <h3 className="mb-0">Outline Draft</h3>
+        <span className="badge bg-info">
+          {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
+        </span>
+      </div>
+      
+      <div className="d-flex gap-2 align-items-center mb-4">
+        <button
+          className="btn btn-outline-info"
+          onClick={() => {
+            const completeOutline = generateCompleteOutline();
+            setSelectedResponse({ 
+              response: JSON.stringify(completeOutline, null, 2), 
+              question: "Complete Hierarchical Outline Preview"
+            });
+            setShowModal(true);
+          }}
+          disabled={getCompletedQuestions() === 0}
+        >
+          <FaEye className="me-2" />
+          Preview Final Outline
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={generateAllResponses}
+          disabled={batchProcessing}
+        >
+          {batchProcessing ? (
+            <>
+              <FaSpinner className="fa-spin me-2" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <FaPlayCircle className="me-2" />
+              Generate All Responses
+            </>
           )}
-        </div>
+        </button>
       </div>
 
       {outlineData.map((section, sectionIndex) => (
@@ -292,9 +343,9 @@ const OutlineDraft = ({
                               {citations.length > 0 && (
                                 <div className="mb-2">
                                   <strong>Citations:</strong>
-                                  <ul className="mb-2">
+                                  <div className="mb-2">
                                     {citations.map((citation, i) => (
-                                      <li
+                                      <div
                                         key={i}
                                         style={{
                                           fontSize: '0.95em',
@@ -302,9 +353,7 @@ const OutlineDraft = ({
                                           background: idx === i ? '#e7f7fb' : 'transparent', // subtle highlight for active
                                           borderRadius: '4px',
                                           padding: '2px 6px',
-                                          display: 'inline-block',
                                           marginBottom: '2px',
-                                          marginRight: '6px',
                                           textDecoration: 'none'
                                         }}
                                         onClick={() => handleJumpToResponse(key, i)}
@@ -322,11 +371,11 @@ const OutlineDraft = ({
                                           {`${questionNum}.${i + 1}`}
                                         </span>
                                         {citation.apa || citation.title || citation.source || JSON.stringify(citation)}
-                                      </li>
+                                      </div>
                                     ))}
                                     {/* Fused/master outline */}
                                     {citations.length > 0 && (
-                                      <li
+                                      <div
                                         key="fused-master-outline"
                                         style={{
                                           fontSize: '0.95em',
@@ -334,9 +383,7 @@ const OutlineDraft = ({
                                           background: idx === citations.length ? '#e7f7fb' : 'transparent',
                                           borderRadius: '4px',
                                           padding: '2px 6px',
-                                          display: 'inline-block',
                                           marginBottom: '2px',
-                                          marginRight: '6px',
                                           textDecoration: 'none'
                                         }}
                                         onClick={() => handleJumpToResponse(key, citations.length)}
@@ -354,9 +401,9 @@ const OutlineDraft = ({
                                           {`${questionNum}.F`}
                                         </span>
                                         <em>Fused/Master Outline</em>
-                                      </li>
+                                      </div>
                                     )}
-                                  </ul>
+                                  </div>
                                 </div>
                               )}
                               <button
@@ -401,15 +448,17 @@ const OutlineDraft = ({
                                     </span>
                                   )}
                                 </h6>
-                                {respArr[idx] && (
-                                  <button
-                                    className="btn btn-sm btn-outline-secondary"
-                                    onClick={() => openModal(respArr[idx], questionObj.question)}
-                                  >
-                                    <FaExpand className="me-1" />
-                                    Expand
-                                  </button>
-                                )}
+                                <div className="d-flex gap-2">
+                                  {respArr[idx] && (
+                                    <button
+                                      className="btn btn-sm btn-outline-secondary"
+                                      onClick={() => openModal(respArr[idx], questionObj.question)}
+                                    >
+                                      <FaExpand className="me-1" />
+                                      Expand
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <div className="d-flex align-items-center mb-2">
                                 <button
@@ -428,20 +477,26 @@ const OutlineDraft = ({
                                 </button>
                               </div>
                               {respArr[idx] ? (
-                                <div className="bg-light p-3 rounded" style={{ minHeight: 120 }}>
-                                  <pre className="mb-0" style={{
-                                    maxHeight: '150px',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    fontFamily: 'inherit',
-                                    whiteSpace: 'pre-wrap'
-                                  }}>
-                                    {respArr[idx]}
-                                  </pre>
+                                <div style={{
+                                  fontFamily: 'inherit',
+                                  whiteSpace: 'pre-wrap',
+                                  lineHeight: '1.6',
+                                  margin: 0,
+                                  maxHeight: '70vh',
+                                  overflowY: 'auto',
+                                  paddingRight: '8px'
+                                }}>
+                                  {respArr[idx]}
                                 </div>
                               ) : (
-                                <div className="bg-light p-3 rounded text-muted" style={{ minHeight: 120 }}>
-                                  <em>No response generated yet</em>
+                                <div className="text-muted" style={{ 
+                                  minHeight: 100,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontStyle: 'italic'
+                                }}>
+                                  No response generated yet
                                 </div>
                               )}
                             </div>
@@ -485,16 +540,27 @@ const OutlineDraft = ({
               padding: 0,
               background: 'none'
             }}>
-              <pre className="mb-0" style={{
-                whiteSpace: 'pre-wrap',
-                lineHeight: '1.6',
-                background: 'none',
-                margin: 0,
-                padding: 0,
-                fontFamily: 'inherit'
-              }}>
-                {selectedResponse.response}
-              </pre>
+              {selectedResponse.question === "Complete Hierarchical Outline Preview" ? (
+                <div style={{
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: '1.6',
+                  fontFamily: 'monospace',
+                  fontSize: '0.9em'
+                }}>
+                  {selectedResponse.response}
+                </div>
+              ) : (
+                <pre className="mb-0" style={{
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: '1.6',
+                  background: 'none',
+                  margin: 0,
+                  padding: 0,
+                  fontFamily: 'inherit'
+                }}>
+                  {selectedResponse.response}
+                </pre>
+              )}
             </div>
           </div>
         </Modal>

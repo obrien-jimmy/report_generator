@@ -180,16 +180,22 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     URL.revokeObjectURL(url);
   };
 
-  // Helper to convert responses to Dict[str, str]
+  // Helper to convert responses to Dict[str, str] - ONLY uses fused/master responses
   function getStringResponses(responses) {
     const stringResponses = {};
     Object.entries(responses).forEach(([key, value]) => {
       if (Array.isArray(value)) {
-        stringResponses[key] = value.map(v => v.raw || v).join('\n');
+        // Always use the last response (fused/master outline) if available
+        if (value.length > 0) {
+          const fusedResponse = value[value.length - 1]; // Last response is always fused
+          stringResponses[key] = typeof fusedResponse === 'string' ? fusedResponse : String(fusedResponse);
+        } else {
+          stringResponses[key] = '';
+        }
       } else if (typeof value === 'object' && value.raw) {
         stringResponses[key] = value.raw;
       } else {
-        stringResponses[key] = value;
+        stringResponses[key] = String(value);
       }
     });
     return stringResponses;
