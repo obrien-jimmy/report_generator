@@ -18,6 +18,7 @@ const OutlineDraft = ({
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [citationReferenceMap, setCitationReferenceMap] = useState({}); // Global citation reference mapping
 
   // Safe stringify for methodology and thesis
   const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
@@ -29,6 +30,65 @@ const OutlineDraft = ({
       setResponses(draftData.responses);
     }
   }, [draftData]);
+
+  // Build citation reference map using simple running numbers
+  const buildCitationReferenceMap = () => {
+    const referenceMap = {};
+    const globalCitationMap = {}; // Maps citation content to reference number
+    let globalRefNumber = 1;
+    
+    outlineData.forEach((section, sectionIndex) => {
+      if (section.subsections) {
+        section.subsections.forEach((subsection, subsectionIndex) => {
+          if (subsection.questions) {
+            subsection.questions.forEach((questionObj, questionIndex) => {
+              const questionNum = questionIndex + 1;
+              const citations = questionObj.citations || [];
+              
+              citations.forEach((citation, citationIndex) => {
+                const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+                
+                // Create a unique key for the citation to avoid duplicates
+                const citationKey = `${citation.apa || citation.title || citation.source || citation.author}`;
+                
+                let referenceNumber;
+                if (globalCitationMap[citationKey]) {
+                  // Reuse existing reference number for the same citation
+                  referenceNumber = globalCitationMap[citationKey];
+                } else {
+                  // Assign new reference number
+                  referenceNumber = globalRefNumber;
+                  globalCitationMap[citationKey] = globalRefNumber;
+                  globalRefNumber++;
+                }
+                
+                if (!referenceMap[questionKey]) {
+                  referenceMap[questionKey] = {};
+                }
+                
+                referenceMap[questionKey][citationIndex] = {
+                  referenceNumber,
+                  citation,
+                  questionNum,
+                  citationNum: citationIndex + 1
+                };
+              });
+            });
+          }
+        });
+      }
+    });
+    
+    setCitationReferenceMap(referenceMap);
+    return referenceMap;
+  };
+
+  // Initialize citation reference map when outline data changes
+  useEffect(() => {
+    if (outlineData && outlineData.length > 0) {
+      buildCitationReferenceMap();
+    }
+  }, [outlineData]);
 
   // Function to generate complete hierarchical outline
   const generateCompleteOutline = () => {
@@ -105,6 +165,7 @@ const OutlineDraft = ({
       const subsectionContext = outlineData[sectionIndex]?.subsections[subsectionIndex]?.subsection_context;
       const citations = questionObj.citations || [];
       const questionNum = questionIndex + 1;
+      const questionRefs = citationReferenceMap[key] || {};
 
       // 1. Generate outline for each citation
       const citationResponses = [];
@@ -119,6 +180,10 @@ const OutlineDraft = ({
         const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
         const safeThesis = typeof finalThesis === "string" ? finalThesis : JSON.stringify(finalThesis);
 
+        // Include reference ID in the request
+        const referenceInfo = questionRefs[i] || {};
+        const referenceNumber = referenceInfo.referenceNumber || (i + 1);
+
         const response = await axios.post('http://localhost:8000/generate_citation_response', {
           question: questionObj.question,
           citation: safeCitation,
@@ -127,7 +192,8 @@ const OutlineDraft = ({
           thesis: safeThesis,
           methodology: safeMethodology,
           question_number: questionNum,
-          citation_number: i + 1
+          citation_number: i + 1,
+          reference_id: referenceNumber.toString() // Add reference number to backend call
         });
         citationResponses.push(response.data.response);
       }
@@ -135,11 +201,12 @@ const OutlineDraft = ({
       // 2. Generate fused/master outline
       let fusedResponse = '';
       if (citationResponses.length > 0) {
-        const safeCitations = citations.map(c => ({
+        const safeCitations = citations.map((c, i) => ({
           apa: typeof c.apa === "string" ? c.apa : null,
           title: typeof c.title === "string" ? c.title : null,
           source: typeof c.source === "string" ? c.source : null,
-          author: typeof c.author === "string" ? c.author : null
+          author: typeof c.author === "string" ? c.author : null,
+          reference_id: (questionRefs[i]?.referenceNumber || (i + 1)).toString()
         }));
         const fusedResp = await axios.post('http://localhost:8000/generate_fused_response', {
           question: questionObj.question,
@@ -149,7 +216,11 @@ const OutlineDraft = ({
           subsection_context: subsectionContext,
           thesis: safeThesis,
           methodology: safeMethodology,
-          question_number: questionNum
+          question_number: questionNum,
+          citation_references: Object.values(questionRefs).map(ref => ({
+            reference_id: ref.referenceNumber.toString(),
+            citation: ref.citation
+          }))
         });
         fusedResponse = fusedResp.data.response;
       }
@@ -170,7 +241,8 @@ const OutlineDraft = ({
             outline: outlineData,
             responses: updated,
             thesis: finalThesis,
-            methodology
+            methodology,
+            citationReferenceMap: citationReferenceMap
           });
         }
         return updated;
@@ -344,35 +416,44 @@ const OutlineDraft = ({
                                 <div className="mb-2">
                                   <strong>Citations:</strong>
                                   <div className="mb-2">
-                                    {citations.map((citation, i) => (
-                                      <div
-                                        key={i}
-                                        style={{
-                                          fontSize: '0.95em',
-                                          cursor: 'pointer',
-                                          background: idx === i ? '#e7f7fb' : 'transparent', // subtle highlight for active
-                                          borderRadius: '4px',
-                                          padding: '2px 6px',
-                                          marginBottom: '2px',
-                                          textDecoration: 'none'
-                                        }}
-                                        onClick={() => handleJumpToResponse(key, i)}
-                                      >
-                                        <span
+                                    {citations.map((citation, i) => {
+                                      const questionRefs = citationReferenceMap[key] || {};
+                                      const refInfo = questionRefs[i] || {};
+                                      const referenceNumber = refInfo.referenceNumber || (i + 1);
+                                      
+                                      return (
+                                        <div
+                                          key={i}
                                           style={{
-                                            color: '#0dcaf0', // Bootstrap light blue for citation number only
-                                            background: 'transparent',
-                                            borderRadius: '3px',
-                                            padding: '1px 6px',
-                                            marginRight: '4px',
-                                            fontWeight: 'normal'
+                                            fontSize: '0.95em',
+                                            cursor: 'pointer',
+                                            background: idx === i ? '#e7f7fb' : 'transparent', // subtle highlight for active
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            marginBottom: '2px',
+                                            textDecoration: 'none'
                                           }}
+                                          onClick={() => handleJumpToResponse(key, i)}
                                         >
-                                          {`${questionNum}.${i + 1}`}
-                                        </span>
-                                        {citation.apa || citation.title || citation.source || JSON.stringify(citation)}
-                                      </div>
-                                    ))}
+                                          <span
+                                            style={{
+                                              color: '#0dcaf0', // Bootstrap light blue for citation number only
+                                              background: 'transparent',
+                                              borderRadius: '3px',
+                                              padding: '1px 6px',
+                                              marginRight: '4px',
+                                              fontWeight: 'bold'
+                                            }}
+                                          >
+                                            [{referenceNumber}]
+                                          </span>
+                                          <span style={{ fontWeight: 'normal' }}>
+                                            {citation.author ? `${citation.author} - ` : ''}
+                                            {citation.title || citation.apa || citation.source || 'Unknown Citation'}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
                                     {/* Fused/master outline */}
                                     {citations.length > 0 && (
                                       <div
@@ -395,12 +476,15 @@ const OutlineDraft = ({
                                             borderRadius: '3px',
                                             padding: '1px 6px',
                                             marginRight: '4px',
-                                            fontWeight: 'normal'
+                                            fontWeight: 'bold'
                                           }}
                                         >
-                                          {`${questionNum}.F`}
+                                          Fused
                                         </span>
                                         <em>Fused/Master Outline</em>
+                                        <div style={{ fontSize: '0.85em', color: '#666', marginTop: '2px' }}>
+                                          References: {Object.values(citationReferenceMap[key] || {}).map(ref => `[${ref.referenceNumber}]`).join(', ')}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -438,13 +522,13 @@ const OutlineDraft = ({
                                       style={{
                                         backgroundColor: 'transparent',
                                         color: '#0dcaf0',
-                                        fontWeight: 'normal',
+                                        fontWeight: 'bold',
                                         border: '1px solid #0dcaf0'
                                       }}
                                     >
                                       {idx < citations.length
-                                        ? `${questionNum}.${idx + 1}`
-                                        : `${questionNum}.F`}
+                                        ? `[${(citationReferenceMap[key] || {})[idx]?.referenceNumber || (idx + 1)}]`
+                                        : `Fused`}
                                     </span>
                                   )}
                                 </h6>

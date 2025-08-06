@@ -42,6 +42,8 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   const [refining, setRefining] = useState(false);
   const [refineProgress, setRefineProgress] = useState({section: null, subsection: null, idx: 0, total: 0});
   const [showRefined, setShowRefined] = useState(false);
+  const [hoveredCitation, setHoveredCitation] = useState(null);
+  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
 
   // Level selector options
   const levelOptions = [
@@ -201,6 +203,141 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     return stringResponses;
   }
 
+  // Parse fused response content into hierarchical structure
+  function parseFusedResponseContent(responseText) {
+    if (!responseText) return [];
+    
+    const lines = responseText.split('\n').filter(line => line.trim());
+    const parsedContent = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Match different level patterns: 1., a., i., 1), a), i)
+      const level3Match = trimmed.match(/^(\d+)\.\s*(.+)$/); // 1., 2., 3.
+      const level4Match = trimmed.match(/^([a-z])\.\s*(.+)$/); // a., b., c.
+      const level5Match = trimmed.match(/^([ivx]+)\.\s*(.+)$/); // i., ii., iii.
+      const level6Match = trimmed.match(/^(\d+)\)\s*(.+)$/); // 1), 2), 3)
+      const level7Match = trimmed.match(/^([a-z])\)\s*(.+)$/); // a), b), c)
+      
+      if (level3Match) {
+        parsedContent.push({ level: 3, number: level3Match[1], content: level3Match[2] });
+      } else if (level4Match) {
+        parsedContent.push({ level: 4, number: level4Match[1], content: level4Match[2] });
+      } else if (level5Match) {
+        parsedContent.push({ level: 5, number: level5Match[1], content: level5Match[2] });
+      } else if (level6Match) {
+        parsedContent.push({ level: 6, number: level6Match[1], content: level6Match[2] });
+      } else if (level7Match) {
+        parsedContent.push({ level: 7, number: level7Match[1], content: level7Match[2] });
+      } else {
+        // If no level indicator found, treat as continuation of previous level or level 3
+        parsedContent.push({ level: 3, number: '', content: trimmed });
+      }
+    }
+    
+    return parsedContent;
+  }
+
+  // Extract reference numbers from response text
+  function extractReferenceNumbers(responseText) {
+    if (!responseText) return [];
+    
+    // Match patterns like [1] or [1, 2, 3]
+    const referencePattern = /\[(\d+(?:,\s*\d+)*)\]/g;
+    const references = [];
+    let match;
+    
+    while ((match = referencePattern.exec(responseText)) !== null) {
+      const refNumbers = match[1].split(/,\s*/).map(num => parseInt(num.trim()));
+      references.push(...refNumbers);
+    }
+    
+    return [...new Set(references)].sort((a, b) => a - b); // Remove duplicates and sort
+  }
+
+  // Build a comprehensive reference index from all responses
+  function buildReferenceIndex() {
+    const allReferences = new Set();
+    
+    if (draftData?.responses) {
+      Object.values(draftData.responses).forEach(responseArray => {
+        if (Array.isArray(responseArray)) {
+          responseArray.forEach(response => {
+            const refs = extractReferenceNumbers(response);
+            refs.forEach(ref => allReferences.add(ref));
+          });
+        }
+      });
+    }
+    
+    return Array.from(allReferences).sort((a, b) => a - b);
+  }
+
+  // Build citation mapping from draftData
+  function buildCitationMapping() {
+    const citationMap = {};
+    
+    if (draftData?.citationReferenceMap) {
+      Object.values(draftData.citationReferenceMap).forEach(questionRefs => {
+        Object.values(questionRefs).forEach(refInfo => {
+          if (refInfo.referenceNumber && refInfo.citation) {
+            citationMap[refInfo.referenceNumber] = refInfo.citation;
+          }
+        });
+      });
+    }
+    
+    return citationMap;
+  }
+
+  // Render text with hoverable citations
+  function renderTextWithCitations(text, citationMap) {
+    if (!text) return text;
+    
+    // Replace [1], [2], etc. with hoverable elements
+    const parts = text.split(/(\[\d+(?:,\s*\d+)*\])/g);
+    
+    return parts.map((part, index) => {
+      const citationMatch = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
+      if (citationMatch) {
+        const refNumbers = citationMatch[1].split(/,\s*/).map(num => parseInt(num.trim()));
+        const citations = refNumbers.map(num => citationMap[num]).filter(Boolean);
+        
+        return (
+          <span
+            key={index}
+            style={{
+              color: '#0dcaf0',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              backgroundColor: '#e7f7fb',
+              borderRadius: '3px',
+              padding: '1px 4px',
+              fontSize: '0.9em'
+            }}
+            onMouseEnter={(e) => {
+              if (citations.length > 0) {
+                setHoveredCitation(citations);
+                setHoverPosition({ x: e.clientX, y: e.clientY });
+              }
+            }}
+            onMouseLeave={() => {
+              setHoveredCitation(null);
+            }}
+          >
+            [{refNumbers.join(', ')}]
+          </span>
+        );
+      }
+      return part;
+    });
+  }
+
+  // Build citation mapping for this render
+  const citationMapping = buildCitationMapping();
+
   // Render outline recursively (with continuous numbering and notes)
   const renderOutline = () => (
     <div className="final-outline-content">
@@ -234,17 +371,61 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
                   )}
                   {(expandedSections[sIdx] || level > 2) && sub.questions?.map((q, qIdx) => {
                     if (level < 3) return null;
-                    const qNum = qIdx + 1;
                     const key = `${sIdx}-${subIdx}-${qIdx}`;
-                    const resp = getStringResponses(draftData.responses)[key];
+                    const rawResponse = getStringResponses(draftData.responses)[key];
+                    const parsedContent = parseFusedResponseContent(rawResponse);
+                    
+                    // Maintain counters for each level to ensure proper numbering
+                    const counters = { 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+                    
                     return (
-                      <div key={qIdx} className="final-outline-question">
-                        <span className="final-outline-question-num">{qNum}.</span>
-                        <span className="final-outline-question-text">{resp}</span>
-                        {q.note && (
-                          <FaStickyNote className="final-outline-note-icon" onClick={() => handleShowNote(q.note)} />
-                        )}
-                        {/* You can add further subpoints rendering here if needed */}
+                      <div key={qIdx} className="final-outline-question-section">
+                        {parsedContent.map((item, itemIdx) => {
+                          if (level < item.level) return null;
+                          
+                          // Reset lower level counters when we encounter a higher level
+                          for (let resetLevel = item.level + 1; resetLevel <= 7; resetLevel++) {
+                            counters[resetLevel] = 0;
+                          }
+                          
+                          // Increment counter for current level
+                          counters[item.level]++;
+                          
+                          // Determine the numbering based on the item level and counter
+                          let displayNumber = '';
+                          switch (item.level) {
+                            case 3:
+                              displayNumber = `${counters[3]}.`;
+                              break;
+                            case 4:
+                              displayNumber = `${lowerAlpha(counters[4] - 1)}.`;
+                              break;
+                            case 5:
+                              displayNumber = `${roman(counters[5] - 1)}.`;
+                              break;
+                            case 6:
+                              displayNumber = `${counters[6]})`;
+                              break;
+                            case 7:
+                              displayNumber = `${lowerAlpha(counters[7] - 1)})`;
+                              break;
+                            default:
+                              displayNumber = '';
+                          }
+                          
+                          return (
+                            <div 
+                              key={itemIdx} 
+                              className={`final-outline-level-${item.level}`}
+                              style={{ 
+                                marginBottom: '4px'
+                              }}
+                            >
+                              <span className="final-outline-item-num">{displayNumber}</span>
+                              <span className="final-outline-item-text"> {renderTextWithCitations(item.content, citationMapping)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
@@ -409,6 +590,28 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
 
       {/* Notes Modal */}
       <FinalOutlineModal show={noteModal.show} onClose={handleCloseNote} note={noteModal.note} />
+      
+      {/* Reference Index */}
+      {!collapsed && (
+        <div className="mt-4">
+          <h5>Reference Index</h5>
+          <div className="card">
+            <div className="card-body">
+              {buildReferenceIndex().length > 0 ? (
+                <div style={{ fontSize: '0.9em' }}>
+                  {buildReferenceIndex().map(refId => (
+                    <div key={refId} style={{ marginBottom: '4px' }}>
+                      <strong>#{refId}:</strong> <em>Citation reference tracked throughout outline</em>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted">No references found in outline responses.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

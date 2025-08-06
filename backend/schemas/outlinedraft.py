@@ -6,9 +6,14 @@ class Citation(BaseModel):
     title: Optional[str] = None
     source: Optional[str] = None
     author: Optional[str] = None
+    reference_id: Optional[str] = None
 
     class Config:
         extra = "ignore"
+
+class CitationReference(BaseModel):
+    reference_id: str
+    citation: Citation
 
 class CitationResponseRequest(BaseModel):
     question: str
@@ -19,6 +24,7 @@ class CitationResponseRequest(BaseModel):
     methodology: str
     question_number: int
     citation_number: int
+    reference_id: Optional[str] = None
 
 class FusedResponseRequest(BaseModel):
     question: str
@@ -29,6 +35,7 @@ class FusedResponseRequest(BaseModel):
     thesis: str
     methodology: str
     question_number: int
+    citation_references: Optional[List[CitationReference]] = []
 
 class LLMResponse(BaseModel):
     response: str

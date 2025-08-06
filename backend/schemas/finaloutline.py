@@ -19,3 +19,4 @@ class RefineSubsectionRequest(BaseModel):
     thesis: str
     methodology: str
     responses: list[str]
+    citation_references: Dict[str, str] = {}  # Maps reference_id to citation info
