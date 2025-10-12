@@ -117,7 +117,7 @@ const MethodologyGenerator = ({
 
   const handleMethodologySelect = (methodologyId) => {
     setSelectedMethodology(methodologyId);
-    setSelectedSubMethodology('');
+    setSelectedSubMethodology(''); // Clear but don't require
     setGeneratedMethodologies([]);
     setMethodologySets([]);
     setCurrentSetIndex(0);
@@ -161,7 +161,7 @@ const MethodologyGenerator = ({
     try {
       const requestData = {
         methodology_type: selectedMethodology,
-        sub_methodology: selectedSubMethodology || '',
+        // Remove sub_methodology from request
         final_thesis: finalThesis,
         paper_type: selectedPaperType.name,
         paper_purpose: selectedPaperType.purpose,
@@ -468,42 +468,6 @@ const MethodologyGenerator = ({
                   ))}
                 </div>
               </div>
-
-              {/* Sub-methodology Selection */}
-              {selectedMethodology && (
-                <div className="mb-3">
-                  <label className="form-label">Choose a specific approach (optional):</label>
-                  <div className="row">
-                    {methodologyOptions
-                      .find(m => m.id === selectedMethodology)
-                      ?.sub_methodologies?.map((subMethodology) => (
-                        <div key={subMethodology.id} className="col-md-6 mb-2">
-                          <div
-                            className={`card h-100 methodology-card ${selectedSubMethodology === subMethodology.id ? 'border-primary' : ''}`}
-                            style={{ cursor: 'pointer', minHeight: '120px' }}
-                            onClick={() => handleSubMethodologySelect(subMethodology.id)}
-                          >
-                            <div className="card-body">
-                              <div className="d-flex align-items-center mb-2">
-                                <input
-                                  type="radio"
-                                  name="subMethodology"
-                                  checked={selectedSubMethodology === subMethodology.id}
-                                  onChange={() => handleSubMethodologySelect(subMethodology.id)}
-                                  className="me-2"
-                                />
-                                <h6 className="card-title mb-0">{subMethodology.name}</h6>
-                              </div>
-                              <div className="mt-2">
-                                <small className="text-muted">{subMethodology.description}</small>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
 
               {/* Generate Button */}
               <div className="mt-3">

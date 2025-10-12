@@ -1,4 +1,6 @@
-#!/Users/jimmy_mac/Desktop/code/SocraticAI/backend/venv/bin/python3
+#!/bin/sh
+'''exec' "/Users/jimmyobrien/Desktop/00 - code/report_generator/backend/venv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys

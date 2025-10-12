@@ -3,7 +3,7 @@ from typing import List, Optional
 
 class MethodologySelectionRequest(BaseModel):
     methodology_type: str
-    sub_methodology: Optional[str] = None
+    # sub_methodology: Optional[str] = None  # Keep but make unused
     final_thesis: str
     paper_type: str
     paper_purpose: str
@@ -27,6 +27,7 @@ class GeneratedMethodology(BaseModel):
     approach: str
     source_focus: str
     structure_alignment: str
+    methodology_type: str = Field(description="Either 'Focused', 'Comprehensive', or 'Innovative'")
 
 class MethodologyGenerationResponse(BaseModel):
     methodologies: List[GeneratedMethodology]
