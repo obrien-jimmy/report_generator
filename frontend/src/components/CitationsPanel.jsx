@@ -11,6 +11,7 @@ const CitationsPanel = ({
   const [citations, setCitations] = useState([]);
   const [sortBy, setSortBy] = useState('number'); // 'number', 'author', 'category'
   const [expandedCitations, setExpandedCitations] = useState({});
+  const [expandedCategories, setExpandedCategories] = useState({});
   const [citationChecks, setCitationChecks] = useState({});
   const [checkingCitation, setCheckingCitation] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +117,13 @@ const CitationsPanel = ({
     setExpandedCitations(prev => ({
       ...prev,
       [citationNumber]: !prev[citationNumber]
+    }));
+  };
+
+  const toggleCategoryExpansion = (categoryName) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryName]: !prev[categoryName]
     }));
   };
 
@@ -284,12 +292,29 @@ const CitationsPanel = ({
               if (sortBy === 'category') {
                 return Object.entries(groupedCitations).map(([category, categoryCitations]) => (
                   <div key={category} className="mb-4">
-                    <div className="d-flex align-items-center mb-3">
+                    <div 
+                      className="d-flex align-items-center mb-3 cursor-pointer" 
+                      onClick={() => toggleCategoryExpansion(category)}
+                      style={{ 
+                        cursor: 'pointer',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      <button 
+                        className="btn btn-sm btn-outline-secondary me-2"
+                        style={{ minWidth: '28px' }}
+                      >
+                        {expandedCategories[category] ? '▼' : '►'}
+                      </button>
                       <h6 className="text-primary mb-0 me-2">{category}</h6>
                       <div className="flex-grow-1 border-bottom border-primary opacity-25"></div>
                       <small className="text-muted ms-2">({categoryCitations.length} citations)</small>
                     </div>
-                    {categoryCitations.map((citation) => (
+                    {expandedCategories[category] && categoryCitations.map((citation) => (
               <div key={citation.number} className="card mb-3">
                 <div className="card-header py-2 d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center">
