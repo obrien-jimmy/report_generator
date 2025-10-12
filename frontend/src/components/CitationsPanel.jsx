@@ -78,6 +78,35 @@ const CitationsPanel = ({
     }
   };
 
+  const getGroupedCitations = () => {
+    if (sortBy !== 'category') {
+      return { ungrouped: getSortedCitations() };
+    }
+
+    const groups = {};
+    citations.forEach(citation => {
+      const category = (citation.categories?.[0] || 'Uncategorized').trim();
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(citation);
+    });
+
+    // Sort categories alphabetically and sort citations within each category by author
+    const sortedGroups = {};
+    Object.keys(groups)
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+      .forEach(category => {
+        sortedGroups[category] = groups[category].sort((a, b) => {
+          const authorA = extractAuthor(a.apa || '').toLowerCase();
+          const authorB = extractAuthor(b.apa || '').toLowerCase();
+          return authorA.localeCompare(authorB);
+        });
+      });
+
+    return sortedGroups;
+  };
+
   const extractAuthor = (apaString) => {
     const match = apaString.match(/^([^,]+)/);
     return match ? match[1].trim() : 'Unknown Author';
@@ -249,7 +278,18 @@ const CitationsPanel = ({
               </div>
             </div>
           ) : (
-            getSortedCitations().map((citation) => (
+            (() => {
+              const groupedCitations = getGroupedCitations();
+              
+              if (sortBy === 'category') {
+                return Object.entries(groupedCitations).map(([category, categoryCitations]) => (
+                  <div key={category} className="mb-4">
+                    <div className="d-flex align-items-center mb-3">
+                      <h6 className="text-primary mb-0 me-2">{category}</h6>
+                      <div className="flex-grow-1 border-bottom border-primary opacity-25"></div>
+                      <small className="text-muted ms-2">({categoryCitations.length} citations)</small>
+                    </div>
+                    {categoryCitations.map((citation) => (
               <div key={citation.number} className="card mb-3">
                 <div className="card-header py-2 d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center">
@@ -342,7 +382,140 @@ const CitationsPanel = ({
                   )}
                 </div>
               </div>
-            ))
+                    ))}
+                  </div>
+                ));
+              } else {
+                return groupedCitations.ungrouped.map((citation) => (
+                  <div key={citation.number} className="card mb-3">
+                    <div className="card-header py-2 d-flex justify-content-between align-items-center">
+                      <div className="d-flex align-items-center">
+                        <strong className="me-2">[{citation.number}]</strong>
+                        {citationChecks[citation.number] && getStatusIcon(citationChecks[citation.number].status)}
+                        <span className="ms-2 small">{extractAuthor(citation.apa || '')}</span>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <button
+                          className="btn btn-sm btn-outline-info me-2"
+                          onClick={() => checkCitation(citation)}
+                          disabled={checkingCitation === citation.number}
+                        >
+                          {checkingCitation === citation.number ? '...' : 'Check'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => toggleCitationExpansion(citation.number)}
+                        >
+                          {expandedCitations[citation.number] ? '▼' : '►'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="card-body py-2">
+                      <p className="small mb-2"><strong>APA:</strong> {citation.apa}</p>
+                      
+                      {citation.categories && citation.categories.length > 0 && (
+                        <div className="mb-2">
+                          {citation.categories.map((category, idx) => (
+                            <span key={idx} className="badge bg-secondary me-1 small">{category}</span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {citationChecks[citation.number] && (
+                        <div className="mt-2 p-2 bg-light rounded">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div className="flex-grow-1">
+                              <small className="fw-bold d-block">Validation Status: </small>
+                              <small className={`d-block ${citationChecks[citation.number].status === 'valid' ? 'text-success' : 
+                                citationChecks[citation.number].status === 'partial' ? 'text-warning' : 'text-danger'}`}>
+                                {citationChecks[citation.number].summary || 'No summary available'}
+                              </small>
+                            </div>
+                          </div>
+                          
+                          {citationChecks[citation.number].analysis && (
+                            <div className="mt-2">
+                              <div className="row">
+                                <div className="col-6">
+                                  <small className="fw-bold">Format:</small>
+                                  <small className={`d-block ${citationChecks[citation.number].analysis.format_correct ? 'text-success' : 'text-danger'}`}>
+                                    {citationChecks[citation.number].analysis.format_correct ? '✓ Correct' : '✗ Issues found'}
+                                  </small>
+                                </div>
+                                <div className="col-6">
+                                  <small className="fw-bold">Credibility:</small>
+                                  <small className={`d-block ${citationChecks[citation.number].analysis.source_credible ? 'text-success' : 'text-warning'}`}>
+                                    {citationChecks[citation.number].analysis.source_credible ? '✓ Credible' : '⚠ Check source'}
+                                  </small>
+                                </div>
+                                <div className="col-6">
+                                  <small className="fw-bold">Relevance:</small>
+                                  <small className={`d-block ${citationChecks[citation.number].analysis.content_relevant ? 'text-success' : 'text-warning'}`}>
+                                    {citationChecks[citation.number].analysis.content_relevant ? '✓ Relevant' : '⚠ May not be relevant'}
+                                  </small>
+                                </div>
+                                <div className="col-6">
+                                  <small className="fw-bold">Accessibility:</small>
+                                  <small className={`d-block ${citationChecks[citation.number].analysis.accessible ? 'text-success' : 'text-warning'}`}>
+                                    {citationChecks[citation.number].analysis.accessible ? '✓ Accessible' : '⚠ Check access'}
+                                  </small>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {citationChecks[citation.number].link && (
+                            <div className="mt-2">
+                              <a 
+                                href={citationChecks[citation.number].link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-outline-primary"
+                              >
+                                Access Article Online
+                              </a>
+                            </div>
+                          )}
+                          {!citationChecks[citation.number].link && citationChecks[citation.number].status !== 'error' && (
+                            <small className="text-muted d-block mt-1">No link found</small>
+                          )}
+                        </div>
+                      )}
+                      
+                      {expandedCitations[citation.number] && (
+                        <div className="mt-2 pt-2 border-top">
+                          <div className="row">
+                            <div className="col-12 mb-2">
+                              <small><strong>Section:</strong> {citation.sectionTitle}</small>
+                            </div>
+                            <div className="col-12 mb-2">
+                              <small><strong>Subsection:</strong> {citation.subsectionTitle}</small>
+                            </div>
+                            <div className="col-12 mb-2">
+                              <small><strong>Question:</strong> {citation.question}</small>
+                            </div>
+                            {citation.description && (
+                              <div className="col-12 mb-2">
+                                <small><strong>Description:</strong> {citation.description}</small>
+                              </div>
+                            )}
+                            {citation.methodologyPoints && citation.methodologyPoints.length > 0 && (
+                              <div className="col-12 mb-2">
+                                <small><strong>Methodology Support:</strong> {citation.methodologyPoints.join(', ')}</small>
+                              </div>
+                            )}
+                            <div className="col-12">
+                              <small className="text-muted"><strong>Context:</strong> This supports the thesis directly by providing evidence for "{citation.question}" within the {citation.subsectionTitle} analysis framework.</small>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ));
+              }
+            })()
           )}
         </div>
       </div>
