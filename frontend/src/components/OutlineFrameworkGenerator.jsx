@@ -79,7 +79,7 @@ const OutlineGenerator = ({
                               parseInt(paperLength, 10);
 
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
-      const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;
+      // const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;  // Removed from production, kept for future consideration
 
       const structureToUse = customStructure ? 
         customStructure.filter(s => !s.isAdmin).map(s => ({
@@ -97,7 +97,7 @@ const OutlineGenerator = ({
           paper_length_pages: safePaperLength,
           source_categories: sourceCategories,
           methodology_id: methodologyId,
-          sub_methodology_id: subMethodologyId,
+          // sub_methodology_id: subMethodologyId,  // Removed from production, kept for future consideration
           custom_structure: structureToUse
         });
       }, 3, 3000);
@@ -482,7 +482,7 @@ const OutlineGenerator = ({
           <PaperStructurePreview 
             paperType={selectedPaperType}
             methodology={methodology?.methodologyType || methodology?.methodology_type}
-            subMethodology={methodology?.subMethodology || methodology?.sub_methodology}
+            // subMethodology={methodology?.subMethodology || methodology?.sub_methodology}  // Removed from production, kept for future consideration
             paperLength={paperLength}
             onStructureChange={handleStructureChange}
             onGenerateOutline={() => generateOutline(false)}

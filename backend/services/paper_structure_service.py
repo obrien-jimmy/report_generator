@@ -450,14 +450,14 @@ class PaperStructureService:
     }
 
     @staticmethod
-    def get_paper_structure(paper_type: str, methodology_id: Optional[str] = None, sub_methodology_id: Optional[str] = None) -> List[str]:
+    def get_paper_structure(paper_type: str, methodology_id: Optional[str] = None) -> List[str]:
         """
         Generate a structured paper outline based on paper type and methodology.
         
         Args:
             paper_type: The type of paper (e.g., 'argumentative', 'analytical')
             methodology_id: Main methodology type (e.g., 'quantitative', 'qualitative')
-            sub_methodology_id: Sub-methodology type (e.g., 'thematic_analysis')
+            # sub_methodology_id: Sub-methodology type (e.g., 'thematic_analysis') - Removed from production, kept for future consideration
             
         Returns:
             List of section titles in order
@@ -483,13 +483,12 @@ class PaperStructureService:
         # Determine which methodology template to use
         methodology_template = None
         
-        # First try sub-methodology if specified
-        if sub_methodology_id:
-            methodology_template = PaperStructureService.METHODOLOGY_TEMPLATES.get(sub_methodology_id)
+        # First try sub-methodology if specified (Removed from production, kept for future consideration)
+        # if sub_methodology_id:
+        #     methodology_template = PaperStructureService.METHODOLOGY_TEMPLATES.get(sub_methodology_id)
         
-        # If no sub-methodology template found, try main methodology
-        if not methodology_template:
-            methodology_template = PaperStructureService.METHODOLOGY_TEMPLATES.get(methodology_id)
+        # Try main methodology
+        methodology_template = PaperStructureService.METHODOLOGY_TEMPLATES.get(methodology_id)
         
         # If no methodology template found, return base structure
         if not methodology_template:
@@ -560,22 +559,22 @@ class PaperStructureService:
         return merged
     
     @staticmethod
-    def get_structure_preview(paper_type: str, methodology_id: Optional[str] = None, sub_methodology_id: Optional[str] = None) -> Dict:
+    def get_structure_preview(paper_type: str, methodology_id: Optional[str] = None) -> Dict:
         """
         Get a preview of the paper structure with metadata.
         
         Returns:
             Dictionary with structure and metadata
         """
-        structure = PaperStructureService.get_paper_structure(paper_type, methodology_id, sub_methodology_id)
+        # sub_methodology_id: Optional[str] = None - Removed from production, kept for future consideration
+        structure = PaperStructureService.get_paper_structure(paper_type, methodology_id)
         
         return {
             "structure": structure,
             "total_sections": len(structure),
             "paper_type": paper_type,
             "methodology": methodology_id,
-            "sub_methodology": sub_methodology_id,
+            # "sub_methodology": sub_methodology_id,  # Removed from production, kept for future consideration
             "has_methodology_sections": bool(methodology_id and 
-                (PaperStructureService.METHODOLOGY_TEMPLATES.get(sub_methodology_id) or 
-                 PaperStructureService.METHODOLOGY_TEMPLATES.get(methodology_id)))
+                PaperStructureService.METHODOLOGY_TEMPLATES.get(methodology_id))
         }

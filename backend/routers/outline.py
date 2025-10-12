@@ -369,8 +369,8 @@ async def get_paper_structure(request: PaperStructureRequest):
     try:
         structure_data = PaperStructureService.get_structure_preview(
             request.paper_type,
-            request.methodology_id,
-            request.sub_methodology_id
+            request.methodology_id
+            # request.sub_methodology_id  # Removed from production, kept for future consideration
         )
         
         return PaperStructureResponse(**structure_data)
@@ -384,8 +384,8 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
         # Get the structured outline
         structure_preview = PaperStructureService.get_structure_preview(
             request.paper_type,
-            request.methodology_id,
-            request.sub_methodology_id
+            request.methodology_id
+            # request.sub_methodology_id  # Removed from production, kept for future consideration
         )
         
         # Generate sections based on structure

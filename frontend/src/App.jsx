@@ -10,6 +10,7 @@ import PaperTypeSelector from './components/PaperTypeSelector';
 import OutlineDraft from './components/OutlineDraft';
 import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
+import FloatingContextButton from './components/FloatingContextButton'; // Add this import
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -172,6 +173,8 @@ function App() {
 
   const handleMethodologySelected = (methodologyData) => {
     setMethodology(methodologyData);
+    setOutlineVersion(prev => prev + 1); // Force outline regeneration
+    setOutlineData(null); // Clear existing outline data
     triggerAutoSave(true); // Immediate save for important milestone
   };
 
@@ -228,6 +231,18 @@ function App() {
       setCurrentProject(null);
       setOutlineVersion(prev => prev + 1);
     }
+  };
+
+  // Helper function to determine current step based on progress
+  const getCurrentStep = () => {
+    if (!selectedPaperType) return 'paper-type';
+    if (!thesisFinalized) return 'thesis';
+    if (!categoriesFinalized) return 'sources';
+    if (!methodology) return 'methodology';
+    if (!frameworkComplete) return 'outline';
+    if (activeTab === 'outline') return 'draft';
+    if (activeTab === 'initial') return 'final';
+    return 'framework';
   };
 
   return (
@@ -492,6 +507,17 @@ function App() {
           </div>
         </>
       )}
+
+      {/* Floating Context Button - Add this at the end */}
+      <FloatingContextButton
+        currentStep={getCurrentStep()}
+        finalThesis={finalThesis}
+        selectedCategories={sourceCategories}
+        methodology={methodology}
+        selectedPaperType={selectedPaperType}
+        pageCount={paperLength}
+        outline={outlineData}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import FloatingContextButton from './FloatingContextButton';
 import ThesisRefinement from './ThesisRefinement';
 import SourceCategories from './SourceCategories';
 import MethodologyGenerator from './MethodologyGenerator';
@@ -9,10 +10,12 @@ const ResearchGenerator = () => {
   const [paperLength, setPaperLength] = useState(5);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [methodology, setMethodology] = useState('');
-  const [step, setStep] = useState('thesis'); // thesis, sources, methodology, outline
+  const [step, setStep] = useState('thesis');
+  const [selectedPaperType, setSelectedPaperType] = useState(null);
+  const [outline, setOutline] = useState([]);
 
   return (
-    <div className="container my-5">
+    <div className="container-fluid py-4">
       {step === 'thesis' && (
         <ThesisRefinement
           onFinalize={(thesis) => {
@@ -54,6 +57,17 @@ const ResearchGenerator = () => {
           sourceCategories={selectedCategories}
         />
       )}
+
+      {/* Floating Context Button */}
+      <FloatingContextButton
+        currentStep={step}
+        finalThesis={finalThesis}
+        selectedCategories={selectedCategories}
+        methodology={methodology}
+        selectedPaperType={selectedPaperType}
+        pageCount={paperLength}
+        outline={outline}
+      />
     </div>
   );
 };

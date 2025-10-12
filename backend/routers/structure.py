@@ -6,7 +6,9 @@ from schemas.outline import (
     QuestionsRequest, QuestionsResponse
 )
 from schemas.methodology import MethodologyRequest, MethodologyResponse
+from schemas.structure import PaperStructureRequest, PaperStructureResponse
 from services.bedrock_service import invoke_bedrock
+from services.paper_structure_service import PaperStructureService
 import json
 import re
 
@@ -189,3 +191,25 @@ async def generate_questions(request: QuestionsRequest):
         raise HTTPException(status_code=500, detail=f"JSON decode error: {str(e)}. Snippet: {cleaned_response[:200]}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+@router.post("/paper_structure_preview", response_model=PaperStructureResponse)
+async def get_paper_structure_preview(request: PaperStructureRequest):
+    """Get enhanced paper structure preview with metadata"""
+    try:
+        preview = PaperStructureService.get_structure_preview(
+            paper_type=request.paper_type,
+            methodology_id=request.methodology_id
+            # sub_methodology_id=request.sub_methodology_id  # Removed from production, kept for future consideration
+        )
+        
+        return PaperStructureResponse(
+            structure=preview["structure"],
+            total_sections=preview["total_sections"],
+            paper_type=preview["paper_type"],
+            methodology=preview["methodology"],
+            # sub_methodology=preview["sub_methodology"],  # Removed from production, kept for future consideration
+            has_methodology_sections=preview["has_methodology_sections"]
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating structure preview: {str(e)}")

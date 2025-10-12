@@ -5,7 +5,7 @@ import { FaList, FaEye, FaEyeSlash, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, Fa
 const PaperStructurePreview = ({ 
   paperType, 
   methodology, 
-  subMethodology, 
+  // subMethodology,  // Removed from production, kept for future consideration
   paperLength, 
   onStructureChange,
   onGenerateOutline, // Add this prop
@@ -35,7 +35,7 @@ const PaperStructurePreview = ({
     if (paperType?.id && methodology) {
       fetchStructure();
     }
-  }, [paperType, methodology, subMethodology]);
+  }, [paperType, methodology]); // Removed subMethodology dependency - kept for future consideration
 
   // Re-initialize structure when paperLength changes
   useEffect(() => {
@@ -50,18 +50,18 @@ const PaperStructurePreview = ({
     try {
       // Get the actual methodology ID to send
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type || methodology;
-      const subMethodologyId = subMethodology?.subMethodology || subMethodology?.sub_methodology || subMethodology;
+      // const subMethodologyId = subMethodology?.subMethodology || subMethodology?.sub_methodology || subMethodology;  // Removed from production, kept for future consideration
       
       console.log('Sending to backend:');
       console.log('- Paper Type:', paperType.id);
       console.log('- Methodology ID:', methodologyId);
-      console.log('- Sub-methodology ID:', subMethodologyId);
+      // console.log('- Sub-methodology ID:', subMethodologyId);  // Removed from production, kept for future consideration
       console.log('- Original methodology object:', methodology);
       
       const response = await axios.post('http://localhost:8000/paper_structure', {
         paper_type: paperType.id,
         methodology_id: methodologyId,
-        sub_methodology_id: subMethodologyId
+        // sub_methodology_id: subMethodologyId  // Removed from production, kept for future consideration
       });
       
       // Debug logging
@@ -227,32 +227,32 @@ const PaperStructurePreview = ({
       'mixed_methods': 'Mixed Methods'
     };
     
-    const subMethodologyNames = {
-      'thematic_analysis': 'Thematic Analysis',
-      'case_study': 'Case Study',
-      'systematic_review': 'Systematic Review',
-      'statistical_techniques': 'Core Statistical Techniques',
-      'regression_models': 'Regression & Generalized Models',
-      'content_analysis': 'Content Analysis',
-      'narrative_review': 'Narrative Review',
-      'narrative_analysis': 'Narrative Analysis',
-      'scoping_review': 'Scoping Review',
-      'integrative_review': 'Integrative Review',
-      'critical_review': 'Critical Review',
-      'conceptual_review': 'Conceptual Review',
-      'meta_synthesis': 'Meta-Synthesis'
-    };
+    // const subMethodologyNames = {  // Removed from production, kept for future consideration
+    //   'thematic_analysis': 'Thematic Analysis',
+    //   'case_study': 'Case Study',
+    //   'systematic_review': 'Systematic Review',
+    //   'statistical_techniques': 'Core Statistical Techniques',
+    //   'regression_models': 'Regression & Generalized Models',
+    //   'content_analysis': 'Content Analysis',
+    //   'narrative_review': 'Narrative Review',
+    //   'narrative_analysis': 'Narrative Analysis',
+    //   'scoping_review': 'Scoping Review',
+    //   'integrative_review': 'Integrative Review',
+    //   'critical_review': 'Critical Review',
+    //   'conceptual_review': 'Conceptual Review',
+    //   'meta_synthesis': 'Meta-Synthesis'
+    // };
     
     // Get the main methodology display name
     const mainMethod = methodologyNames[methodology] || methodology;
     
-    // Get the sub-methodology display name if it exists
-    const subMethod = subMethodology ? subMethodologyNames[subMethodology] : null;
+    // Get the sub-methodology display name if it exists (Removed from production, kept for future consideration)
+    // const subMethod = subMethodology ? subMethodologyNames[subMethodology] : null;
     
-    // Only show the sub-methodology if it exists and is different from the main methodology
-    if (subMethod && subMethod !== mainMethod) {
-      return `${mainMethod} - ${subMethod}`;
-    }
+    // Only show the sub-methodology if it exists and is different from the main methodology (Removed from production, kept for future consideration)
+    // if (subMethod && subMethod !== mainMethod) {
+    //   return `${mainMethod} - ${subMethod}`;
+    // }
     
     // If sub-methodology is the same as main or doesn't exist, just show the main
     return mainMethod;

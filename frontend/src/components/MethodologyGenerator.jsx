@@ -14,7 +14,7 @@ const MethodologyGenerator = ({
 }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
-  const [selectedSubMethodology, setSelectedSubMethodology] = useState('');
+  // const [selectedSubMethodology, setSelectedSubMethodology] = useState('');  // Removed from production, kept for future consideration
   const [generatedMethodologies, setGeneratedMethodologies] = useState([]);
   const [methodologySets, setMethodologySets] = useState([]);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
@@ -54,7 +54,7 @@ const MethodologyGenerator = ({
       
       // Use IDs if available, fallback to names/types for backward compatibility
       setSelectedMethodology(methodology.methodologyId || methodology.methodologyType || '');
-      setSelectedSubMethodology(methodology.subMethodologyId || methodology.subMethodology || '');
+      // setSelectedSubMethodology(methodology.subMethodologyId || methodology.subMethodology || '');  // Removed from production, kept for future consideration
       setIsCustomMethodology(!!methodology.isCustom);
 
       // Mark as finalized and show the finalized UI
@@ -76,7 +76,7 @@ const MethodologyGenerator = ({
       setCustomStructureAlignment('');
       setSelectedMethodologyDetails(null);
       setSelectedMethodology('');
-      setSelectedSubMethodology('');
+      // setSelectedSubMethodology('');  // Removed from production, kept for future consideration
       setIsCustomMethodology(false);
       setFinalized(false);
       setCollapsed(false);
@@ -117,7 +117,7 @@ const MethodologyGenerator = ({
 
   const handleMethodologySelect = (methodologyId) => {
     setSelectedMethodology(methodologyId);
-    setSelectedSubMethodology(''); // Clear but don't require
+    // setSelectedSubMethodology(''); // Clear but don't require - Removed from production, kept for future consideration
     setGeneratedMethodologies([]);
     setMethodologySets([]);
     setCurrentSetIndex(0);
@@ -125,14 +125,14 @@ const MethodologyGenerator = ({
     setSelectedSetIndex(null);
   };
 
-  const handleSubMethodologySelect = (subMethodologyId) => {
-    setSelectedSubMethodology(subMethodologyId);
-    setGeneratedMethodologies([]);
-    setMethodologySets([]);
-    setCurrentSetIndex(0);
-    setSelectedMethodologyIndex(null);
-    setSelectedSetIndex(null);
-  };
+  // const handleSubMethodologySelect = (subMethodologyId) => {  // Removed from production, kept for future consideration
+  //   setSelectedSubMethodology(subMethodologyId);
+  //   setGeneratedMethodologies([]);
+  //   setMethodologySets([]);
+  //   setCurrentSetIndex(0);
+  //   setSelectedMethodologyIndex(null);
+  //   setSelectedSetIndex(null);
+  // };
 
   const generateMethodologyOptions = async () => {
     if (!selectedMethodology) {
@@ -268,7 +268,7 @@ const MethodologyGenerator = ({
     // Get the actual methodology names instead of IDs
     const selectedMethodologyInfo = getSelectedMethodologyInfo();
     const mainMethodologyInfo = methodologyOptions.find(m => m.id === selectedMethodology);
-    const subMethodologyInfo = mainMethodologyInfo?.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
+    // const subMethodologyInfo = mainMethodologyInfo?.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);  // Removed from production, kept for future consideration
     
     const fullMethodology = {
       description: customMethodology,
@@ -278,8 +278,8 @@ const MethodologyGenerator = ({
       details: selectedMethodologyDetails,
       methodologyType: mainMethodologyInfo?.name || selectedMethodology,
       methodologyId: selectedMethodology,
-      subMethodology: subMethodologyInfo?.name || selectedSubMethodology,
-      subMethodologyId: selectedSubMethodology,
+      // subMethodology: subMethodologyInfo?.name || selectedSubMethodology,  // Removed from production, kept for future consideration
+      // subMethodologyId: selectedSubMethodology,  // Removed from production, kept for future consideration
       isCustom: isCustomMethodology
     };
     
@@ -349,10 +349,10 @@ const MethodologyGenerator = ({
     const mainMethodology = methodologyOptions.find(m => m.id === selectedMethodology);
     if (!mainMethodology) return null;
     
-    if (selectedSubMethodology) {
-      const subMethodology = mainMethodology.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
-      return subMethodology || mainMethodology;
-    }
+    // if (selectedSubMethodology) {  // Removed from production, kept for future consideration
+    //   const subMethodology = mainMethodology.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
+    //   return subMethodology || mainMethodology;
+    // }
     return mainMethodology;
   };
 
@@ -728,7 +728,7 @@ const MethodologyGenerator = ({
                   <div className="mt-3">
                     <small className="text-muted">
                       <strong>Selected Methodology:</strong> {methodologyOptions.find(m => m.id === selectedMethodology)?.name || selectedMethodology}
-                      {selectedSubMethodology && (
+                      {/* selectedSubMethodology && (  // Removed from production, kept for future consideration
                         <>
                           <br />
                           <strong>Sub-Methodology:</strong> {(() => {
@@ -737,7 +737,7 @@ const MethodologyGenerator = ({
                             return subMethod?.name || selectedSubMethodology;
                           })()}
                         </>
-                      )}
+                      ) */}
                     </small>
                   </div>
                 )}
