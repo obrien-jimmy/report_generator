@@ -11,6 +11,7 @@ import OutlineDraft from './components/OutlineDraft';
 import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
 import FloatingContextButton from './components/FloatingContextButton'; // Add this import
+import FloatingCitationsButton from './components/FloatingCitationsButton';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -517,6 +518,13 @@ function App() {
         selectedPaperType={selectedPaperType}
         pageCount={paperLength}
         outline={outlineData}
+      />
+      
+      {/* Floating Citations Button */}
+      <FloatingCitationsButton
+        outline={outlineData}
+        methodology={methodology}
+        finalThesis={finalThesis}
       />
     </div>
   );

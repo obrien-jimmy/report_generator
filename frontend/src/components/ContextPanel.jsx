@@ -15,6 +15,12 @@ const ContextPanel = ({
 }) => {
   const [structurePreview, setStructurePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    sourceCategories: false,
+    methodology: false,
+    outlineContext: false,
+    processFlow: false
+  });
 
   // Load structure preview when methodology changes
   useEffect(() => {
@@ -39,6 +45,13 @@ const ContextPanel = ({
       console.error('Error loading structure preview:', error);
     }
     setLoading(false);
+  };
+
+  const toggleSection = (sectionName) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionName]: !prev[sectionName]
+    }));
   };
 
   if (!isOpen) return null;
@@ -196,9 +209,9 @@ const ContextPanel = ({
                       <small className="text-muted">Methodology:</small>
                     </div>
                     <div className="col-8">
-                      <small><strong>{methodology.title || methodology.name}</strong></small>
+                      <small><strong>{methodology.methodologyType || methodology.title || methodology.name}</strong></small>
                       <br />
-                      <small className="text-muted">Type: {methodology.methodology_type}</small>
+                      <small className="text-muted">Type: {methodology.methodologyId || methodology.methodology_type}</small>
                       {methodology.description && (
                         <>
                           <br />
@@ -230,6 +243,82 @@ const ContextPanel = ({
                 Each selection builds upon previous choices to create a cohesive, methodologically sound research paper structure.
               </p>
             </div>
+
+            {/* Source Categories Analysis */}
+            {selectedCategories?.length > 0 && finalThesis && (
+              <div className="card mb-3">
+                <div className="card-header py-2 d-flex justify-content-between align-items-center" 
+                     style={{cursor: 'pointer'}} 
+                     onClick={() => toggleSection('sourceCategories')}>
+                  <small><strong>Source Categories Analysis</strong></small>
+                  <small>{expandedSections.sourceCategories ? '▼' : '►'}</small>
+                </div>
+                {expandedSections.sourceCategories && (
+                  <div className="card-body py-2">
+                    <small className="text-muted">
+                      {ContextService.generateSourceCategoriesAnalysis(finalThesis, selectedCategories)}
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Methodology Analysis */}
+            {methodology && finalThesis && (
+              <div className="card mb-3">
+                <div className="card-header py-2 d-flex justify-content-between align-items-center" 
+                     style={{cursor: 'pointer'}} 
+                     onClick={() => toggleSection('methodology')}>
+                  <small><strong>Methodology Analysis</strong></small>
+                  <small>{expandedSections.methodology ? '▼' : '►'}</small>
+                </div>
+                {expandedSections.methodology && (
+                  <div className="card-body py-2">
+                    <small className="text-muted">
+                      {ContextService.generateMethodologyAnalysis(finalThesis, methodology)}
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Outline Context Analysis */}
+            {outline?.length > 0 && finalThesis && (
+              <div className="card mb-3">
+                <div className="card-header py-2 d-flex justify-content-between align-items-center" 
+                     style={{cursor: 'pointer'}} 
+                     onClick={() => toggleSection('outlineContext')}>
+                  <small><strong>Outline Structure Analysis</strong></small>
+                  <small>{expandedSections.outlineContext ? '▼' : '►'}</small>
+                </div>
+                {expandedSections.outlineContext && (
+                  <div className="card-body py-2">
+                    <small className="text-muted" style={{whiteSpace: 'pre-line'}}>
+                      {ContextService.generateOutlineContextAnalysis(outline, finalThesis)}
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Process Flow Summary */}
+            {finalThesis && (
+              <div className="card mb-3">
+                <div className="card-header py-2 d-flex justify-content-between align-items-center" 
+                     style={{cursor: 'pointer'}} 
+                     onClick={() => toggleSection('processFlow')}>
+                  <small><strong>Process Flow Summary</strong></small>
+                  <small>{expandedSections.processFlow ? '▼' : '►'}</small>
+                </div>
+                {expandedSections.processFlow && (
+                  <div className="card-body py-2">
+                    <small className="text-muted">
+                      {ContextService.generateProcessFlowSummary(finalThesis, methodology, selectedCategories, outline)}
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Outline Summary */}
