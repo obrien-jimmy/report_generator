@@ -9,7 +9,8 @@ const CitationsPanel = ({
   methodology
 }) => {
   const [citations, setCitations] = useState([]);
-  const [sortBy, setSortBy] = useState('number'); // 'number', 'author', 'category'
+  const [viewType, setViewType] = useState('individual'); // 'individual', 'categories'
+  const [orderBy, setOrderBy] = useState('number'); // 'number', 'author'
   const [expandedCitations, setExpandedCitations] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
   const [citationChecks, setCitationChecks] = useState({});
@@ -61,26 +62,19 @@ const CitationsPanel = ({
   const getSortedCitations = () => {
     const sorted = [...citations];
     
-    switch (sortBy) {
-      case 'author':
-        return sorted.sort((a, b) => {
-          const authorA = extractAuthor(a.apa || '').toLowerCase();
-          const authorB = extractAuthor(b.apa || '').toLowerCase();
-          return authorA.localeCompare(authorB);
-        });
-      case 'category':
-        return sorted.sort((a, b) => {
-          const categoryA = (a.categories?.[0] || '').toLowerCase();
-          const categoryB = (b.categories?.[0] || '').toLowerCase();
-          return categoryA.localeCompare(categoryB);
-        });
-      default:
-        return sorted.sort((a, b) => a.number - b.number);
+    if (orderBy === 'author') {
+      return sorted.sort((a, b) => {
+        const authorA = extractAuthor(a.apa || '').toLowerCase();
+        const authorB = extractAuthor(b.apa || '').toLowerCase();
+        return authorA.localeCompare(authorB);
+      });
+    } else {
+      return sorted.sort((a, b) => a.number - b.number);
     }
   };
 
   const getGroupedCitations = () => {
-    if (sortBy !== 'category') {
+    if (viewType !== 'categories') {
       return { ungrouped: getSortedCitations() };
     }
 
@@ -93,16 +87,20 @@ const CitationsPanel = ({
       groups[category].push(citation);
     });
 
-    // Sort categories alphabetically and sort citations within each category by author
+    // Sort categories alphabetically and sort citations within each category by orderBy
     const sortedGroups = {};
     Object.keys(groups)
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
       .forEach(category => {
-        sortedGroups[category] = groups[category].sort((a, b) => {
-          const authorA = extractAuthor(a.apa || '').toLowerCase();
-          const authorB = extractAuthor(b.apa || '').toLowerCase();
-          return authorA.localeCompare(authorB);
-        });
+        if (orderBy === 'author') {
+          sortedGroups[category] = groups[category].sort((a, b) => {
+            const authorA = extractAuthor(a.apa || '').toLowerCase();
+            const authorB = extractAuthor(b.apa || '').toLowerCase();
+            return authorA.localeCompare(authorB);
+          });
+        } else {
+          sortedGroups[category] = groups[category].sort((a, b) => a.number - b.number);
+        }
       });
 
     return sortedGroups;
@@ -242,19 +240,46 @@ const CitationsPanel = ({
         {/* Controls */}
         <div className="border-bottom p-3">
           <div className="row align-items-center">
-            <div className="col-md-6">
+            <div className="col-md-4">
               <label className="form-label small mb-1">Sort by:</label>
               <select 
                 className="form-select form-select-sm"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                value={viewType}
+                onChange={(e) => setViewType(e.target.value)}
               >
-                <option value="number">Citation Number</option>
-                <option value="author">Author (A-Z)</option>
-                <option value="category">Category (A-Z)</option>
+                <option value="individual">Individual Citations</option>
+                <option value="categories">Categories</option>
               </select>
             </div>
-            <div className="col-md-6 text-end">
+            <div className="col-md-3 d-flex align-items-end gap-3">
+              <div className="d-flex flex-column">
+                <small className="form-label mb-1">A-Z</small>
+                <div className="form-check">
+                  <input 
+                    className="form-check-input" 
+                    type="radio" 
+                    name="orderBy" 
+                    id="orderAlpha"
+                    checked={orderBy === 'author'}
+                    onChange={() => setOrderBy('author')}
+                  />
+                </div>
+              </div>
+              <div className="d-flex flex-column">
+                <small className="form-label mb-1"># Order</small>
+                <div className="form-check">
+                  <input 
+                    className="form-check-input" 
+                    type="radio" 
+                    name="orderBy" 
+                    id="orderNumber"
+                    checked={orderBy === 'number'}
+                    onChange={() => setOrderBy('number')}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="col-md-5 text-end">
               <div className="d-flex gap-2 justify-content-end">
                 <button 
                   className="btn btn-outline-primary btn-sm"
@@ -289,7 +314,7 @@ const CitationsPanel = ({
             (() => {
               const groupedCitations = getGroupedCitations();
               
-              if (sortBy === 'category') {
+              if (viewType === 'categories') {
                 return Object.entries(groupedCitations).map(([category, categoryCitations]) => (
                   <div key={category} className="mb-4">
                     <div 

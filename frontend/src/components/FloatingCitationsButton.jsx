@@ -52,7 +52,7 @@ const FloatingCitationsButton = ({
         className="position-fixed d-flex align-items-center justify-content-center"
         style={{
           bottom: '20px',
-          right: '100px', // Position next to context button
+          right: '90px', // Position next to context button with 10px gap (60px + 20px + 10px)
           width: '60px',
           height: '60px',
           backgroundColor: citationsAvailable ? '#0d6efd' : '#6c757d',

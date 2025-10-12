@@ -15,22 +15,30 @@ const FloatingContextButton = ({
   return (
     <>
       {/* Floating Button */}
-      <button
-        className="btn btn-primary position-fixed shadow"
+      <div 
+        className="position-fixed d-flex align-items-center justify-content-center"
         style={{
           bottom: '20px',
           right: '20px',
+          width: '60px',
+          height: '60px',
+          backgroundColor: '#0d6efd',
+          color: 'white',
+          borderRadius: '50%',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          cursor: 'pointer',
           zIndex: 9998,
-          borderRadius: '50px',
-          padding: '12px 20px',
-          fontSize: '14px',
-          fontWeight: '600'
+          transition: 'all 0.3s ease',
+          border: 'none'
         }}
         onClick={() => setIsPanelOpen(true)}
+        title="View Context Information"
       >
-        <i className="bi bi-info-circle me-2"></i>
-        Context
-      </button>
+        <div className="text-center">
+          <i className="bi bi-info-circle fs-5 d-block"></i>
+          <small style={{ fontSize: '10px' }}>Context</small>
+        </div>
+      </div>
 
       {/* Context Panel */}
       <ContextPanel
