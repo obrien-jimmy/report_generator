@@ -86,19 +86,22 @@ const OutlineDraft2 = ({
     initializeDataSections();
   }, [outlineData, draftData]);
 
-  // Simple function to extract data sections (Component 1 & 2) directly
+  // Simple function to extract data sections - now completely generic
   const extractDataSectionsSimple = (draft1Data) => {
     if (!draft1Data || !Array.isArray(draft1Data)) return [];
     
     console.log('OutlineDraft2: Extracting data sections from draft1Data:', draft1Data);
     
-    // Filter for specific data analysis sections (the two main content sections)
+    // Filter for main content sections (exclude administrative/intro sections)
     const dataSections = draft1Data.filter(section => {
       if (!section.section_title || !section.section_context || section.is_administrative) return false;
-      const titleLower = section.section_title.toLowerCase();
-      // Look for the two main analytical sections
-      return (titleLower.includes('current us cybersecurity framework') || 
-              titleLower.includes('policy effectiveness and strategic gaps'));
+      
+      // Include sections that have substantial content (subsections with questions)
+      const hasSubstantialContent = section.subsections && 
+                                   section.subsections.length > 0 && 
+                                   section.subsections.some(sub => sub.questions && sub.questions.length > 0);
+      
+      return hasSubstantialContent;
     });
     
     console.log('OutlineDraft2: Found data sections:', dataSections);
@@ -155,19 +158,22 @@ const OutlineDraft2 = ({
     return 'structured analytical approach to understanding the research problem';
   };
 
-  // Helper function to determine thesis connection
+  // Helper function to determine thesis connection - now generic
   const getThesisConnection = (subsection, thesis) => {
     const title = subsection.subsection_title?.toLowerCase() || '';
-    if (title.includes('threat') || title.includes('vulnerability')) {
-      return 'identifying and analyzing critical vulnerabilities that necessitate policy reassessment';
-    } else if (title.includes('deterrence') || title.includes('defense')) {
-      return 'evaluating current defense strategies and their effectiveness';
-    } else if (title.includes('cooperation') || title.includes('diplomacy')) {
-      return 'examining international cooperation mechanisms essential for comprehensive cybersecurity';
-    } else if (title.includes('policy') || title.includes('framework')) {
-      return 'assessing current policy frameworks and identifying areas for strategic improvement';
+    const thesisSnippet = thesis ? thesis.substring(0, 100) + '...' : 'the research thesis';
+    
+    // Generic connection based on analytical purpose
+    if (title.includes('analysis') || title.includes('assessment')) {
+      return `providing analytical evidence and evaluation to support ${thesisSnippet}`;
+    } else if (title.includes('framework') || title.includes('structure')) {
+      return `establishing structural foundations and frameworks that underpin ${thesisSnippet}`;
+    } else if (title.includes('effectiveness') || title.includes('evaluation')) {
+      return `evaluating effectiveness and performance metrics relevant to ${thesisSnippet}`;
+    } else if (title.includes('implementation') || title.includes('application')) {
+      return `examining implementation strategies and practical applications supporting ${thesisSnippet}`;
     }
-    return 'providing essential evidence and analysis to support the need for comprehensive cybersecurity policy reassessment';
+    return `contributing essential research evidence and analysis to support ${thesisSnippet}`;
   };
 
   // Extract citation numbers from text like [106, 107, 108] or [104]
@@ -388,66 +394,96 @@ const OutlineDraft2 = ({
     return synthesizedPoints;
   };
 
-  // Group questions by thematic similarity for coherent synthesis
+  // Group questions dynamically by analyzing their actual content
   const groupQuestionsByTheme = (questions) => {
-    const themes = {
-      threats: { theme: 'Threat Analysis and Vulnerability Assessment', questions: [] },
-      policy: { theme: 'Policy Framework and Effectiveness Evaluation', questions: [] },
-      cooperation: { theme: 'International Cooperation and Collaborative Mechanisms', questions: [] },
-      deterrence: { theme: 'Deterrence Strategies and Defense Implementation', questions: [] },
-      infrastructure: { theme: 'Critical Infrastructure and Resilience Frameworks', questions: [] },
-      governance: { theme: 'Governance Structures and Regulatory Mechanisms', questions: [] }
-    };
-
-    questions.forEach(question => {
-      const lowerQuestion = question.question.toLowerCase();
+    if (!questions || questions.length === 0) return [];
+    
+    // Use AI-based clustering if we have the analysis data available
+    // For now, create simple thematic groups based on question similarity
+    const questionGroups = [];
+    const processed = new Set();
+    
+    questions.forEach((question, index) => {
+      if (processed.has(index)) return;
       
-      if (lowerQuestion.includes('threat') || lowerQuestion.includes('vulnerability') || lowerQuestion.includes('attack')) {
-        themes.threats.questions.push(question);
-      } else if (lowerQuestion.includes('policy') || lowerQuestion.includes('effective') || lowerQuestion.includes('framework')) {
-        themes.policy.questions.push(question);
-      } else if (lowerQuestion.includes('cooperation') || lowerQuestion.includes('international') || lowerQuestion.includes('collaborative')) {
-        themes.cooperation.questions.push(question);
-      } else if (lowerQuestion.includes('deterrence') || lowerQuestion.includes('defense') || lowerQuestion.includes('response')) {
-        themes.deterrence.questions.push(question);
-      } else if (lowerQuestion.includes('infrastructure') || lowerQuestion.includes('resilience') || lowerQuestion.includes('protection')) {
-        themes.infrastructure.questions.push(question);
-      } else {
-        themes.governance.questions.push(question);
-      }
+      // Start a new group with this question
+      const group = {
+        theme: extractThemeFromQuestion(question.question),
+        questions: [question]
+      };
+      
+      // Find similar questions
+      questions.forEach((otherQuestion, otherIndex) => {
+        if (otherIndex !== index && !processed.has(otherIndex)) {
+          const similarity = calculateQuestionSimilarity(question.question, otherQuestion.question);
+          if (similarity > 0.3) { // 30% similarity threshold
+            group.questions.push(otherQuestion);
+            processed.add(otherIndex);
+          }
+        }
+      });
+      
+      processed.add(index);
+      questionGroups.push(group);
     });
-
-    // Return only themes that have questions
-    return Object.values(themes).filter(theme => theme.questions.length > 0);
+    
+    return questionGroups;
   };
 
-  // Create specific content instead of generic academic language
-  const createSpecificContent = (originalText, citationNumbers, citationDetails, subsection, indentLevel) => {
-    // Always prioritize extracting actual specifics from citations over generic text
-    const specifics = extractConcreteSpecifics(citationNumbers, citationDetails, subsection);
+  // Extract theme from individual question content
+  const extractThemeFromQuestion = (questionText) => {
+    const words = questionText.toLowerCase().split(/\s+/);
+    const keyTerms = [];
     
-    // If we have citation specifics, use them to create concrete content
-    if (specifics.length > 0) {
-      if (indentLevel === 0) {
-        return createSpecificMainContent(specifics, subsection);
-      } else if (indentLevel === 1) {
-        return createSpecificSubContent(specifics, subsection);
-      } else {
-        return createSpecificSupportingContent(specifics, subsection);
+    // Extract meaningful terms (nouns, adjectives)
+    words.forEach(word => {
+      const cleaned = word.replace(/[^\w]/g, '');
+      if (cleaned.length > 3 && 
+          !['what', 'how', 'when', 'where', 'why', 'does', 'would', 'could', 'should', 'this', 'that', 'these', 'those'].includes(cleaned)) {
+        keyTerms.push(cleaned);
       }
+    });
+    
+    // Create theme name from key terms
+    if (keyTerms.length > 0) {
+      const primaryTerms = keyTerms.slice(0, 3).join(' ');
+      return `${primaryTerms.charAt(0).toUpperCase()}${primaryTerms.slice(1)} Analysis`;
     }
     
-    // If original text has specific details, enhance it
+    return 'Research Analysis';
+  };
+
+  // Calculate similarity between two questions
+  const calculateQuestionSimilarity = (question1, question2) => {
+    const words1 = new Set(question1.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    const words2 = new Set(question2.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return intersection.size / union.size;
+  };
+
+  // Create content based on actual data instead of hardcoded templates
+  const createSpecificContent = (originalText, citationNumbers, citationDetails, subsection, indentLevel) => {
+    // Always prioritize actual content from citations
+    const actualContent = extractActualContentFromCitations(citationNumbers, citationDetails);
+    
+    if (actualContent) {
+      return actualContent;
+    }
+    
+    // If original text has specific details, enhance it with citation context
     if (hasSpecificDetails(originalText)) {
       return enhanceWithCitationSpecifics(originalText, citationNumbers, citationDetails);
     }
 
-    // For generic text, try to replace with contextually appropriate specific content
+    // For generic text, use data-driven approach
     if (isGenericAcademicText(originalText)) {
-      return createContextSpecificContent(originalText, subsection, indentLevel, citationNumbers);
+      return createDataDrivenContent(originalText, citationNumbers, citationDetails, subsection, indentLevel);
     }
 
-    // Last resort: return original text
+    // Return original text if it's already specific
     return originalText;
   };
 
@@ -469,46 +505,99 @@ const OutlineDraft2 = ({
     return genericPhrases.some(phrase => lowerText.includes(phrase));
   };
 
-  // Create context-specific content based on subsection and level
-  const createContextSpecificContent = (originalText, subsection, indentLevel, citationNumbers) => {
-    const title = subsection.subsection_title?.toLowerCase() || '';
-    const citationCount = citationNumbers ? citationNumbers.reduce((acc, match) => acc + match.numbers.length, 0) : 0;
+  // Create content based on actual citation data instead of hardcoded templates
+  const createDataDrivenContent = (originalText, citationNumbers, citationDetails, subsection, indentLevel) => {
+    // First, try to extract actual content from citations
+    const citationContent = extractActualContentFromCitations(citationNumbers, citationDetails);
+    
+    if (citationContent && citationContent.length > 0) {
+      // Use actual content from citations
+      return citationContent;
+    }
+    
+    // If original text has specific details, use it
+    if (hasSpecificDetails(originalText)) {
+      return originalText;
+    }
+    
+    // Last resort: create generic content that doesn't assume topic
+    return createGenericStructuredContent(originalText, subsection, indentLevel);
+  };
+
+  // Extract actual content from citation descriptions
+  const extractActualContentFromCitations = (citationNumbers, citationDetails) => {
+    if (!citationNumbers || !citationDetails) return null;
+    
+    let bestContent = '';
+    let maxSpecificity = 0;
+    
+    citationNumbers.forEach(match => {
+      match.numbers.forEach(num => {
+        const citation = citationDetails[num];
+        if (citation && citation.description) {
+          const specificity = calculateContentSpecificity(citation.description);
+          if (specificity > maxSpecificity) {
+            maxSpecificity = specificity;
+            bestContent = extractBestSentenceFromDescription(citation.description);
+          }
+        }
+      });
+    });
+    
+    return bestContent || null;
+  };
+
+  // Calculate how specific/detailed a piece of content is
+  const calculateContentSpecificity = (text) => {
+    let score = 0;
+    
+    // Higher score for specific details
+    if (/\d{4}/.test(text)) score += 3; // Years
+    if (/\d+%/.test(text)) score += 3; // Percentages
+    if (/\$\d+/.test(text)) score += 2; // Money amounts
+    if (/\b\d+\b/.test(text)) score += 1; // Any numbers
+    
+    // Score for proper nouns and specific terms
+    const properNouns = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
+    score += properNouns.length * 0.5;
+    
+    // Lower score for generic academic language
+    if (/\b(comprehensive|systematic|detailed|thorough)\b/i.test(text)) score -= 1;
+    if (/\bthis (study|research|paper|analysis)\b/i.test(text)) score -= 2;
+    
+    return score;
+  };
+
+  // Extract the most informative sentence from a citation description
+  const extractBestSentenceFromDescription = (description) => {
+    const sentences = description.split(/[.!?]+/);
+    let bestSentence = '';
+    let maxScore = 0;
+    
+    sentences.forEach(sentence => {
+      const trimmed = sentence.trim();
+      if (trimmed.length > 20 && trimmed.length < 300) {
+        const score = calculateContentSpecificity(trimmed);
+        if (score > maxScore) {
+          maxScore = score;
+          bestSentence = trimmed;
+        }
+      }
+    });
+    
+    return bestSentence || description.substring(0, 150).trim() + '...';
+  };
+
+  // Create generic structured content that doesn't assume research topic
+  const createGenericStructuredContent = (originalText, subsection, indentLevel) => {
+    const subsectionTitle = subsection.subsection_title || '';
     
     if (indentLevel === 0) {
-      // Main points - create specific historical or policy content
-      if (title.includes('deterrence')) {
-        return `U.S. Cyber Deterrence Doctrine Evolution (2009-2024): From Bush Administration's Comprehensive National Cybersecurity Initiative to Biden's National Cybersecurity Strategy`;
-      } else if (title.includes('framework')) {
-        return `Implementation Timeline of Critical Cybersecurity Frameworks: NIST Cybersecurity Framework (2014), Executive Order 14028 (2021), and Zero Trust Architecture Mandates`;
-      } else if (title.includes('threat')) {
-        return `Current Threat Landscape Assessment: Nation-State APT Groups, Ransomware-as-a-Service Operations, and Critical Infrastructure Targeting Patterns (2020-2024)`;
-      } else if (title.includes('policy')) {
-        return `Policy Effectiveness Metrics: Analysis of PPD-20 (2012), PPD-41 (2016), NSPM-13 (2018), and National Cybersecurity Strategy Implementation`;
-      } else {
-        return `Strategic Analysis Framework: ${title.charAt(0).toUpperCase() + title.slice(1)} Assessment and Implementation Roadmap`;
-      }
+      return originalText || `Analysis of ${subsectionTitle}`;
     } else if (indentLevel === 1) {
-      // Sub-points - create specific implementation details
-      if (title.includes('deterrence')) {
-        return `Persistent Engagement Strategy Implementation: Cyber Command's "Defend Forward" Operations and Hunt Forward Team Deployments`;
-      } else if (title.includes('framework')) {
-        return `Federal Agency Compliance Metrics: OMB M-22-09 Zero Trust Implementation Timeline and CISA Binding Operational Directives`;
-      } else if (title.includes('threat')) {
-        return `Advanced Persistent Threat Attribution: Russian SVR (APT29), Chinese MSS (APT40), and Iranian IRGC (APT35) Campaign Analysis`;
-      } else {
-        return `Implementation Mechanisms: Regulatory Requirements, Budget Allocations ($10.9B FY2024), and Performance Indicators`;
-      }
+      return originalText || `Key findings and evidence regarding ${subsectionTitle.toLowerCase()}`;
     } else {
-      // Deeper points - create specific evidence and cases
-      if (title.includes('deterrence')) {
-        return `Case Study Evidence: Operation Glowing Symphony (2016), Ukraine Grid Attacks Response (2015-2016), and SolarWinds Attribution Timeline (2020-2021)`;
-      } else if (title.includes('framework')) {
-        return `Compliance Evidence: Federal Risk and Authorization Management Program (FedRAMP) adoption rates, Continuous Diagnostics and Mitigation (CDM) deployment metrics`;
-      } else if (title.includes('threat')) {
-        return `Incident Documentation: Colonial Pipeline Ransomware (May 2021), JBS Cyberattack (June 2021), and Kaseya Supply Chain Attack (July 2021)`;
-      } else {
-        return `Operational Evidence: Budget impact assessments, implementation timeline adherence, and measurable security posture improvements`;
-      }
+      return originalText || `Supporting details and case studies`;
     }
   };
 
@@ -519,7 +608,7 @@ const OutlineDraft2 = ({
       /\d+%/,   // Percentages  
       /\$\d+/,  // Dollar amounts
       /\b(Act|Strategy|Framework|Initiative|Policy|Directive|Order)\b/i,  // Specific documents
-      /\b(DoD|NIST|DHS|NSA|CIA|FBI|GAO|RAND|CSIS|CNAS)\b/,  // Organizations
+      /\b[A-Z]{2,}\b/,  // Acronyms (like DoD, NIST, etc.)
       /\b(Operation|Project|Program)\s+[A-Z][a-z]+/,  // Named operations
       /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i  // Months
     ];
@@ -633,92 +722,162 @@ const OutlineDraft2 = ({
     return `Documented in ${citationCount} case studies and reports`;
   };
 
-  // Create specific main point from text and subsection context
-  const createSpecificMainPoint = (text, subsection, pointNumber) => {
-    const title = subsection.subsection_title || '';
+  // Create data-driven main point from available sources
+  const createDataDrivenMainPoint = (text, subsection, pointNumber, citationDetails) => {
+    // Try to extract content from citations first
+    const citationContent = extractBestContentFromCitationMap(citationDetails);
     
-    if (title.toLowerCase().includes('deterrence')) {
-      return `Evolution of U.S. Cyber Deterrence Doctrine (2008–2024)`;
-    } else if (title.toLowerCase().includes('framework')) {
-      return `Implementation of Comprehensive National Cybersecurity Framework`;
-    } else if (title.toLowerCase().includes('policy')) {
-      return `Strategic Policy Effectiveness and Gap Analysis`;
-    } else if (title.toLowerCase().includes('infrastructure')) {
-      return `Critical Infrastructure Protection and Resilience Assessment`;
-    } else {
-      return text || `Component ${pointNumber}: ${title} Analysis`;
+    if (citationContent) {
+      return citationContent;
     }
-  };
-
-  // Create specific sub-point from text and context
-  const createSpecificSubPoint = (text, subsection, citationDetails) => {
-    if (hasSpecificDetails(text)) {
+    
+    // Use existing text if it's specific
+    if (text && hasSpecificDetails(text)) {
       return text;
     }
     
-    const title = subsection.subsection_title || '';
-    
-    if (title.toLowerCase().includes('deterrence')) {
-      return `Deterrence by Denial and Resilience Development`;
-    } else if (title.toLowerCase().includes('framework')) {
-      return `Zero-Trust Architecture Implementation and Software Supply Chain Defense`;
-    } else if (title.toLowerCase().includes('policy')) {
-      return `Policy Framework Effectiveness Metrics and Implementation Gaps`;
-    } else {
-      return text || `Supporting analysis of implementation mechanisms`;
-    }
+    // Generic fallback that doesn't assume research topic
+    const title = subsection.subsection_title || 'Research Component';
+    return text || `Analysis of ${title}`;
   };
 
-  // Create specific evidence from text and context
-  const createSpecificEvidence = (text, subsection, citationDetails) => {
-    if (hasSpecificDetails(text)) {
+  // Create data-driven sub-point from available evidence
+  const createDataDrivenSubPoint = (text, subsection, citationDetails) => {
+    // Try to extract supporting details from citations
+    const supportingContent = extractSupportingContentFromCitations(citationDetails);
+    
+    if (supportingContent) {
+      return supportingContent;
+    }
+    
+    // Use existing text if it has specifics
+    if (text && hasSpecificDetails(text)) {
       return text;
     }
     
-    const title = subsection.subsection_title || '';
-    
-    if (title.toLowerCase().includes('deterrence')) {
-      return `Cyber Command's "defend forward" posture, introduced in 2018, institutionalized preemptive threat engagement`;
-    } else if (title.toLowerCase().includes('framework')) {
-      return `NIST SP 800-207 (Zero Trust) and DoD Zero Trust Reference Architecture (2023) provide implementation guidelines`;
-    } else {
-      return text || `Operational case studies demonstrate strategic implementation patterns`;
-    }
+    // Generic fallback
+    return text || `Key findings and supporting evidence`;
   };
 
-  // Create specific fallback outline when no structure exists
-  const createSpecificFallbackOutline = (subsection, citationDetails) => {
-    const title = subsection.subsection_title || '';
+  // Create data-driven evidence from citation details
+  const createDataDrivenEvidence = (text, subsection, citationDetails) => {
+    // Extract specific examples or case studies from citations
+    const evidenceContent = extractEvidenceFromCitations(citationDetails);
     
+    if (evidenceContent) {
+      return evidenceContent;
+    }
+    
+    // Use existing text if specific
+    if (text && hasSpecificDetails(text)) {
+      return text;
+    }
+    
+    // Generic fallback
+    return text || `Supporting details and case studies from research sources`;
+  };
+
+  // Extract best content from citation map
+  const extractBestContentFromCitationMap = (citationDetails) => {
+    if (!citationDetails || Object.keys(citationDetails).length === 0) return null;
+    
+    let bestContent = '';
+    let maxScore = 0;
+    
+    Object.values(citationDetails).forEach(citation => {
+      if (citation.description) {
+        const score = calculateContentSpecificity(citation.description);
+        if (score > maxScore) {
+          maxScore = score;
+          bestContent = extractBestSentenceFromDescription(citation.description);
+        }
+      }
+    });
+    
+    return maxScore > 3 ? bestContent : null;
+  };
+
+  // Extract supporting content from citations
+  const extractSupportingContentFromCitations = (citationDetails) => {
+    if (!citationDetails) return null;
+    
+    const citations = Object.values(citationDetails);
+    if (citations.length === 0) return null;
+    
+    // Look for methodological or analytical content
+    for (const citation of citations) {
+      if (citation.description) {
+        const sentences = citation.description.split(/[.!?]+/);
+        for (const sentence of sentences) {
+          const trimmed = sentence.trim();
+          if (trimmed.length > 30 && 
+              /\b(method|approach|analysis|framework|model|strategy)\b/i.test(trimmed) &&
+              !isGenericSourceDescription(trimmed)) {
+            return trimmed;
+          }
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  // Extract evidence examples from citations
+  const extractEvidenceFromCitations = (citationDetails) => {
+    if (!citationDetails) return null;
+    
+    const citations = Object.values(citationDetails);
+    if (citations.length === 0) return null;
+    
+    // Look for specific examples, case studies, or data points
+    for (const citation of citations) {
+      if (citation.description) {
+        const sentences = citation.description.split(/[.!?]+/);
+        for (const sentence of sentences) {
+          const trimmed = sentence.trim();
+          if (trimmed.length > 20 && 
+              /\b(example|case|study|data|evidence|result|finding|showed|demonstrated)\b/i.test(trimmed) &&
+              hasSpecificDetails(trimmed)) {
+            return trimmed;
+          }
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  // Create data-driven fallback outline when no structure exists
+  const createDataDrivenFallbackOutline = (subsection, citationDetails) => {
     return {
       level: '1',
       type: 'number',
-      content: createSpecificMainPoint('', subsection, 1),
-      citations: [], // Add empty citations array
+      content: createDataDrivenMainPoint('', subsection, 1, citationDetails),
+      citations: [],
       reference: `Analysis derived from ${subsection.subsection_title} research data`,
       editable: true,
       subPoints: [{
         level: 'a',
         type: 'lowercase',
-        content: createSpecificSubPoint('', subsection, citationDetails),
-        citations: [], // Add empty citations array
+        content: createDataDrivenSubPoint('', subsection, citationDetails),
+        citations: [],
         reference: 'Primary source documentation',
         editable: true,
         deeperPoints: [{
           level: 'i',
           type: 'roman_lower',
-          content: createSpecificEvidence('', subsection, citationDetails),
-          citations: [], // Add empty citations array
-          reference: 'Operational evidence base',
+          content: createDataDrivenEvidence('', subsection, citationDetails),
+          citations: [],
+          reference: 'Supporting evidence from research sources',
           editable: true
         }]
       }]
     };
   };
 
-  // Synthesize thematic framework with specific details instead of generic academic language
+  // Synthesize thematic framework based on actual content from citations
   const synthesizeThematicFramework = (themeGroup, subsection) => {
-    // Extract specific details from the questions and citations in this theme
+    // Extract all citations from this thematic group
     const allCitations = [];
     themeGroup.questions.forEach(question => {
       if (question.citations) {
@@ -726,86 +885,30 @@ const OutlineDraft2 = ({
       }
     });
 
-    // Extract concrete specifics from all citations in this theme
-    const concreteSpecifics = [];
+    // Find the most substantive content from citations
+    let bestContent = '';
+    let maxSpecificity = 0;
+
     allCitations.forEach(citation => {
       if (citation.description) {
-        const specifics = extractConcreteFromDescription(citation.description);
-        concreteSpecifics.push(...specifics);
+        const specificity = calculateContentSpecificity(citation.description);
+        if (specificity > maxSpecificity) {
+          maxSpecificity = specificity;
+          bestContent = extractBestSentenceFromDescription(citation.description);
+        }
       }
     });
 
-    // Create specific content based on theme and extracted details
-    const themeTitle = themeGroup.theme;
-    const subsectionTitle = subsection.subsection_title || '';
+    // If we found specific content, use it
+    if (bestContent && maxSpecificity > 3) {
+      return `${themeGroup.theme}: ${bestContent}`;
+    }
+
+    // Otherwise, create a descriptive title based on the theme and citation count
     const citationCount = allCitations.length;
-
-    // Build specific content based on what's actually in the sources
-    if (concreteSpecifics.length > 0) {
-      // Use actual specifics found in the citations
-      const years = concreteSpecifics.filter(s => /\b(19|20)\d{2}\b/.test(s));
-      const documents = concreteSpecifics.filter(s => /(Act|Strategy|Framework|Initiative|Policy|Directive|Plan)/i.test(s));
-      const events = concreteSpecifics.filter(s => /(SolarWinds|Colonial Pipeline|WannaCry|Operation|Stuxnet|Estonia|Georgia)/i.test(s));
-      const organizations = concreteSpecifics.filter(s => /(DoD|NIST|DHS|NSA|CIA|FBI|GAO|RAND|CSIS)/i.test(s));
-
-      if (themeTitle.includes('Threat Analysis') || themeTitle.includes('Vulnerability')) {
-        if (events.length > 0) {
-          return `Cyber Threat Landscape Analysis: ${events[0]} and Related Incident Response Patterns`;
-        } else if (years.length >= 2) {
-          const yearRange = `${Math.min(...years.map(y => parseInt(y.match(/\d{4}/)[0])))}–${Math.max(...years.map(y => parseInt(y.match(/\d{4}/)[0])))}`;
-          return `Threat Evolution Assessment (${yearRange}): Documented Attack Patterns and Vulnerability Trends`;
-        } else {
-          return `Current Cyber Threat Assessment: ${concreteSpecifics[0]}`;
-        }
-      } else if (themeTitle.includes('Deterrence') || themeTitle.includes('Defense')) {
-        if (documents.length > 0) {
-          return `Implementation of ${documents[0]} and Strategic Deterrence Mechanisms`;
-        } else if (organizations.length > 0) {
-          return `${organizations[0]} Deterrence Strategy Development and Implementation Framework`;
-        } else {
-          return `Cyber Deterrence Strategy Evolution: ${concreteSpecifics[0]}`;
-        }
-      } else if (themeTitle.includes('Policy') || themeTitle.includes('Framework')) {
-        if (documents.length > 0) {
-          return `Policy Framework Analysis: ${documents[0]} Implementation and Effectiveness Assessment`;
-        } else if (years.length > 0) {
-          return `Policy Development Timeline (${years[0]}): Strategic Implementation and Gap Analysis`;
-        } else {
-          return `Policy Effectiveness Evaluation: ${concreteSpecifics[0]}`;
-        }
-      } else if (themeTitle.includes('International') || themeTitle.includes('Cooperation')) {
-        if (events.length > 0) {
-          return `International Response Coordination: ${events[0]} Case Study Analysis`;
-        } else if (organizations.length > 0) {
-          return `Multilateral Cybersecurity Cooperation: ${organizations[0]} Partnership Framework`;
-        } else {
-          return `International Collaboration Mechanisms: ${concreteSpecifics[0]}`;
-        }
-      } else if (themeTitle.includes('Infrastructure') || themeTitle.includes('Resilience')) {
-        if (documents.length > 0) {
-          return `Critical Infrastructure Protection: ${documents[0]} Implementation Strategy`;
-        } else {
-          return `Infrastructure Resilience Assessment: ${concreteSpecifics[0]}`;
-        }
-      } else {
-        return `Strategic Analysis: ${concreteSpecifics[0]}`;
-      }
-    }
-
-    // Fallback to specific contextual content if no concrete specifics found
-    if (themeTitle.includes('Threat Analysis')) {
-      return `Comprehensive Threat Landscape Assessment: Current Attack Vectors and Vulnerability Patterns (${citationCount} sources)`;
-    } else if (themeTitle.includes('Deterrence')) {
-      return `Cyber Deterrence Strategy Evaluation: Effectiveness Analysis and Strategic Gaps (${citationCount} sources)`;
-    } else if (themeTitle.includes('Policy')) {
-      return `Policy Framework Effectiveness: Implementation Assessment and Strategic Recommendations (${citationCount} sources)`;
-    } else if (themeTitle.includes('International')) {
-      return `International Cooperation Analysis: Partnership Mechanisms and Coordination Challenges (${citationCount} sources)`;
-    } else if (themeTitle.includes('Infrastructure')) {
-      return `Critical Infrastructure Security: Protection Strategies and Resilience Assessment (${citationCount} sources)`;
-    } else {
-      return `Strategic Framework Analysis: ${subsectionTitle} Assessment and Implementation (${citationCount} sources)`;
-    }
+    const themeTitle = themeGroup.theme || 'Research Analysis';
+    
+    return `${themeTitle} (${citationCount} source${citationCount !== 1 ? 's' : ''})`;
   };
 
   // Create specific main content from extracted specifics
@@ -991,20 +1094,20 @@ const OutlineDraft2 = ({
     // If no verifiable specific content, use general thematic content based on description themes
     const lowerDesc = description.toLowerCase();
     
-    if (lowerDesc.includes('deterrence') || lowerDesc.includes('dissuasion')) {
-      return `Cyber deterrence strategy development and implementation challenges, as documented in government policy analysis and strategic assessments`;
-    } else if (lowerDesc.includes('framework') || lowerDesc.includes('strategy')) {
-      return `National cybersecurity framework implementation and strategic coordination mechanisms across federal agencies and critical infrastructure sectors`;
-    } else if (lowerDesc.includes('threat') || lowerDesc.includes('attack')) {
-      return `Evolving cyber threat landscape analysis, including nation-state actors, advanced persistent threats, and critical infrastructure targeting patterns`;
+    if (lowerDesc.includes('strategy') || lowerDesc.includes('approach')) {
+      return `Strategic development and implementation challenges, as documented in policy analysis and strategic assessments`;
+    } else if (lowerDesc.includes('framework') || lowerDesc.includes('structure')) {
+      return `Framework implementation and coordination mechanisms across multiple agencies and sectors`;
+    } else if (lowerDesc.includes('analysis') || lowerDesc.includes('assessment')) {
+      return `Comprehensive analysis of key factors, patterns, and strategic considerations`;
     } else if (lowerDesc.includes('cooperation') || lowerDesc.includes('international')) {
-      return `International cybersecurity cooperation initiatives, bilateral agreements, and multilateral coordination mechanisms for threat response`;
+      return `International cooperation initiatives, bilateral agreements, and multilateral coordination mechanisms`;
     } else if (lowerDesc.includes('policy') || lowerDesc.includes('effectiveness')) {
-      return `Policy effectiveness evaluation and strategic gap analysis in current cybersecurity governance and regulatory frameworks`;
-    } else if (lowerDesc.includes('infrastructure') || lowerDesc.includes('resilience')) {
-      return `Critical infrastructure protection strategies, resilience assessment methodologies, and sector-specific security enhancements`;
+      return `Policy effectiveness evaluation and strategic gap analysis in governance and regulatory frameworks`;
+    } else if (lowerDesc.includes('implementation') || lowerDesc.includes('practical')) {
+      return `Implementation strategies, practical considerations, and sector-specific approaches`;
     } else {
-      return `Comprehensive analysis of cybersecurity challenges and strategic responses based on authoritative sources and expert assessments`;
+      return `Comprehensive analysis of research challenges and strategic responses based on authoritative sources and expert assessments`;
     }
   };
   
@@ -1192,35 +1295,35 @@ const OutlineDraft2 = ({
     if (evidence.length === 0) {
       const mainDescription = group.mainCitation.description?.toLowerCase() || '';
       
-      if (mainDescription.includes('deterrence') || mainDescription.includes('dissuasion')) {
+      if (mainDescription.includes('strategy') || mainDescription.includes('approach')) {
         evidence.push(
-          { point: `Cyber deterrence strategies face attribution challenges that complicate effective response mechanisms`, source: `Policy analysis and strategic assessments` },
-          { point: `Persistent engagement doctrine represents shift toward proactive cyber defense posture`, source: `Military strategy documentation` },
-          { point: `Deterrence effectiveness varies significantly between state and non-state cyber actors`, source: `Academic research on cyber deterrence` }
+          { point: `Strategic approaches face implementation challenges that complicate effective execution`, source: `Policy analysis and strategic assessments` },
+          { point: `Contemporary doctrine represents shift toward proactive engagement strategies`, source: `Strategic policy documentation` },
+          { point: `Strategy effectiveness varies significantly across different contexts and stakeholders`, source: `Academic research on strategic implementation` }
         );
-      } else if (mainDescription.includes('framework') || mainDescription.includes('strategy')) {
+      } else if (mainDescription.includes('framework') || mainDescription.includes('structure')) {
         evidence.push(
-          { point: `National cybersecurity frameworks require coordination across multiple government agencies and private sector entities`, source: `Policy implementation studies` },
-          { point: `Zero-trust architecture implementation faces technical and organizational challenges in legacy systems`, source: `Federal agency implementation reports` },
-          { point: `Cybersecurity framework adoption varies significantly across critical infrastructure sectors`, source: `Infrastructure security assessments` }
+          { point: `Frameworks require coordination across multiple government agencies and sector entities`, source: `Policy implementation studies` },
+          { point: `Implementation faces technical and organizational challenges in existing systems`, source: `Federal agency implementation reports` },
+          { point: `Framework adoption varies significantly across different sectors and organizations`, source: `Sector-specific assessment studies` }
         );
-      } else if (mainDescription.includes('threat') || mainDescription.includes('attack')) {
+      } else if (mainDescription.includes('analysis') || mainDescription.includes('assessment')) {
         evidence.push(
-          { point: `Nation-state cyber actors demonstrate increasing sophistication in attack methodologies and target selection`, source: `Threat intelligence analysis` },
-          { point: `Supply chain compromises represent growing attack vector against both government and private sector targets`, source: `Cybersecurity incident documentation` },
-          { point: `Critical infrastructure targeting patterns reflect strategic adversary objectives and capabilities`, source: `Threat landscape assessments` }
+          { point: `Analytical approaches demonstrate increasing sophistication in methodology and scope`, source: `Research methodology analysis` },
+          { point: `Comprehensive assessments represent growing focus on multi-dimensional evaluation approaches`, source: `Academic evaluation documentation` },
+          { point: `Assessment patterns reflect systematic approaches to evidence-based analysis`, source: `Research methodology assessments` }
         );
       } else if (mainDescription.includes('cooperation') || mainDescription.includes('international')) {
         evidence.push(
-          { point: `International cybersecurity cooperation faces jurisdictional and legal framework challenges`, source: `International law and policy analysis` },
+          { point: `International cooperation faces jurisdictional and legal framework challenges`, source: `International law and policy analysis` },
           { point: `Bilateral and multilateral agreements facilitate information sharing and coordinated response capabilities`, source: `Diplomatic cooperation documentation` },
-          { point: `NATO and other alliance structures adapt to address cyber threats through collective defense mechanisms`, source: `Alliance policy frameworks` }
+          { point: `Alliance structures adapt to address contemporary challenges through collective mechanisms`, source: `Alliance policy frameworks` }
         );
       } else {
         evidence.push(
-          { point: `Cybersecurity policy effectiveness depends on coordination between government agencies and private sector stakeholders`, source: `Policy evaluation studies` },
-          { point: `Critical infrastructure protection requires sector-specific approaches tailored to unique operational environments`, source: `Infrastructure security research` },
-          { point: `Cyber workforce development initiatives address skills gaps in both public and private sectors`, source: `Workforce development analysis` }
+          { point: `Policy effectiveness depends on coordination between government agencies and stakeholder organizations`, source: `Policy evaluation studies` },
+          { point: `Implementation requires sector-specific approaches tailored to unique operational environments`, source: `Sector-specific research studies` },
+          { point: `Development initiatives address capacity gaps across both public and private sectors`, source: `Capacity development analysis` }
         );
       }
     }
@@ -1319,7 +1422,7 @@ const OutlineDraft2 = ({
       if (indentLevel === 0) {
         // Main point (1., 2., 3., etc.) - create specific, detailed content
         const citationNums = extractCitationsForDisplay(itemText);
-        const contentText = enhancedContent || createSpecificMainPoint(cleanText, subsection, mainPointCounter);
+        const contentText = enhancedContent || createDataDrivenMainPoint(cleanText, subsection, mainPointCounter, citationDetails);
         
         // Debug: Log citation extraction
         console.log('Main point citation extraction:', {
@@ -1358,7 +1461,7 @@ const OutlineDraft2 = ({
       } else if (indentLevel === 1 && currentMainPoint) {
         // Sub-point (a), b), c), etc.) - create specific supporting content
         const citationNums = extractCitationsForDisplay(itemText);
-        const contentText = enhancedContent || createSpecificSubPoint(cleanText, subsection, citationDetails);
+        const contentText = enhancedContent || createDataDrivenSubPoint(cleanText, subsection, citationDetails);
         
         // If no citations found, add some test citations for sub-points
         let finalCitations = citationNums;
@@ -1381,7 +1484,7 @@ const OutlineDraft2 = ({
         const lastSubPoint = currentMainPoint.subPoints[currentMainPoint.subPoints.length - 1];
         const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii'];
         const citationNums = extractCitationsForDisplay(itemText);
-        const contentText = enhancedContent || createSpecificEvidence(cleanText, subsection, citationDetails);
+        const contentText = enhancedContent || createDataDrivenEvidence(cleanText, subsection, citationDetails);
         const deepPoint = {
           level: romanNumerals[lastSubPoint.deeperPoints.length] || `${lastSubPoint.deeperPoints.length + 1}`,
           type: 'roman_lower',
@@ -1396,7 +1499,7 @@ const OutlineDraft2 = ({
 
     // If no structured outline was found, create specific structure based on subsection context
     if (masterOutline.length === 0) {
-      masterOutline.push(createSpecificFallbackOutline(subsection, citationDetails));
+      masterOutline.push(createDataDrivenFallbackOutline(subsection, citationDetails));
     }
 
     return masterOutline;
@@ -1583,10 +1686,10 @@ const OutlineDraft2 = ({
     return points.slice(0, 5); // Limit to 5 main points per question
   };
 
-  // Generate comprehensive outline logic for each subsection
+  // Generate comprehensive outline logic using AI analysis of actual data
   const generateOutlineLogic = async () => {
     if (!outlineData || !refinedOutlines || refinedOutlines.length === 0) {
-      setErrorMessage('No refined outlines available for logic analysis.');
+      setErrorMessage('No refined outlines available for analysis');
       return;
     }
 
@@ -1594,64 +1697,175 @@ const OutlineDraft2 = ({
     setErrorMessage('');
 
     try {
-      const logicData = [];
-
-      // Process each subsection systematically
+      // Analyze each subsection's actual data using AI
+      const logicAnalysis = [];
+      
       for (const section of refinedOutlines) {
         for (const subsection of section.subsections || []) {
-          // Step 1: Contextual Analysis
-          const contextAnalysis = analyzeSubsectionContext(subsection, section, finalThesis, methodology);
+          // Prepare the data for AI analysis
+          const analysisRequest = {
+            questions: subsection.questions || [],
+            citations: extractAllCitationsFromQuestions(subsection.questions || []),
+            subsection_title: subsection.subsection_title,
+            subsection_context: subsection.subsection_context,
+            section_title: section.section_title,
+            thesis: finalThesis,
+            methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology
+          };
           
-          // Step 2: Review all question responses
-          const questionResponses = subsection.questions || [];
-          const responseAnalysis = analyzeQuestionResponses(questionResponses);
+          console.log('Sending data for AI analysis:', analysisRequest);
           
-          // Step 3: Generate outline logic
-          const outlineLogic = generateSubsectionLogic(
-            subsection,
-            contextAnalysis,
-            responseAnalysis,
-            finalThesis,
-            methodology
-          );
+          // Call the new AI analysis endpoint
+          const response = await fetch('http://localhost:8000/data-analysis/analyze-subsection', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(analysisRequest)
+          });
           
-          logicData.push(outlineLogic);
+          if (!response.ok) {
+            throw new Error(`Analysis failed: ${response.status} ${response.statusText}`);
+          }
+          
+          const aiAnalysis = await response.json();
+          console.log('Received AI analysis:', aiAnalysis);
+          
+          logicAnalysis.push({
+            section_title: section.section_title,
+            subsection_title: subsection.subsection_title,
+            ai_analysis: aiAnalysis,
+            question_count: subsection.questions?.length || 0,
+            citation_count: extractAllCitationsFromQuestions(subsection.questions || []).length
+          });
         }
       }
-
-      setOutlineLogicData(logicData);
       
-      // After generating logic, automatically start the enhanced outline generation
-      await generateEnhancedOutlines(logicData);
+      setOutlineLogicData(logicAnalysis);
+      setShowOutlineLogic(true);
+      
+      // Generate enhanced master outlines based on AI analysis
+      const enhancedMasterOutlines = await generateDataDrivenMasterOutlines(logicAnalysis, refinedOutlines);
+      setMasterOutlines(enhancedMasterOutlines);
       
     } catch (error) {
       console.error('Error generating outline logic:', error);
-      setErrorMessage('Failed to generate outline logic. Please try again.');
+      setErrorMessage(`Failed to generate outline logic: ${error.message}`);
     } finally {
       setGeneratingLogic(false);
     }
   };
 
-  // Analyze subsection context within the full research framework
-  const analyzeSubsectionContext = (subsection, section, thesis, methodology) => {
-    const contextChain = {
-      thesis: thesis || '',
-      methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
-      section_title: section.section_title || '',
-      section_context: section.section_context || '',
-      subsection_title: subsection.subsection_title || '',
-      subsection_context: subsection.subsection_context || '',
-      question_count: subsection.questions?.length || 0,
-      citation_count: subsection.questions?.reduce((acc, q) => acc + (q.citations?.length || 0), 0) || 0
-    };
+  // Extract all citations from questions for AI analysis
+  const extractAllCitationsFromQuestions = (questions) => {
+    const allCitations = [];
+    questions.forEach(question => {
+      if (question.citations && Array.isArray(question.citations)) {
+        allCitations.push(...question.citations);
+      }
+    });
+    return allCitations;
+  };
 
-    // Generate contextual understanding
-    return {
-      research_scope: `This subsection "${contextChain.subsection_title}" operates within the broader section "${contextChain.section_title}" to support the thesis: ${contextChain.thesis?.substring(0, 150)}...`,
-      methodological_alignment: `Using ${contextChain.methodology} methodology, this subsection will provide ${getMethodologyAlignment(contextChain.methodology, subsection)}`,
-      evidence_base: `Drawing from ${contextChain.question_count} research questions and ${contextChain.citation_count} citations to build comprehensive analysis`,
-      analytical_purpose: `The purpose is to ${getAnalyticalPurpose(subsection, section, thesis)}`
-    };
+  // Generate data-driven master outlines based on AI analysis
+  const generateDataDrivenMasterOutlines = async (logicAnalysis, refinedOutlines) => {
+    const enhancedOutlines = [];
+    
+    for (let i = 0; i < logicAnalysis.length; i++) {
+      const analysis = logicAnalysis[i];
+      const section = refinedOutlines.find(s => s.section_title === analysis.section_title);
+      const subsection = section?.subsections?.find(sub => sub.subsection_title === analysis.subsection_title);
+      
+      if (subsection && analysis.ai_analysis?.generated_outline) {
+        const masterOutline = convertAIOutlineToMasterFormat(
+          analysis.ai_analysis.generated_outline,
+          subsection,
+          analysis.ai_analysis
+        );
+        
+        enhancedOutlines.push({
+          section_title: section.section_title,
+          section_context: section.section_context,
+          master_subsections: [{
+            subsection_title: subsection.subsection_title,
+            subsection_context: subsection.subsection_context,
+            master_outline: masterOutline,
+            question_count: analysis.question_count,
+            citation_count: analysis.citation_count,
+            reference_path: `Section ${section.section_title} → Subsection ${subsection.subsection_title}`,
+            ai_analysis_summary: analysis.ai_analysis.content_summary,
+            thematic_basis: analysis.ai_analysis.generated_outline?.thematic_basis || 'AI-generated thematic organization'
+          }]
+        });
+      }
+    }
+    
+    return enhancedOutlines;
+  };
+
+  // Convert AI-generated outline to our master outline format
+  const convertAIOutlineToMasterFormat = (aiOutline, subsection, fullAnalysis) => {
+    if (!aiOutline?.main_points || aiOutline.main_points.length === 0) {
+      return createFallbackOutlineFromAnalysis(subsection, fullAnalysis);
+    }
+    
+    return aiOutline.main_points.map((mainPoint, index) => ({
+      level: `${index + 1}`,
+      type: 'number',
+      content: mainPoint.content || `Analysis Point ${index + 1}`,
+      citations: mainPoint.citations || [],
+      reference: mainPoint.rationale || 'Generated from AI analysis of research data',
+      editable: true,
+      subPoints: generateSubPointsFromEvidence(mainPoint.supporting_evidence || [], mainPoint.citations || [])
+    }));
+  };
+
+  // Generate sub-points from supporting evidence
+  const generateSubPointsFromEvidence = (supportingEvidence, citations) => {
+    return supportingEvidence.slice(0, 4).map((evidence, index) => ({
+      level: String.fromCharCode(97 + index), // a, b, c, d
+      type: 'lowercase',
+      content: evidence,
+      citations: citations.slice(index * 2, (index + 1) * 2), // Distribute citations
+      reference: 'Supporting evidence from research data',
+      editable: true,
+      deeperPoints: []
+    }));
+  };
+
+  // Create fallback outline when AI analysis doesn't provide structured outline
+  const createFallbackOutlineFromAnalysis = (subsection, analysis) => {
+    const themes = analysis.thematic_clusters || [];
+    
+    if (themes.length === 0) {
+      return [{
+        level: '1',
+        type: 'number',
+        content: `Analysis of ${subsection.subsection_title}`,
+        citations: [],
+        reference: 'Generated from research questions and citations',
+        editable: true,
+        subPoints: []
+      }];
+    }
+    
+    return themes.map((theme, index) => ({
+      level: `${index + 1}`,
+      type: 'number',
+      content: theme.theme_description || theme.theme_name,
+      citations: [],
+      reference: `Thematic analysis: ${theme.key_concepts?.join(', ') || 'Key concepts from research data'}`,
+      editable: true,
+      subPoints: theme.key_concepts?.slice(0, 3).map((concept, subIndex) => ({
+        level: String.fromCharCode(97 + subIndex),
+        type: 'lowercase',
+        content: concept,
+        citations: [],
+        reference: 'Concept extracted from data analysis',
+        editable: true,
+        deeperPoints: []
+      })) || []
+    }));
   };
 
   // Analyze all question responses for patterns and themes
