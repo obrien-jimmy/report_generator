@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye } from 'react-icons/fa';
+import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye, FaSearch, FaCog } from 'react-icons/fa';
 import axios from 'axios';
 import Modal from './Modal';
 
@@ -11,325 +11,406 @@ const OutlineDraft2 = ({
   draftData,
   onOutlineDraft2Complete
 }) => {
-  const [fusedOutline, setFusedOutline] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [selectedCitation, setSelectedCitation] = useState(null);
-  const [allCitations, setAllCitations] = useState([]);
+  // Phase 1: Analysis state
+  const [identifiedSections, setIdentifiedSections] = useState([]);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisSummary, setAnalysisSummary] = useState('');
+  
+  // Phase 2: Building state  
+  const [builtSections, setBuiltSections] = useState([]);
+  const [buildingLoading, setBuildingLoading] = useState(false);
+  const [selectedSectionIndices, setSelectedSectionIndices] = useState([]);
+  const [completionStatus, setCompletionStatus] = useState('');
+  const [continuityNotes, setContinuityNotes] = useState([]);
+  
+  // UI state
   const [selectedSection, setSelectedSection] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedCitation, setSelectedCitation] = useState(null);
+  const [currentPhase, setCurrentPhase] = useState(1); // 1 = Analysis, 2 = Building, 3 = Review
 
-  // Process Draft 1 data to extract Data sections
-  const getDataSections = () => {
-    if (!outlineData || !draftData?.responses) return [];
+  // Phase 1: Analyze and identify data sections
+  const analyzeDataSections = async () => {
+    setAnalysisLoading(true);
     
-    const dataSections = [];
-    
-    outlineData.forEach((section, sectionIndex) => {
-      // Categorize the section using our categorization logic
-      const category = categorizeSection(section.section_title);
+    try {
+      const response = await axios.post('http://localhost:8000/analyze_data_sections', {
+        outline_framework: outlineData || [],
+        outline_draft1: draftData ? [draftData] : [],
+        thesis: finalThesis,
+        methodology: typeof methodology === 'string' ? methodology : JSON.stringify(methodology),
+        paper_type: selectedPaperType?.id || 'analytical'
+      });
+
+      setIdentifiedSections(response.data.identified_sections);
+      setAnalysisSummary(response.data.analysis_summary);
+      setAnalysisComplete(true);
+      setCurrentPhase(2);
       
-      if (category === 'Data') {
-        // Collect all responses and citations from this section
-        const allResponses = [];
-        const allCitations = [];
-        
-        if (section.subsections) {
-          section.subsections.forEach((subsection, subsectionIndex) => {
-            if (subsection.questions) {
-              subsection.questions.forEach((questionObj, questionIndex) => {
-                const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-                const responses = draftData.responses[questionKey] || [];
-                
-                // Get the fused response (last item) or all responses
-                if (responses.length > 0) {
-                  const fusedResponse = responses[responses.length - 1];
-                  if (fusedResponse) {
-                    allResponses.push(fusedResponse);
-                  }
-                }
-                
-                // Collect citations
-                if (questionObj.citations) {
-                  allCitations.push(...questionObj.citations);
-                }
-              });
-            }
-          });
-        }
-        
-        if (allResponses.length > 0) {
-          dataSections.push({
-            section_title: section.section_title,
-            section_context: section.section_context || '',
-            category: category,
-            subsections: section.subsections || [],
-            all_responses: allResponses,
-            all_citations: allCitations
-          });
+      // Auto-select first 2 sections for building
+      const recommendedOrder = response.data.recommended_build_order || [];
+      setSelectedSectionIndices(recommendedOrder.slice(0, 2));
+      
+    } catch (error) {
+      console.error('Error analyzing data sections:', error);
+      alert('Failed to analyze data sections. Please try again.');
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  // Phase 2: Build selected sections into academic prose
+  const buildDataSections = async (sectionIndices = null) => {
+    setBuildingLoading(true);
+    
+    try {
+      const indicesToBuild = sectionIndices || selectedSectionIndices;
+      
+      const response = await axios.post('http://localhost:8000/build_data_sections', {
+        identified_data_sections: identifiedSections,
+        outline_framework: outlineData || [],
+        outline_draft1: draftData ? [draftData] : [],
+        thesis: finalThesis,
+        methodology: typeof methodology === 'string' ? methodology : JSON.stringify(methodology),
+        paper_type: selectedPaperType?.id || 'analytical',
+        target_section_indices: indicesToBuild
+      });
+
+      setBuiltSections([...builtSections, ...response.data.built_sections]);
+      setCompletionStatus(response.data.completion_status);
+      setContinuityNotes(response.data.continuity_notes);
+      
+      if (response.data.completion_status === 'complete') {
+        setCurrentPhase(3);
+        if (onOutlineDraft2Complete) {
+          onOutlineDraft2Complete(response.data);
         }
       }
-    });
-    
-    return dataSections;
+      
+    } catch (error) {
+      console.error('Error building data sections:', error);
+      alert('Failed to build data sections. Please try again.');
+    } finally {
+      setBuildingLoading(false);
+    }
   };
 
-  // Simple categorization logic (matching backend)
-  const categorizeSection = (sectionTitle) => {
-    const sectionLower = sectionTitle.toLowerCase();
-    
-    // Admin sections
-    if (['title page', 'abstract', 'references', 'bibliography', 'appendix']
-        .some(term => sectionLower.includes(term))) {
-      return 'Admin';
-    }
-    
-    // Intro sections
-    if (['introduction', 'background', 'context', 'overview', 'scope']
-        .some(term => sectionLower.includes(term))) {
-      return 'Intro';
-    }
-    
-    // Method sections
-    if (['analytical framework', 'model', 'methodology', 'method', 'approach', 
-         'framework', 'theoretical', 'literature context', 'proposed solution']
-        .some(term => sectionLower.includes(term))) {
-      return 'Method';
-    }
-    
-    // Summary sections
-    if (['conclusion', 'summary', 'implications', 'future', 'lessons learned',
-         'reflections', 'tentative conclusions']
-        .some(term => sectionLower.includes(term))) {
-      return 'Summary';
-    }
-    
-    // Analysis sections
-    if (['synthesis', 'discussion', 'evaluation', 'assessment', 'analysis',
-         'critique', 'reaction', 'inter-relationships', 'comparison',
-         'counterarguments', 'rebuttals', 'overall assessment']
-        .some(term => sectionLower.includes(term))) {
-      return 'Analysis';
-    }
-    
-    // Data sections (explicitly include component)
-    if (['component', 'body', 'claim', 'evidence', 'facts', 'timeline',
-         'description', 'cause', 'effect', 'example']
-        .some(term => sectionLower.includes(term))) {
-      return 'Data';
-    }
-    
-    // Default to Data for main content sections
-    return 'Data';
+  // Section selection handlers
+  const toggleSectionSelection = (index) => {
+    setSelectedSectionIndices(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
   };
 
-  // Collect all citations for the modal
-  useEffect(() => {
-    const dataSections = getDataSections();
-    const citations = [];
-    dataSections.forEach(section => {
-      citations.push(...section.all_citations);
-    });
-    setAllCitations(citations);
-  }, [outlineData, draftData]);
+  const selectAllSections = () => {
+    setSelectedSectionIndices(identifiedSections.map((_, index) => index));
+  };
 
-  // Citation modal functions
-  const openCitationModal = (citationIndex) => {
-    if (allCitations[citationIndex]) {
-      setSelectedCitation({ ...allCitations[citationIndex], index: citationIndex });
-    }
+  const clearSelection = () => {
+    setSelectedSectionIndices([]);
+  };
+
+  // Modal handlers
+  const viewSection = (section) => {
+    setSelectedSection(section);
+    setShowModal(true);
+  };
+
+  const openCitationModal = (citation) => {
+    setSelectedCitation(citation);
   };
 
   const closeCitationModal = () => {
     setSelectedCitation(null);
   };
 
-  // Make openCitationModal globally available for the inline citation links
-  useEffect(() => {
-    window.openCitationModal = openCitationModal;
-    return () => {
-      delete window.openCitationModal;
-    };
-  }, [allCitations]);
-
-  const generateFusedOutline = async () => {
-    setLoading(true);
-    
-    try {
-      const dataSections = getDataSections();
-      
-      if (dataSections.length === 0) {
-        alert('No Data sections found in Outline Draft 1. Please ensure you have completed sections that contain core analysis content.');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.post('http://localhost:8000/generate_fused_outline', {
-        data_sections: dataSections,
-        thesis: finalThesis,
-        methodology: typeof methodology === 'string' ? methodology : JSON.stringify(methodology),
-        paper_type: selectedPaperType?.id || 'analytical'
-      });
-
-      setFusedOutline(response.data);
-      
-      // Call completion callback
-      if (onOutlineDraft2Complete) {
-        onOutlineDraft2Complete(response.data);
-      }
-      
-    } catch (error) {
-      console.error('Error generating fused outline:', error);
-      alert('Failed to generate fused outline. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const viewSection = (section) => {
-    setSelectedSection(section);
-    setShowModal(true);
-  };
-
-  const dataSections = getDataSections();
-
   return (
     <div className="outline-draft-2">
       <div className="d-flex align-items-center gap-3 mb-3">
-        <h3 className="mb-0">Outline Draft 2</h3>
-        <span className="badge bg-secondary">
-          Data Fusion & Restructuring
+        <h3 className="mb-0">Data Section Builder</h3>
+        <span className="badge bg-info">
+          Phase {currentPhase} of 3
         </span>
       </div>
 
-      <div className="alert alert-info">
-        <h6>About Outline Draft 2</h6>
+      <div className="alert alert-primary">
+        <h6>🧩 Data Section Builder</h6>
         <p className="mb-2">
-          This stage takes all the "Data" sections from your Outline Draft 1 and creates a cohesive, 
-          well-structured outline that better organizes your evidence and citations to support your thesis.
+          Transform your outlined sections into organized academic paragraphs that describe, contextualize, 
+          and interpret the <strong>factual data being studied</strong>. Build data sections iteratively with 
+          structural integrity and narrative continuity.
         </p>
-        <p className="mb-0">
-          <strong>Found {dataSections.length} Data sections</strong> from Draft 1 ready for fusion and restructuring.
-        </p>
+        <div className="row">
+          <div className="col-md-4">
+            <strong>Phase 1:</strong> Identify Data Sections
+          </div>
+          <div className="col-md-4">
+            <strong>Phase 2:</strong> Build Academic Prose  
+          </div>
+          <div className="col-md-4">
+            <strong>Phase 3:</strong> Review & Integration
+          </div>
+        </div>
       </div>
 
-      {dataSections.length > 0 && (
-        <div className="mb-4">
-          <h5>Data Sections from Draft 1</h5>
-          {dataSections.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="mb-4">
-              <div className="card">
-                <div className="card-header">
-                  <h6 className="mb-0">{section.section_title}</h6>
-                  <small className="text-muted">
-                    {section.all_responses.length} responses • {section.all_citations.length} citations
-                  </small>
-                </div>
-                <div className="card-body">
-                  <p className="card-text">{section.section_context}</p>
-                  
-                  {/* Display all responses with citations */}
-                  {section.all_responses.map((response, responseIndex) => (
-                    <div key={responseIndex} className="mb-3 p-3 border-start border-info border-3 bg-light">
-                      <div className="response-content" 
-                           dangerouslySetInnerHTML={{ 
-                             __html: response.replace(/\[(\d+)\]/g, (match, citationNumber) => {
-                               return `<sup><a href="#" class="citation-link text-primary fw-bold text-decoration-none" onclick="openCitationModal(${citationNumber - 1}); return false;">[${citationNumber}]</a></sup>`;
-                             })
-                           }} 
-                      />
-                      {responseIndex < section.all_responses.length - 1 && <hr className="my-2" />}
-                    </div>
-                  ))}
-                </div>
-              </div>
+      {/* Phase 1: Data Section Analysis */}
+      {currentPhase === 1 && (
+        <div className="phase-1">
+          <div className="card">
+            <div className="card-header">
+              <h5 className="mb-0">
+                <FaSearch className="me-2" />
+                Phase 1: Identify Data Sections
+              </h5>
             </div>
-          ))}
+            <div className="card-body">
+              <p>
+                Analyze your Outline Framework and Draft 1 to identify sections containing 
+                <strong> factual data, evidence, findings, or results</strong> that should be 
+                transformed into scholarly prose.
+              </p>
+              
+              <button
+                className="btn btn-primary"
+                onClick={analyzeDataSections}
+                disabled={analysisLoading || !outlineData}
+              >
+                {analysisLoading ? (
+                  <>
+                    <FaSpinner className="fa-spin me-2" />
+                    Analyzing Sections...
+                  </>
+                ) : (
+                  <>
+                    <FaSearch className="me-2" />
+                    Analyze Data Sections
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="d-flex gap-3 mb-4">
-        <button
-          className="btn btn-primary"
-          onClick={generateFusedOutline}
-          disabled={loading || dataSections.length === 0}
-        >
-          {loading ? (
-            <>
-              <FaSpinner className="fa-spin me-2" />
-              Generating Fused Outline...
-            </>
-          ) : (
-            <>
-              <FaPlay className="me-2" />
-              Generate Fused Outline
-            </>
-          )}
-        </button>
-      </div>
-
-      {fusedOutline && (
-        <div className="fused-outline-results">
-          <div className="d-flex align-items-center gap-3 mb-3">
-            <h5 className="mb-0">Fused Outline Results</h5>
-            <span className="badge bg-success">
-              <FaCheckCircle className="me-1" />
-              Complete
-            </span>
-          </div>
-
-          <div className="alert alert-success">
-            <h6>Outline Summary</h6>
-            <p className="mb-0">{fusedOutline.outline_summary}</p>
-          </div>
-
-          {fusedOutline.restructuring_notes && fusedOutline.restructuring_notes.length > 0 && (
-            <div className="alert alert-info">
-              <h6>Restructuring Notes</h6>
-              <ul className="mb-0">
-                {fusedOutline.restructuring_notes.map((note, index) => (
-                  <li key={index}>{note}</li>
-                ))}
-              </ul>
+      {/* Phase 2: Section Building */}
+      {currentPhase === 2 && (
+        <div className="phase-2">
+          {/* Analysis Summary */}
+          {analysisSummary && (
+            <div className="alert alert-success mb-4">
+              <h6>Analysis Complete</h6>
+              <p className="mb-0">{analysisSummary}</p>
             </div>
           )}
 
-          <div className="sections-list">
-            {fusedOutline.sections.map((section, sectionIndex) => (
-              <div key={sectionIndex} className="card mb-3">
-                <div className="card-header d-flex justify-content-between align-items-center">
-                  <div>
-                    <h6 className="mb-1">{section.title}</h6>
-                    <small className="text-muted">{section.context}</small>
+          {/* Identified Sections */}
+          <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">
+                <FaCog className="me-2" />
+                Phase 2: Build Data Sections
+              </h5>
+              <div>
+                <button 
+                  className="btn btn-sm btn-outline-secondary me-2" 
+                  onClick={selectAllSections}
+                >
+                  Select All
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary" 
+                  onClick={clearSelection}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="card-body">
+              <p>
+                Found <strong>{identifiedSections.length} data sections</strong>. 
+                Select sections to build into academic prose (recommended: 1-2 at a time).
+              </p>
+              
+              {identifiedSections.map((section, index) => (
+                <div key={index} className="mb-3">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id={`section-${index}`}
+                      checked={selectedSectionIndices.includes(index)}
+                      onChange={() => toggleSectionSelection(index)}
+                    />
+                    <label className="form-check-label" htmlFor={`section-${index}`}>
+                      <strong>{section.section_title}</strong>
+                    </label>
                   </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => viewSection(section)}
-                    >
-                      <FaEye className="me-1" />
-                      View Details
-                    </button>
+                  <div className="ms-4 mt-2">
+                    <div className="small text-muted mb-2">
+                      <strong>Purpose:</strong> {section.academic_purpose}
+                    </div>
+                    <div className="small text-muted mb-2">
+                      <strong>Data Scope:</strong> {section.data_scope}
+                    </div>
+                    {section.key_variables && section.key_variables.length > 0 && (
+                      <div className="small">
+                        <strong>Key Variables:</strong> {section.key_variables.join(', ')}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-md-8">
-                      <h6>Subsections ({section.subsections.length})</h6>
-                      <ul className="list-unstyled">
-                        {section.subsections.map((subsection, subIndex) => (
-                          <li key={subIndex} className="mb-2">
-                            <strong>{subsection.title}</strong>
-                            <div className="small text-muted">
-                              {subsection.supporting_evidence.length} evidence points • {subsection.citations.length} citations
+              ))}
+              
+              <div className="mt-3">
+                <button
+                  className="btn btn-success"
+                  onClick={() => buildDataSections()}
+                  disabled={buildingLoading || selectedSectionIndices.length === 0}
+                >
+                  {buildingLoading ? (
+                    <>
+                      <FaSpinner className="fa-spin me-2" />
+                      Building Sections...
+                    </>
+                  ) : (
+                    <>
+                      <FaPlay className="me-2" />
+                      Build Selected Sections ({selectedSectionIndices.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Built Sections Preview */}
+          {builtSections.length > 0 && (
+            <div className="built-sections">
+              <h5>Built Sections Preview</h5>
+              {builtSections.map((section, index) => (
+                <div key={index} className="card mb-3">
+                  <div className="card-header">
+                    <h6 className="mb-0">
+                      {section.section_number}. {section.section_title}
+                    </h6>
+                  </div>
+                  <div className="card-body">
+                    <p className="text-muted">{section.section_purpose}</p>
+                    <div className="row">
+                      <div className="col-md-8">
+                        <h6>Subsections ({section.subsections.length})</h6>
+                        {section.subsections.slice(0, 2).map((subsection, subIndex) => (
+                          <div key={subIndex} className="mb-3 p-3 bg-light rounded">
+                            <strong>{subsection.subsection_number}. {subsection.subsection_title}</strong>
+                            <div className="mt-2 small">
+                              {subsection.academic_content.substring(0, 200)}...
                             </div>
-                          </li>
+                          </div>
                         ))}
-                      </ul>
+                        {section.subsections.length > 2 && (
+                          <div className="text-muted">
+                            + {section.subsections.length - 2} more subsections
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-4">
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => viewSection(section)}
+                        >
+                          <FaEye className="me-1" />
+                          View Full Section
+                        </button>
+                      </div>
                     </div>
-                    <div className="col-md-4">
-                      <h6>Section Summary</h6>
-                      <p className="small">{section.section_summary}</p>
+                  </div>
+                </div>
+              ))}
+              
+              {continuityNotes.length > 0 && (
+                <div className="alert alert-info">
+                  <h6>Continuity Notes</h6>
+                  <ul className="mb-0">
+                    {continuityNotes.map((note, index) => (
+                      <li key={index}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Phase 3: Review & Integration */}
+      {currentPhase === 3 && (
+        <div className="phase-3">
+          <div className="alert alert-success">
+            <h6>
+              <FaCheckCircle className="me-2" />
+              Data Section Building Complete
+            </h6>
+            <p className="mb-0">
+              All data sections have been successfully built into academic prose. 
+              Review the sections below and use them as the foundation for your paper's data content.
+            </p>
+          </div>
+
+          <div className="built-sections-final">
+            {builtSections.map((section, index) => (
+              <div key={index} className="card mb-4">
+                <div className="card-header">
+                  <h5 className="mb-0">
+                    {section.section_number}. {section.section_title}
+                  </h5>
+                </div>
+                <div className="card-body">
+                  <div className="mb-3">
+                    <strong>Purpose:</strong> {section.section_purpose}
+                  </div>
+                  
+                  <h6>Subsections</h6>
+                  {section.subsections.map((subsection, subIndex) => (
+                    <div key={subIndex} className="mb-4 border-start border-3 border-primary ps-3">
+                      <h6>{subsection.subsection_number}. {subsection.subsection_title}</h6>
+                      <div 
+                        className="academic-content"
+                        dangerouslySetInnerHTML={{ 
+                          __html: subsection.academic_content.replace(/\[(\d+)\]/g, 
+                            '<sup><strong>[$1]</strong></sup>'
+                          )
+                        }}
+                      />
+                      
+                      {subsection.data_sources.length > 0 && (
+                        <div className="mt-2">
+                          <small className="text-muted">
+                            <strong>Data Sources:</strong> {subsection.data_sources.join(', ')}
+                          </small>
+                        </div>
+                      )}
+                      
+                      {subsection.citations.length > 0 && (
+                        <div className="mt-2">
+                          <small className="text-muted">
+                            <strong>Citations:</strong> {subsection.citations.length} sources
+                          </small>
+                        </div>
+                      )}
+                      
+                      {subsection.transition_to_next && (
+                        <div className="mt-2 fst-italic text-muted">
+                          {subsection.transition_to_next}
+                        </div>
+                      )}
                     </div>
+                  ))}
+                  
+                  <div className="mt-3 p-3 bg-light rounded">
+                    <strong>Section Summary:</strong> {section.section_summary}
                   </div>
                 </div>
               </div>
@@ -343,58 +424,66 @@ const OutlineDraft2 = ({
         <Modal
           isOpen={showModal}
           onClose={() => setShowModal(false)}
-          title={selectedSection.title}
+          title={`${selectedSection.section_number}. ${selectedSection.section_title}`}
           size="xl"
         >
           <div className="section-details">
             <div className="alert alert-info">
-              <strong>Context:</strong> {selectedSection.context}
+              <strong>Purpose:</strong> {selectedSection.section_purpose}
             </div>
             
-            <div className="mb-4">
-              <strong>Section Summary:</strong>
-              <p>{selectedSection.section_summary}</p>
-            </div>
-
             {selectedSection.subsections.map((subsection, index) => (
-              <div key={index} className="card mb-3">
-                <div className="card-header">
-                  <h6 className="mb-0">{subsection.title}</h6>
+              <div key={index} className="mb-4">
+                <h5>{subsection.subsection_number}. {subsection.subsection_title}</h5>
+                
+                <div className="mb-3">
+                  <div 
+                    className="academic-prose p-3 bg-light rounded"
+                    dangerouslySetInnerHTML={{ 
+                      __html: subsection.academic_content.replace(/\n/g, '<br><br>')
+                    }} 
+                  />
                 </div>
-                <div className="card-body">
+
+                {subsection.data_sources.length > 0 && (
                   <div className="mb-3">
-                    <h6>Content</h6>
-                    <div className="p-3 bg-light rounded">
-                      <div dangerouslySetInnerHTML={{ __html: subsection.content.replace(/\n/g, '<br>') }} />
-                    </div>
-                  </div>
-
-                  {subsection.supporting_evidence.length > 0 && (
-                    <div className="mb-3">
-                      <h6>Supporting Evidence</h6>
-                      <ul>
-                        {subsection.supporting_evidence.map((evidence, evidenceIndex) => (
-                          <li key={evidenceIndex}>{evidence}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {subsection.citations.length > 0 && (
-                    <div>
-                      <h6>Citations</h6>
-                      {subsection.citations.map((citation, citationIndex) => (
-                        <div key={citationIndex} className="citation-item mb-2 p-2 border rounded">
-                          <small className="text-muted">
-                            <strong>APA:</strong> {citation.apa}
-                          </small>
-                        </div>
+                    <h6>Data Sources</h6>
+                    <ul>
+                      {subsection.data_sources.map((source, sourceIndex) => (
+                        <li key={sourceIndex}>{source}</li>
                       ))}
-                    </div>
-                  )}
-                </div>
+                    </ul>
+                  </div>
+                )}
+
+                {subsection.citations.length > 0 && (
+                  <div className="mb-3">
+                    <h6>Citations ({subsection.citations.length})</h6>
+                    {subsection.citations.map((citation, citationIndex) => (
+                      <div 
+                        key={citationIndex} 
+                        className="citation-item mb-2 p-2 border rounded cursor-pointer"
+                        onClick={() => openCitationModal(citation)}
+                      >
+                        <small>
+                          <strong>APA:</strong> {citation.apa}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {subsection.transition_to_next && (
+                  <div className="transition-note p-2 bg-warning bg-opacity-25 rounded">
+                    <strong>Transition:</strong> {subsection.transition_to_next}
+                  </div>
+                )}
               </div>
             ))}
+
+            <div className="section-summary p-3 bg-success bg-opacity-25 rounded">
+              <strong>Section Summary:</strong> {selectedSection.section_summary}
+            </div>
           </div>
         </Modal>
       )}
@@ -427,17 +516,6 @@ const OutlineDraft2 = ({
                     <span key={idx} className="badge bg-secondary me-1 mb-1">{category}</span>
                   ))}
                 </div>
-              </div>
-            )}
-            
-            {selectedCitation.methodologyPoints && selectedCitation.methodologyPoints.length > 0 && (
-              <div className="mb-3">
-                <strong>Methodology Points:</strong>
-                <ul className="mt-1">
-                  {selectedCitation.methodologyPoints.map((point, idx) => (
-                    <li key={idx}>{point}</li>
-                  ))}
-                </ul>
               </div>
             )}
           </div>
