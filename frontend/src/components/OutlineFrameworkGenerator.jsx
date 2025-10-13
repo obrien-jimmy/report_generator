@@ -672,7 +672,7 @@ const OutlineGenerator = ({
                         <h6 className="text-success mb-3">Complete Outline Framework Ready</h6>
                         <p className="mb-3">
                           Your complete outline framework with detailed sections, subsections, questions, and citations is ready. 
-                          Transfer it to the Outline Draft to begin generating responses.
+                          Transfer it to the Outline Draft 1 to begin generating responses.
                         </p>
                         <button 
                           className="btn btn-success"
@@ -681,7 +681,7 @@ const OutlineGenerator = ({
                             onTransferToOutlineDraft();
                           }}
                         >
-                          Transfer to Outline Draft
+                          Transfer to Outline Draft 1
                         </button>
                       </div>
                     </>

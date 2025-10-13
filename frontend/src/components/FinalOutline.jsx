@@ -442,7 +442,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     return (
       <div className="text-center py-5">
         <h4>No outline data available</h4>
-        <p className="text-muted">Please complete the Outline Draft first.</p>
+        <p className="text-muted">Please complete the Outline Draft 1 first.</p>
       </div>
     );
   }

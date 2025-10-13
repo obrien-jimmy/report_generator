@@ -80,19 +80,36 @@ const PaperStructurePreview = ({
     const sections = data.structure.map((section, index) => {
       const isAdmin = ['Title Page', 'Abstract', 'References (APA 7th)'].includes(section);
       
-      // Determine section type for tagging
-      const isIntro = section.toLowerCase().includes('introduction');
-      const isSummary = section.toLowerCase().includes('conclusion') || section.toLowerCase().includes('summary');
+      // Determine section type for tagging using proper categorization
+      const sectionLower = section.toLowerCase();
+      const isIntro = sectionLower.includes('introduction') || sectionLower.includes('background') || 
+                      sectionLower.includes('context') || sectionLower.includes('overview') || 
+                      sectionLower.includes('scope');
+      const isSummary = sectionLower.includes('conclusion') || sectionLower.includes('summary') ||
+                        sectionLower.includes('implications') || sectionLower.includes('future') ||
+                        sectionLower.includes('lessons learned') || sectionLower.includes('reflections');
       
-      // TEMPORARY: Force methodology sections to appear for debugging
-      console.log('Section:', section);
-      console.log('- isAdmin:', isAdmin);
-      console.log('- isIntro:', isIntro);
-      console.log('- isSummary:', isSummary);
-      console.log('- data.has_methodology_sections:', data.has_methodology_sections);
+      // Method sections (analytical frameworks, methodology, etc.)
+      const isMethodology = !isAdmin && !isIntro && !isSummary && (
+        sectionLower.includes('analytical framework') || sectionLower.includes('model') ||
+        sectionLower.includes('methodology') || sectionLower.includes('method') ||
+        sectionLower.includes('approach') || sectionLower.includes('framework') ||
+        sectionLower.includes('theoretical') || sectionLower.includes('literature context') ||
+        sectionLower.includes('proposed solution')
+      );
       
-      // Force methodology detection for debugging - all non-admin, non-intro, non-summary sections
-      const isMethodology = !isAdmin && !isIntro && !isSummary;
+      // Analysis sections 
+      const isAnalysis = !isAdmin && !isIntro && !isSummary && !isMethodology && (
+        sectionLower.includes('synthesis') || sectionLower.includes('discussion') ||
+        sectionLower.includes('evaluation') || sectionLower.includes('assessment') ||
+        sectionLower.includes('analysis') || sectionLower.includes('critique') ||
+        sectionLower.includes('reaction') || sectionLower.includes('inter-relationships') ||
+        sectionLower.includes('comparison') || sectionLower.includes('counterarguments') ||
+        sectionLower.includes('rebuttals') || sectionLower.includes('overall assessment')
+      );
+      
+      // Data sections (components, body content, etc.) - everything else that's not categorized above
+      const isData = !isAdmin && !isIntro && !isSummary && !isMethodology && !isAnalysis;
       console.log('- Final isMethodology:', isMethodology);
       
       // Calculate default percentage allocation
@@ -122,9 +139,11 @@ const PaperStructurePreview = ({
         percentage: defaultPercentage,
         pages: isAdmin ? 0 : Math.ceil((defaultPercentage / 100) * totalPages) || 1,
         isAdmin,
-        isMethodology, // Using the correctly defined variable
+        isMethodology,
         isIntro,
         isSummary,
+        isAnalysis,
+        isData,
         order: index
       };
     });
@@ -457,6 +476,12 @@ const PaperStructurePreview = ({
                           )}
                           {section.isSummary && (
                             <span className="badge bg-success" style={{ minWidth: '50px' }}>Summary</span>
+                          )}
+                          {section.isAnalysis && (
+                            <span className="badge bg-warning" style={{ minWidth: '50px' }}>Analysis</span>
+                          )}
+                          {section.isData && (
+                            <span className="badge bg-info" style={{ minWidth: '50px' }}>Data</span>
                           )}
                         </div>
                       </div>

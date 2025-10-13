@@ -18,9 +18,9 @@ class PaperStructureService:
             "Abstract",
             "Introduction (Problem Statement)",
             "Analytical Framework / Model",
-            "Component Analysis 1",
-            "Component Analysis 2",
-            "Synthesis & Discussion",
+            "Component 1",
+            "Component 2",
+            "Analysis & Discussion",
             "Conclusion",
             "References (APA 7th)"
         ],
@@ -578,3 +578,62 @@ class PaperStructureService:
             "has_methodology_sections": bool(methodology_id and 
                 PaperStructureService.METHODOLOGY_TEMPLATES.get(methodology_id))
         }
+    
+    @staticmethod
+    def categorize_section(section_title: str) -> str:
+        """
+        Categorize a section based on its title and content type for Outline Draft 2 processing.
+        
+        Categories:
+        - Admin: Administrative sections (Title, Abstract, References)
+        - Intro: Introduction and opening sections
+        - Method: Methodology-related sections (frameworks, models, analytical approaches)
+        - Data: Core analysis and component sections (main research content)
+        - Analysis: Analysis discussion, synthesis, evaluation sections
+        - Summary: Conclusion and closing sections
+        """
+        section_lower = section_title.lower()
+        
+        # Admin sections
+        if any(term in section_lower for term in [
+            'title page', 'abstract', 'references', 'bibliography', 'appendix'
+        ]):
+            return 'Admin'
+        
+        # Intro sections
+        if any(term in section_lower for term in [
+            'introduction', 'background', 'context', 'overview', 'scope'
+        ]):
+            return 'Intro'
+        
+        # Method sections (frameworks, models, analytical approaches)
+        if any(term in section_lower for term in [
+            'analytical framework', 'model', 'methodology', 'method', 'approach',
+            'framework', 'theoretical', 'literature context', 'proposed solution'
+        ]):
+            return 'Method'
+        
+        # Summary sections
+        if any(term in section_lower for term in [
+            'conclusion', 'summary', 'implications', 'future', 'lessons learned',
+            'reflections', 'tentative conclusions'
+        ]):
+            return 'Summary'
+        
+        # Analysis sections
+        if any(term in section_lower for term in [
+            'synthesis', 'discussion', 'evaluation', 'assessment', 'analysis',
+            'critique', 'reaction', 'inter-relationships', 'comparison',
+            'counterarguments', 'rebuttals', 'overall assessment'
+        ]):
+            return 'Analysis'
+        
+        # Data sections (core analysis components - explicitly include component)
+        if any(term in section_lower for term in [
+            'component', 'body', 'claim', 'evidence', 'facts', 'timeline',
+            'description', 'cause', 'effect', 'example'
+        ]):
+            return 'Data'
+        
+        # Default to Data for main content sections
+        return 'Data'

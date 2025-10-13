@@ -7,7 +7,8 @@ import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
-import OutlineDraft from './components/OutlineDraft';
+import OutlineDraft1 from './components/OutlineDraft1';
+import OutlineDraft2 from './components/OutlineDraft2';
 import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
 import FloatingContextButton from './components/FloatingContextButton'; // Add this import
@@ -39,6 +40,7 @@ function App() {
   const [frameworkComplete, setFrameworkComplete] = useState(false);
   const [outlineData, setOutlineData] = useState(null);
   const [draftData, setDraftData] = useState(null);
+  const [draft2Data, setDraft2Data] = useState(null);
 
   // Project management
   const [currentProject, setCurrentProject] = useState(null);
@@ -156,14 +158,23 @@ function App() {
     }
   };
 
-  const handleTransferToOutlineDraft = () => {
-    console.log('App.jsx: Transferring to outline draft');
-    setActiveTab('outline');
+  const handleTransferToOutlineDraft1 = () => {
+    console.log('App.jsx: Transferring to outline draft 1');
+    setActiveTab('draft1');
+  };
+
+  const handleOutlineDraft1Complete = (draftData) => {
+    setDraftData(draftData);
     triggerAutoSave();
   };
 
-  const handleOutlineDraftComplete = (draftData) => {
-    setDraftData(draftData);
+  const handleTransferToOutlineDraft2 = () => {
+    console.log('App.jsx: Transferring to outline draft 2');
+    setActiveTab('draft2');
+  };
+
+  const handleOutlineDraft2Complete = (draft2Data) => {
+    setDraft2Data(draft2Data);
     triggerAutoSave();
   };
 
@@ -196,6 +207,7 @@ function App() {
     setSelectedPaperType(data.selectedPaperType || null);
     setOutlineData(data.outlineData || null);
     setDraftData(data.draftData || null);
+    setDraft2Data(data.draft2Data || null);
     
     // Restore state flags
     setThesisFinalized(data.thesisFinalized || false);
@@ -221,6 +233,7 @@ function App() {
       setSelectedPaperType(null);
       setOutlineData(null);
       setDraftData(null);
+      setDraft2Data(null);
       
       setThesisFinalized(false);
       setCategoriesFinalized(false);
@@ -241,7 +254,8 @@ function App() {
     if (!categoriesFinalized) return 'sources';
     if (!methodology) return 'methodology';
     if (!frameworkComplete) return 'outline';
-    if (activeTab === 'outline') return 'draft';
+    if (activeTab === 'draft1') return 'draft';
+    if (activeTab === 'draft2') return 'draft';
     if (activeTab === 'initial') return 'final';
     return 'framework';
   };
@@ -286,6 +300,7 @@ function App() {
             selectedPaperType={selectedPaperType}
             outlineData={outlineData}
             draftData={draftData}
+            draft2Data={draft2Data}
             thesisFinalized={thesisFinalized}
             categoriesFinalized={categoriesFinalized}
             sourceCategoriesActivated={sourceCategoriesActivated}
@@ -314,22 +329,33 @@ function App() {
             </li>
             <li className="nav-item" role="presentation">
               <button
-                className={`nav-link ${activeTab === 'outline' ? 'active' : ''} ${!frameworkComplete ? 'disabled' : ''}`}
-                onClick={() => frameworkComplete && handleTabChange('outline')}
+                className={`nav-link ${activeTab === 'draft1' ? 'active' : ''} ${!frameworkComplete ? 'disabled' : ''}`}
+                onClick={() => frameworkComplete && handleTabChange('draft1')}
                 type="button"
                 role="tab"
                 disabled={!frameworkComplete}
               >
-                Outline Draft
+                Outline Draft 1
               </button>
             </li>
             <li className="nav-item" role="presentation">
               <button
-                className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!draftData ? 'disabled' : ''}`}
-                onClick={() => draftData && handleTabChange('initial')}
+                className={`nav-link ${activeTab === 'draft2' ? 'active' : ''} ${!draftData ? 'disabled' : ''}`}
+                onClick={() => draftData && handleTabChange('draft2')}
                 type="button"
                 role="tab"
                 disabled={!draftData}
+              >
+                Outline Draft 2
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!draft2Data ? 'disabled' : ''}`}
+                onClick={() => draft2Data && handleTabChange('initial')}
+                type="button"
+                role="tab"
+                disabled={!draft2Data}
               >
                 Final Outline
               </button>
@@ -402,7 +428,7 @@ function App() {
                     sourceCategories={sourceCategories}
                     selectedPaperType={selectedPaperType}
                     onFrameworkComplete={handleFrameworkComplete}
-                    onTransferToOutlineDraft={handleTransferToOutlineDraft}
+                    onTransferToOutlineDraft={handleTransferToOutlineDraft1}
                     savedOutlineData={outlineData}
                   />
                 </div>
@@ -410,17 +436,32 @@ function App() {
             </div>
           )}
 
-          {/* Outline Draft Tab */}
-          {activeTab === 'outline' && (
+          {/* Outline Draft 1 Tab */}
+          {activeTab === 'draft1' && (
             <div className="tab-pane fade show active">
-              <OutlineDraft
+              <OutlineDraft1
                 outlineData={outlineData}
                 finalThesis={finalThesis}
                 methodology={methodology}
-                onOutlineDraftComplete={handleOutlineDraftComplete}
+                onOutlineDraft1Complete={handleOutlineDraft1Complete}
+                onTransferToOutlineDraft2={handleTransferToOutlineDraft2}
                 autoSave={autoSave}
                 onAutoSaveDraft={handleAutoSaveDraft}
-                draftData={draftData} // <-- add this line
+                draftData={draftData}
+              />
+            </div>
+          )}
+
+          {/* Outline Draft 2 Tab */}
+          {activeTab === 'draft2' && (
+            <div className="tab-pane fade show active">
+              <OutlineDraft2
+                outlineData={outlineData}
+                finalThesis={finalThesis}
+                methodology={methodology}
+                selectedPaperType={selectedPaperType}
+                draftData={draftData}
+                onOutlineDraft2Complete={handleOutlineDraft2Complete}
               />
             </div>
           )}

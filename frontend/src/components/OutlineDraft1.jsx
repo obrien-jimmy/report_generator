@@ -3,11 +3,12 @@ import { FaPlay, FaPlayCircle, FaExpand, FaChevronLeft, FaChevronRight, FaCheckC
 import axios from 'axios';
 import Modal from './Modal';
 
-const OutlineDraft = ({
+const OutlineDraft1 = ({
   outlineData,
   finalThesis,
   methodology,
-  onOutlineDraftComplete,
+  onOutlineDraft1Complete,
+  onTransferToOutlineDraft2,
   autoSave,
   onAutoSaveDraft,
   draftData // receives: { responses }
@@ -331,7 +332,7 @@ const OutlineDraft = ({
   return (
     <div className="outline-draft">
       <div className="d-flex align-items-center gap-3 mb-3">
-        <h3 className="mb-0">Outline Draft</h3>
+        <h3 className="mb-0">Outline Draft 1</h3>
         <span className="badge bg-info">
           {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
         </span>
@@ -352,6 +353,19 @@ const OutlineDraft = ({
         >
           <FaEye className="me-2" />
           Preview Final Outline
+        </button>
+
+        <button
+          className="btn btn-success"
+          onClick={() => {
+            if (onTransferToOutlineDraft2) {
+              onTransferToOutlineDraft2();
+            }
+          }}
+          disabled={getCompletedQuestions() === 0}
+        >
+          <FaChevronRight className="me-2" />
+          Transfer to Draft 2
         </button>
         <button
           className="btn btn-primary"
@@ -653,4 +667,4 @@ const OutlineDraft = ({
   );
 };
 
-export default OutlineDraft;
+export default OutlineDraft1;
