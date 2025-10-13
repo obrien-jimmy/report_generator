@@ -462,6 +462,8 @@ function App() {
                 selectedPaperType={selectedPaperType}
                 draftData={draftData}
                 onOutlineDraft2Complete={handleOutlineDraft2Complete}
+                // TODO: Add preIdentifiedDataSections from outline framework
+                // preIdentifiedDataSections={outlineData?.dataSections}
               />
             </div>
           )}

@@ -6,78 +6,105 @@ This is an AI-powered research paper generator with a **React + Vite frontend** 
 
 ### Key Components
 - **Backend**: FastAPI app in `/backend` with modular router structure 
-- **Frontend**: React SPA in `/frontend` with component-based UI and context state management
+- **Frontend**: React SPA in `/frontend` with component-based UI and local state management
 - **AI Integration**: AWS Bedrock service for content generation via `bedrock_service.py`
 - **Data Flow**: Pydantic schemas define strict API contracts between frontend/backend
 
-## Development Patterns
+## Critical Development Patterns
 
-### Backend Structure
-- **Routers**: Each feature has its own router (e.g., `outline.py`, `methodology.py`) with specific endpoints
-- **Schemas**: Pydantic models in `/schemas` define request/response structures - always use existing schemas or extend them
-- **Services**: Business logic lives in `/services` - especially AWS integrations in `bedrock_service.py`
-- **Error Handling**: Use FastAPI's `HTTPException` with descriptive error messages
+### Multi-Phase Component Pattern
+Components like `OutlineDraft2.jsx` use **sequential phases** controlled by `currentPhase` state:
+- Phase 1: Analysis/Identification → Phase 2: Building/Generation → Phase 3: Review/Integration
+- Each phase has distinct UI, API calls, and state management
+- **Always declare ALL state variables** used across phases (common bug: missing `setErrorMessage`, `isAnalyzing` etc.)
 
-### Frontend Patterns
-- **State Management**: Uses React Context (`ThesisContext.jsx`) and local state - avoid prop drilling
-- **Component Structure**: Self-contained components with co-located CSS files (e.g., `FinalOutline.jsx` + `FinalOutline.css`)
-- **API Integration**: Uses Axios for backend calls - follow existing error handling patterns in components
-- **Project Management**: Local storage-based project persistence via `ProjectManager.jsx`
+### Backend Router Structure
+Each router follows this pattern (see `outlinedraft2.py`):
+- Import schemas from matching `/schemas` module 
+- Use `@router.post("/endpoint", response_model=Schema)` with Pydantic validation
+- Call `invoke_bedrock(prompt)` for AI generation with structured prompts
+- Return structured JSON matching response schema - **never plain strings**
 
-### Paper Generation Workflow
-1. **Framework Phase**: Paper type selection → thesis refinement → source categories → methodology
-2. **Outline Phase**: AI generates structured outlines based on paper type templates in `paper_structure_service.py`
-3. **Draft Phase**: Section-by-section content generation with citation integration
-4. **Final Phase**: Complete paper assembly with proper formatting
+### Frontend State Management
+App.jsx manages global workflow state:
+- `activeTab` controls progression: `'framework' → 'outline' → 'draft' → 'final'`
+- Boolean completion flags: `frameworkComplete`, `thesisFinalized`, `categoriesFinalized`
+- Data flows: `outlineData` → `draftData` → `draft2Data` → final assembly
+- **Project persistence**: All state auto-saves to localStorage via `ProjectManager`
 
-## Critical Conventions
+### AWS Bedrock Integration
+Critical patterns in `bedrock_service.py`:
+- Always use `"anthropic.claude-3-sonnet-20240229-v1:0"` model ID
+- Response structure: `response_body['content'][0]['text']` - responses are nested arrays
+- Error handling with retries and exponential backoff built-in
+- Environment: Requires `AWS_REGION` in `.env`, credentials via AWS CLI/IAM
 
-### AWS Integration
-- **Bedrock Service**: Use `invoke_bedrock(prompt)` function - handles retries and error handling
-- **Model**: Always use "anthropic.claude-3-sonnet-20240229-v1:0" model ID
-- **Prompts**: Structure prompts for academic writing - see existing routers for examples
-- **Environment**: Requires `AWS_REGION` and `OPENSEARCH_ENDPOINT` in backend `.env`
+## Paper Generation Workflow
 
-### Data Models
-- **Paper Types**: Use predefined types from `PaperStructureService.PAPER_TYPE_SKELETONS` 
-- **Schemas**: Import from specific schema modules (e.g., `from schemas.outline import OutlineGenerationRequest`)
-- **Response Format**: Always return structured responses matching Pydantic models
+**Sequential phases** (must complete in order):
+1. **Framework**: `PaperTypeSelector` → `ThesisRefinement` → `SourceCategories` → `MethodologyGenerator`
+2. **Outline**: `OutlineFrameworkGenerator` creates structured outline from paper type templates
+3. **Draft**: `OutlineDraft1` → `OutlineDraft2` builds sections iteratively into academic prose
+4. **Final**: `FinalOutline` assembles complete paper with citations and formatting
 
-### Frontend State Flow
-- **Tab Navigation**: `activeTab` state controls workflow progression (framework → outline → draft → final)
-- **Finalization Flags**: Use boolean flags like `thesisFinalized`, `categoriesFinalized` to control UI flow
-- **Auto-save**: Project state automatically persists to localStorage via `ProjectManager`
+### Paper Type System
+`PaperStructureService.PAPER_TYPE_SKELETONS` defines templates:
+- `"argumentative"`: Claim/evidence structure with counterarguments
+- `"analytical"`: Framework-based analysis with components  
+- `"expository"`: Topic exploration with systematic coverage
+- **Never hardcode structures** - always reference these templates
 
 ## Development Workflow
 
 ### Running the Application
 ```bash
-# Backend (Terminal 1)
+# Backend (Terminal 1) - Must run first
 cd backend
-source venv/bin/activate  # or python3 -m venv venv first time
+source venv/bin/activate  
 uvicorn app.main:app --reload --port 8000
 
-# Frontend (Terminal 2) 
-cd frontend
-npm run dev  # Runs on http://localhost:5173
+# Frontend (Terminal 2)
+cd frontend  
+npm run dev  # http://localhost:5173
 ```
 
 ### Adding New Features
-1. **API Endpoint**: Create router in `/backend/routers/` with Pydantic schemas
-2. **Frontend Component**: Add to `/frontend/src/components/` with associated CSS
-3. **Integration**: Update `App.jsx` state management and add to appropriate workflow tab
-4. **Testing**: Add tests in `/tests/` following the boto3 mocking pattern
+1. **Schema First**: Define Pydantic models in `/backend/schemas/`
+2. **Router**: Create endpoint in `/backend/routers/` importing schema
+3. **Component**: Add to `/frontend/src/components/` following multi-phase pattern if complex
+4. **Integration**: Update `App.jsx` state and routing, add to appropriate workflow tab
 
-### Common Gotchas
-- **CORS**: Frontend dev server runs on port 5173, but CORS allows 5174 - check `main.py` if connection issues
-- **AWS Credentials**: Must be configured at system level for boto3 - not in code
-- **Model Responses**: Claude responses are nested in `content[0].text` - see `bedrock_service.py`
-- **Paper Structure**: Each paper type has predefined section templates - don't hardcode structures
+### Testing Patterns
+Follow `/tests/test_bedrock_kb.py` approach:
+- Mock `boto3.client` with `@patch` decorator
+- Use `MagicMock()` for AWS service responses  
+- Test both success and error paths for Bedrock calls
 
-## File Patterns to Follow
+## Common Issues & Fixes
 
-When working with this codebase:
-- **Routers**: Follow the pattern in `general.py` for simple endpoints, `outline.py` for complex multi-step generation
-- **Components**: Look at `ProjectManager.jsx` for complex state management, `ThesisRefinement.jsx` for AI integration
-- **Schemas**: Extend existing patterns in `structure.py` - use `Optional` for non-required fields
-- **Services**: Follow `bedrock_service.py` for external API integration with proper error handling
+### CORS Problems
+- Frontend dev runs on :5173, CORS allows :5173, :5174, :3000 in `main.py`
+- If connection fails, check backend is running and ports match
+
+### Component State Bugs  
+- **Missing state declarations**: Components often use variables not declared in useState
+- **Function naming**: JSX calls must match function names (e.g. `onClick={handleAnalyzeDataSections}`)
+- **Phase management**: Ensure `currentPhase` updates trigger proper UI changes
+
+### AWS Integration Issues
+- **Credentials**: Must be configured system-wide (AWS CLI), not in code
+- **Model responses**: Always access via `content[0].text`, never directly
+- **Timeouts**: Bedrock calls can take 10-30 seconds, ensure UI shows loading states
+
+### Data Flow Errors
+- **Schema mismatches**: Frontend/backend must use exact same field names
+- **Array wrapping**: Draft data often wrapped in objects, extract with `draftData.outline || draftData`
+- **Type conversion**: Methodology may be string or object, handle both cases
+
+## File Reference Patterns
+
+- **Complex State**: `App.jsx` (575 lines) - main state orchestration
+- **Multi-phase UI**: `OutlineDraft2.jsx` - sequential workflow pattern  
+- **AWS Integration**: `bedrock_service.py` - error handling and response parsing
+- **Schema Design**: `outlinedraft2.py` - nested Pydantic models with citations
+- **Paper Templates**: `paper_structure_service.py` - predefined academic structures

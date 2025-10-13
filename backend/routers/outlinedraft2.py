@@ -9,10 +9,51 @@ from schemas.outlinedraft2 import (
     Citation
 )
 from services.bedrock_service import invoke_bedrock
+from services.paper_structure_service import PaperStructureService
+from pydantic import BaseModel
+from typing import List
 import json
 import re
 
 router = APIRouter()
+
+class SectionCategorization(BaseModel):
+    section_title: str
+    is_administrative: bool = False
+
+class CategorizeRequest(BaseModel):
+    sections: List[SectionCategorization]
+
+class CategorizedSection(BaseModel):
+    section_title: str
+    category: str
+
+class CategorizeResponse(BaseModel):
+    categorized_sections: List[CategorizedSection]
+
+@router.post("/categorize_sections", response_model=CategorizeResponse)
+async def categorize_sections(request: CategorizeRequest):
+    """
+    Categorize sections based on their titles using the paper structure service.
+    Returns the category for each section (Admin, Intro, Method, Data, Analysis, Summary).
+    """
+    try:
+        categorized = []
+        for section in request.sections:
+            if section.is_administrative:
+                category = "Admin"
+            else:
+                category = PaperStructureService.categorize_section(section.section_title)
+            
+            categorized.append(CategorizedSection(
+                section_title=section.section_title,
+                category=category
+            ))
+        
+        return CategorizeResponse(categorized_sections=categorized)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error categorizing sections: {str(e)}")
 
 @router.post("/analyze_data_sections", response_model=DataSectionAnalysisResponse)
 async def analyze_data_sections(request: DataSectionAnalysisRequest):
@@ -221,10 +262,17 @@ Draft 1: {json.dumps(request.outline_draft1, indent=2)}
                         description=cit_data.get("description", "")
                     ))
                 
+                # Handle academic_content - could be string or list
+                academic_content = sub_data.get("academic_content", "")
+                if isinstance(academic_content, list):
+                    academic_content = "\n\n".join(academic_content)
+                elif not isinstance(academic_content, str):
+                    academic_content = str(academic_content)
+
                 subsection = DataSubsection(
                     subsection_number=sub_data.get("subsection_number", ""),
                     subsection_title=sub_data.get("subsection_title", ""),
-                    academic_content=sub_data.get("academic_content", ""),
+                    academic_content=academic_content,
                     data_sources=sub_data.get("data_sources", []),
                     citations=citations,
                     transition_to_next=sub_data.get("transition_to_next", "")
