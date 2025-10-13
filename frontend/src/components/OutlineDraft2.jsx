@@ -13,6 +13,8 @@ const OutlineDraft2 = ({
 }) => {
   const [fusedOutline, setFusedOutline] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedCitation, setSelectedCitation] = useState(null);
+  const [allCitations, setAllCitations] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
@@ -120,6 +122,35 @@ const OutlineDraft2 = ({
     return 'Data';
   };
 
+  // Collect all citations for the modal
+  useEffect(() => {
+    const dataSections = getDataSections();
+    const citations = [];
+    dataSections.forEach(section => {
+      citations.push(...section.all_citations);
+    });
+    setAllCitations(citations);
+  }, [outlineData, draftData]);
+
+  // Citation modal functions
+  const openCitationModal = (citationIndex) => {
+    if (allCitations[citationIndex]) {
+      setSelectedCitation({ ...allCitations[citationIndex], index: citationIndex });
+    }
+  };
+
+  const closeCitationModal = () => {
+    setSelectedCitation(null);
+  };
+
+  // Make openCitationModal globally available for the inline citation links
+  useEffect(() => {
+    window.openCitationModal = openCitationModal;
+    return () => {
+      delete window.openCitationModal;
+    };
+  }, [allCitations]);
+
   const generateFusedOutline = async () => {
     setLoading(true);
     
@@ -184,20 +215,35 @@ const OutlineDraft2 = ({
       {dataSections.length > 0 && (
         <div className="mb-4">
           <h5>Data Sections from Draft 1</h5>
-          <div className="row">
-            {dataSections.map((section, index) => (
-              <div key={index} className="col-md-6 mb-3">
-                <div className="card">
-                  <div className="card-body">
-                    <h6 className="card-title">{section.section_title}</h6>
-                    <p className="card-text small text-muted">
-                      {section.all_responses.length} responses • {section.all_citations.length} citations
-                    </p>
-                  </div>
+          {dataSections.map((section, sectionIndex) => (
+            <div key={sectionIndex} className="mb-4">
+              <div className="card">
+                <div className="card-header">
+                  <h6 className="mb-0">{section.section_title}</h6>
+                  <small className="text-muted">
+                    {section.all_responses.length} responses • {section.all_citations.length} citations
+                  </small>
+                </div>
+                <div className="card-body">
+                  <p className="card-text">{section.section_context}</p>
+                  
+                  {/* Display all responses with citations */}
+                  {section.all_responses.map((response, responseIndex) => (
+                    <div key={responseIndex} className="mb-3 p-3 border-start border-info border-3 bg-light">
+                      <div className="response-content" 
+                           dangerouslySetInnerHTML={{ 
+                             __html: response.replace(/\[(\d+)\]/g, (match, citationNumber) => {
+                               return `<sup><a href="#" class="citation-link text-primary fw-bold text-decoration-none" onclick="openCitationModal(${citationNumber - 1}); return false;">[${citationNumber}]</a></sup>`;
+                             })
+                           }} 
+                      />
+                      {responseIndex < section.all_responses.length - 1 && <hr className="my-2" />}
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -349,6 +395,51 @@ const OutlineDraft2 = ({
                 </div>
               </div>
             ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* Citation Modal */}
+      {selectedCitation && (
+        <Modal
+          isOpen={!!selectedCitation}
+          onClose={closeCitationModal}
+          title="Citation Details"
+        >
+          <div className="citation-details">
+            <div className="mb-3">
+              <strong>Citation:</strong>
+              <p className="mt-1">{selectedCitation.apa}</p>
+            </div>
+            
+            {selectedCitation.description && (
+              <div className="mb-3">
+                <strong>Description:</strong>
+                <p className="mt-1">{selectedCitation.description}</p>
+              </div>
+            )}
+            
+            {selectedCitation.categories && selectedCitation.categories.length > 0 && (
+              <div className="mb-3">
+                <strong>Categories:</strong>
+                <div className="mt-1">
+                  {selectedCitation.categories.map((category, idx) => (
+                    <span key={idx} className="badge bg-secondary me-1 mb-1">{category}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {selectedCitation.methodologyPoints && selectedCitation.methodologyPoints.length > 0 && (
+              <div className="mb-3">
+                <strong>Methodology Points:</strong>
+                <ul className="mt-1">
+                  {selectedCitation.methodologyPoints.map((point, idx) => (
+                    <li key={idx}>{point}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </Modal>
       )}

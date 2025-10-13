@@ -89,7 +89,7 @@ Focus on creating a compelling, evidence-based argument structure that a reader 
 """
 
         # Invoke Bedrock to generate the fused outline
-        response = await invoke_bedrock(prompt)
+        response = invoke_bedrock(prompt)
         
         # Parse the JSON response
         try:

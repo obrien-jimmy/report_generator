@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 import socratesIcon from './assets/socrates.png';
@@ -137,7 +137,7 @@ function App() {
     triggerAutoSave();
   };
 
-  const handleFrameworkComplete = (outlineData) => {
+  const handleFrameworkComplete = useCallback((outlineData) => {
     console.log('=== App.jsx: handleFrameworkComplete called ===');
     console.log('App.jsx: Received outline data:', outlineData);
     console.log('App.jsx: Outline data type:', typeof outlineData);
@@ -156,7 +156,7 @@ function App() {
     } else {
       console.error('App.jsx: Invalid outline data received:', outlineData);
     }
-  };
+  }, []);
 
   const handleTransferToOutlineDraft1 = () => {
     console.log('App.jsx: Transferring to outline draft 1');

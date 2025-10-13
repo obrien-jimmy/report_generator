@@ -23,6 +23,7 @@ const OutlineGenerator = ({
   const [collapsedSections, setCollapsedSections] = useState({});
   const [collapsed, setCollapsed] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
+  const [frameworkCompleteCalled, setFrameworkCompleteCalled] = useState(false);
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
@@ -44,11 +45,12 @@ const OutlineGenerator = ({
 
   // Auto-call framework complete when outline is generated
   useEffect(() => {
-    if (hasGenerated && outline.length > 0 && onFrameworkComplete) {
+    if (hasGenerated && outline.length > 0 && onFrameworkComplete && !frameworkCompleteCalled) {
       console.log('OutlineGenerator: Auto-calling framework complete with outline:', outline);
+      setFrameworkCompleteCalled(true);
       onFrameworkComplete(outline);
     }
-  }, [hasGenerated, outline, onFrameworkComplete]);
+  }, [hasGenerated, outline, onFrameworkComplete, frameworkCompleteCalled]);
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const [outlineFrameworkCollapsed, setOutlineFrameworkCollapsed] = useState(false);
@@ -61,6 +63,7 @@ const OutlineGenerator = ({
     setOutline([]);
     setHasGenerated(false);
     setError(null);
+    setFrameworkCompleteCalled(false);
   };
 
   const generateOutline = async (isRegeneration = false) => {
