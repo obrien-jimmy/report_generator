@@ -85,7 +85,7 @@ setStepProgress('Initializing logic framework analysis...');
 ## Technical Implementation Details
 
 ### Files Modified:
-- `/frontend/src/components/OutlineDraft2.jsx`
+- `/frontend/src/components/DataAndObservations.jsx`
 
 ### Key Changes:
 1. **Line 35**: Added `const [stepProgress, setStepProgress] = useState('');`

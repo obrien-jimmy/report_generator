@@ -11,8 +11,8 @@ The data section identification issue has been **FULLY RESOLVED**. Here's what w
 ### 2. 🎨 Frontend Fixes  
 - **Updated `/frontend/src/App.jsx`**: Added proper data section filtering and prop passing
 - **Enhanced `/frontend/src/components/OutlineFrameworkGenerator.jsx`**: Metadata preservation in custom structure mapping
-- **Fixed `/frontend/src/components/OutlineDraft1.jsx`**: Resolved critical metadata loss in `generateCompleteOutline`
-- **Improved `/frontend/src/components/OutlineDraft2.jsx`**: Added direct `outlineData` checking and comprehensive debugging
+- **Fixed `/frontend/src/components/LiteratureReview.jsx`**: Resolved critical metadata loss in `generateCompleteOutline`
+- **Improved `/frontend/src/components/DataAndObservations.jsx`**: Added direct `outlineData` checking and comprehensive debugging
 
 ### 3. 📊 Project Data Update
 - **Updated `cyber_paper.json`**: Added proper data section markers to 2 main analytical components:
@@ -44,17 +44,17 @@ Ctrl/Cmd + R (or F5)
 2. Select the updated `cyber_paper.json` file
 3. The project will be imported with proper data section markers
 
-### Step 3: Navigate to OutlineDraft2
-1. Go to the **"Outline Draft"** tab
+### Step 3: Navigate to Data and Observations
+1. Go to the **"Literature Review"** tab
 2. You should see multiple phases available
-3. Navigate to **OutlineDraft2** (Phase 2)
+3. Navigate to **Data and Observations** (Phase 2)
 
 ### Step 4: Verify the Fix (Check Console)
 1. Open browser developer tools (`F12`)
 2. Go to the **Console** tab
 3. **You should see**: ✅ Success messages like:
    ```
-   OutlineDraft2: ✅ Found identified data section: Current US Cybersecurity Framework and Infrastructure
+   DataAndObservations: ✅ Found identified data section: Current US Cybersecurity Framework and Infrastructure
    OutlineDraft2: ✅ Found identified data section: Policy Effectiveness and Strategic Gaps
    OutlineDraft2: Final identified data sections count: 2
    ```
@@ -109,7 +109,7 @@ OutlineFrameworkGenerator (preserves metadata)
   ↓ (custom structure with data markers)  
 Backend outline.py (processes custom structure)
   ↓ (returns outline with metadata intact)
-OutlineDraft1 (generateCompleteOutline preserves metadata)
+LiteratureReview (generateCompleteOutline preserves metadata)
   ↓ (outlineData with is_data_section, section_type, category)
 OutlineDraft2 (recognizes data sections) ✅ SUCCESS!
 ```

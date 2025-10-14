@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 import socratesIcon from './assets/socrates.png';
@@ -7,12 +7,10 @@ import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
-import OutlineDraft1 from './components/OutlineDraft1';
-import OutlineDraft2 from './components/OutlineDraft2';
+import LiteratureReview from './components/LiteratureReview';
+import DataAndObservations from './components/DataAndObservations';
 import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
-import FloatingContextButton from './components/FloatingContextButton'; // Add this import
-import FloatingCitationsButton from './components/FloatingCitationsButton';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -38,9 +36,10 @@ function App() {
   // Tab management
   const [activeTab, setActiveTab] = useState('framework');
   const [frameworkComplete, setFrameworkComplete] = useState(false);
+  const [literatureReviewComplete, setLiteratureReviewComplete] = useState(false);
   const [outlineData, setOutlineData] = useState(null);
-  const [draftData, setDraftData] = useState(null);
-  const [draft2Data, setDraft2Data] = useState(null);
+  const [literatureReviewData, setLiteratureReviewData] = useState(null);
+  const [dataAndObservationsData, setDataAndObservationsData] = useState(null);
 
   // Project management
   const [currentProject, setCurrentProject] = useState(null);
@@ -137,7 +136,7 @@ function App() {
     triggerAutoSave();
   };
 
-  const handleFrameworkComplete = useCallback((outlineData) => {
+  const handleFrameworkComplete = (outlineData) => {
     console.log('=== App.jsx: handleFrameworkComplete called ===');
     console.log('App.jsx: Received outline data:', outlineData);
     console.log('App.jsx: Outline data type:', typeof outlineData);
@@ -156,48 +155,43 @@ function App() {
     } else {
       console.error('App.jsx: Invalid outline data received:', outlineData);
     }
-  }, []);
-
-  const handleTransferToOutlineDraft1 = () => {
-    console.log('App.jsx: Transferring to outline draft 1');
-    setActiveTab('draft1');
   };
 
-  const handleOutlineDraft1Complete = (draftData) => {
-    setDraftData(draftData);
+  const handleTransferToLiteratureReview = () => {
+    console.log('App.jsx: Transferring to literature review');
+    setActiveTab('outline');
     triggerAutoSave();
   };
 
-  const handleTransferToOutlineDraft2 = () => {
-    console.log('App.jsx: Transferring to outline draft 2');
-    setActiveTab('draft2');
+  const handleLiteratureReviewComplete = (literatureReviewData) => {
+    setLiteratureReviewData(literatureReviewData);
+    setLiteratureReviewComplete(true);
+    triggerAutoSave();
   };
 
-  const handleOutlineDraft2Complete = (draft2Data) => {
-    console.log('App.jsx: OutlineDraft2 data received:', draft2Data);
-    setDraft2Data(draft2Data);
-    triggerAutoSave(true); // Immediate save for step completion
+  const handleAutoSaveLiteratureReview = (literatureReview) => {
+    setLiteratureReviewData(literatureReview);
+    triggerAutoSave(); // Debounced save for frequent draft updates
   };
 
-  // Auto-save function for OutlineDraft2 step updates
-  const handleOutlineDraft2Update = (stepData) => {
-    console.log('App.jsx: OutlineDraft2 step update:', stepData);
-    setDraft2Data(prevData => ({
-      ...prevData,
-      ...stepData
-    }));
-    triggerAutoSave(); // Debounced save for frequent updates
+  const handleTransferToDataAndObservations = () => {
+    console.log('App.jsx: Transferring to data and observations');
+    setActiveTab('dataobs');
+    triggerAutoSave();
   };
 
-  const handleAutoSaveDraft = (draft) => {
-    setDraftData(draft);
+  const handleDataAndObservationsComplete = (dataAndObservationsData) => {
+    setDataAndObservationsData(dataAndObservationsData);
+    triggerAutoSave();
+  };
+
+  const handleAutoSaveDataAndObservations = (dataAndObservations) => {
+    setDataAndObservationsData(dataAndObservations);
     triggerAutoSave(); // Debounced save for frequent draft updates
   };
 
   const handleMethodologySelected = (methodologyData) => {
     setMethodology(methodologyData);
-    setOutlineVersion(prev => prev + 1); // Force outline regeneration
-    setOutlineData(null); // Clear existing outline data
     triggerAutoSave(true); // Immediate save for important milestone
   };
 
@@ -217,8 +211,9 @@ function App() {
     setMethodology(data.methodology || '');
     setSelectedPaperType(data.selectedPaperType || null);
     setOutlineData(data.outlineData || null);
-    setDraftData(data.draftData || null);
-    setDraft2Data(data.draft2Data || null);
+    console.log('🔍 Loading literatureReviewData:', data.literatureReviewData);
+    setLiteratureReviewData(data.literatureReviewData || null);
+    setDataAndObservationsData(data.dataAndObservationsData || null);
     
     // Restore state flags
     setThesisFinalized(data.thesisFinalized || false);
@@ -226,6 +221,7 @@ function App() {
     setSourceCategoriesActivated(data.sourceCategoriesActivated || false);
     setReadyForOutline(data.readyForOutline || false);
     setFrameworkComplete(data.frameworkComplete || false);
+    setLiteratureReviewComplete(data.literatureReviewComplete || false);
     setActiveTab(data.activeTab || 'framework');
     
     setCurrentProject(project);
@@ -244,31 +240,18 @@ function App() {
       setSelectedPaperType(null);
       setOutlineData(null);
       setDraftData(null);
-      setDraft2Data(null);
       
       setThesisFinalized(false);
       setCategoriesFinalized(false);
       setSourceCategoriesActivated(false);
       setReadyForOutline(false);
       setFrameworkComplete(false);
+      setLiteratureReviewComplete(false);
       setActiveTab('framework');
       
       setCurrentProject(null);
       setOutlineVersion(prev => prev + 1);
     }
-  };
-
-  // Helper function to determine current step based on progress
-  const getCurrentStep = () => {
-    if (!selectedPaperType) return 'paper-type';
-    if (!thesisFinalized) return 'thesis';
-    if (!categoriesFinalized) return 'sources';
-    if (!methodology) return 'methodology';
-    if (!frameworkComplete) return 'outline';
-    if (activeTab === 'draft1') return 'draft';
-    if (activeTab === 'draft2') return 'draft';
-    if (activeTab === 'initial') return 'final';
-    return 'framework';
   };
 
   return (
@@ -310,13 +293,14 @@ function App() {
             methodology={methodology}
             selectedPaperType={selectedPaperType}
             outlineData={outlineData}
-            draftData={draftData}
-            draft2Data={draft2Data}
+            literatureReviewData={literatureReviewData}
+            dataAndObservationsData={dataAndObservationsData}
             thesisFinalized={thesisFinalized}
             categoriesFinalized={categoriesFinalized}
             sourceCategoriesActivated={sourceCategoriesActivated}
             readyForOutline={readyForOutline}
             frameworkComplete={frameworkComplete}
+            literatureReviewComplete={literatureReviewComplete}
             activeTab={activeTab}
             showDebugSections={showDebugSections}
             setShowDebugSections={setShowDebugSections}
@@ -340,33 +324,33 @@ function App() {
             </li>
             <li className="nav-item" role="presentation">
               <button
-                className={`nav-link ${activeTab === 'draft1' ? 'active' : ''} ${!frameworkComplete ? 'disabled' : ''}`}
-                onClick={() => frameworkComplete && handleTabChange('draft1')}
+                className={`nav-link ${activeTab === 'outline' ? 'active' : ''} ${!frameworkComplete ? 'disabled' : ''}`}
+                onClick={() => frameworkComplete && handleTabChange('outline')}
                 type="button"
                 role="tab"
                 disabled={!frameworkComplete}
               >
-                Outline Draft 1
+                Literature Review
               </button>
             </li>
             <li className="nav-item" role="presentation">
               <button
-                className={`nav-link ${activeTab === 'draft2' ? 'active' : ''} ${!draftData ? 'disabled' : ''}`}
-                onClick={() => draftData && handleTabChange('draft2')}
+                className={`nav-link ${activeTab === 'dataobs' ? 'active' : ''} ${!literatureReviewData ? 'disabled' : ''}`}
+                onClick={() => literatureReviewData && handleTabChange('dataobs')}
                 type="button"
                 role="tab"
-                disabled={!draftData}
+                disabled={!literatureReviewData}
               >
-                Outline Draft 2
+                Data & Observations
               </button>
             </li>
             <li className="nav-item" role="presentation">
               <button
-                className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!draft2Data ? 'disabled' : ''}`}
-                onClick={() => draft2Data && handleTabChange('initial')}
+                className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!dataAndObservationsData ? 'disabled' : ''}`}
+                onClick={() => dataAndObservationsData && handleTabChange('initial')}
                 type="button"
                 role="tab"
-                disabled={!draft2Data}
+                disabled={!dataAndObservationsData}
               >
                 Final Outline
               </button>
@@ -439,7 +423,7 @@ function App() {
                     sourceCategories={sourceCategories}
                     selectedPaperType={selectedPaperType}
                     onFrameworkComplete={handleFrameworkComplete}
-                    onTransferToOutlineDraft={handleTransferToOutlineDraft1}
+                    onTransferToLiteratureReview={handleTransferToLiteratureReview}
                     savedOutlineData={outlineData}
                   />
                 </div>
@@ -447,39 +431,34 @@ function App() {
             </div>
           )}
 
-          {/* Outline Draft 1 Tab */}
-          {activeTab === 'draft1' && (
+          {/* Literature Review Tab */}
+          {activeTab === 'outline' && (
             <div className="tab-pane fade show active">
-              <OutlineDraft1
+              <LiteratureReview
                 outlineData={outlineData}
                 finalThesis={finalThesis}
                 methodology={methodology}
-                onOutlineDraft1Complete={handleOutlineDraft1Complete}
-                onTransferToOutlineDraft2={handleTransferToOutlineDraft2}
+                onLiteratureReviewComplete={handleLiteratureReviewComplete}
+                onTransferToDataAndObservations={handleTransferToDataAndObservations}
                 autoSave={autoSave}
-                onAutoSaveDraft={handleAutoSaveDraft}
-                draftData={draftData}
+                onAutoSaveDraft={handleAutoSaveLiteratureReview}
+                literatureReviewData={literatureReviewData}
               />
             </div>
           )}
 
-          {/* Outline Draft 2 Tab */}
-          {activeTab === 'draft2' && (
+          {/* Data & Observations Tab */}
+          {activeTab === 'dataobs' && (
             <div className="tab-pane fade show active">
-              <OutlineDraft2
+              <DataAndObservations
                 outlineData={outlineData}
                 finalThesis={finalThesis}
                 methodology={methodology}
                 selectedPaperType={selectedPaperType}
-                draftData={draftData}
-                draft2Data={draft2Data}
-                onOutlineDraft2Complete={handleOutlineDraft2Complete}
-                onOutlineDraft2Update={handleOutlineDraft2Update}
-                preIdentifiedDataSections={outlineData?.filter(section => 
-                  section.is_data_section === true || 
-                  section.section_type === 'data' ||
-                  section.category === 'data_section'
-                )}
+                literatureReviewData={literatureReviewData}
+                dataAndObservationsData={dataAndObservationsData}
+                onDataAndObservationsComplete={handleDataAndObservationsComplete}
+                onDataAndObservationsUpdate={handleAutoSaveDataAndObservations}
               />
             </div>
           )}
@@ -488,7 +467,8 @@ function App() {
           {activeTab === 'initial' && (
             <div className="tab-pane fade show active">
               <FinalOutline
-                draftData={draftData}
+                literatureReviewData={literatureReviewData}
+                dataAndObservationsData={dataAndObservationsData}
                 finalThesis={finalThesis}
               />
             </div>
@@ -567,24 +547,6 @@ function App() {
           </div>
         </>
       )}
-
-      {/* Floating Context Button - Add this at the end */}
-      <FloatingContextButton
-        currentStep={getCurrentStep()}
-        finalThesis={finalThesis}
-        selectedCategories={sourceCategories}
-        methodology={methodology}
-        selectedPaperType={selectedPaperType}
-        pageCount={paperLength}
-        outline={outlineData}
-      />
-      
-      {/* Floating Citations Button */}
-      <FloatingCitationsButton
-        outline={outlineData}
-        methodology={methodology}
-        finalThesis={finalThesis}
-      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from schemas.outlinedraft2 import (
+from schemas.data_and_observations import (
     DataSectionAnalysisRequest,
     DataSectionAnalysisResponse,
     DataSectionBuildRequest,

@@ -1,4 +1,4 @@
-# OutlineDraft2 UI Cleanup - Implementation Summary
+# DataAndObservations UI Cleanup - Implementation Summary
 
 ## ✅ COMPLETED CHANGES
 
@@ -32,7 +32,7 @@
 - **Real-time Status**: Shows "Processing...", "Complete", "Pending"
 
 #### ✅ Step 1: Contextual Analysis
-- **Trigger**: Automatically starts when "Transfer to Draft 2" button is clicked
+- **Trigger**: Automatically starts when "Transfer to Data & Observations" button is clicked
 - **Function**: `startStep1ContextualAnalysis()`
 - **Process**: 
   - Analyzes data section contexts
@@ -70,7 +70,7 @@
 - **Function**: `startStep3SystematicPopulation()`
 - **Process**: 
   - Uses logic framework from Step 2
-  - Extracts critical information from Outline Draft 1 responses
+  - Extracts critical information from Literature Review responses
   - Fills in detailed outlines with requisite details
   - Creates `masterOutlines` with comprehensive analysis
 - **Purpose**: Populate actual outlines with research data based on context + logic framework
@@ -78,7 +78,7 @@
 ### 3. 🔄 Updated User Flow
 
 #### ✅ Automatic Progression
-1. **User clicks "Transfer to Draft 2"** → Step 1 starts immediately
+1. **User clicks "Transfer to Data & Observations"** → Step 1 starts immediately
 2. **Step 1 processing** → Step 1 card pulses blue, contextual analysis runs
 3. **Step 1 complete** → Step 1 turns blue with checkmark, Step 2 starts pulsing
 4. **Step 2 processing** → Logic framework generation, Step 2 pulses yellow
@@ -168,7 +168,7 @@ const [systematicPopulationComplete, setSystematicPopulationComplete] = useState
 - ❌ User had to manually click "Outline Logic" to start anything
 
 #### **After (New System)**:
-- ✅ **Step 1 starts automatically** when user clicks "Transfer to Draft 2"
+- ✅ **Step 1 starts automatically** when user clicks "Transfer to Data & Observations"
 - ✅ **Visual progress indicators** show exactly what's happening
 - ✅ **Pulsing animations** indicate active processing
 - ✅ **Context Map** provides clear understanding of data relationships

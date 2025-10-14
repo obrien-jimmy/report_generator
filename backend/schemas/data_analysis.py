@@ -39,7 +39,7 @@ class GeneratedOutline(BaseModel):
 
 # Inclusion/Exclusion Analysis Schemas
 class InclusionExclusionRequest(BaseModel):
-    draftData: Dict[str, Any] = Field(..., description="Draft outline data to analyze")
+    literatureReviewData: Dict[str, Any] = Field(..., description="Literature review data to analyze")
     thesis: str = Field(..., description="Main thesis statement")
 
 class ContentItem(BaseModel):

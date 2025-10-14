@@ -27,7 +27,7 @@ const getNumberForLevel = (level, idx) => {
   }
 };
 
-const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) => {
+const FinalOutline = ({ literatureReviewData, dataAndObservationsData, finalThesis, methodology, onEditOutline }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [level, setLevel] = useState(7); // Show all levels by default
   const [expandedSections, setExpandedSections] = useState({});
@@ -69,8 +69,8 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        outline: draftData.outline,
-        responses: getStringResponses(draftData.responses),
+        outline: literatureReviewData.outline,
+        responses: getStringResponses(literatureReviewData.responses),
         thesis: finalThesis,
         methodology
       })
@@ -86,7 +86,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   const handleRefineOutline = async () => {
     setRefining(true);
     setRefinedOutlineSections([]); // Reset
-    const outline = draftData.outline || [];
+    const outline = literatureReviewData.outline || [];
     const total = outline.reduce((sum, sec) => sum + (sec.subsections?.length || 0), 0);
     let idx = 0;
     const newSections = [];
@@ -102,7 +102,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
         const responsesArr = [];
         for (let qIdx = 0; qIdx < (subsection.questions?.length || 0); qIdx++) {
           const key = `${sIdx}-${subIdx}-${qIdx}`;
-          const resp = getStringResponses(draftData.responses)[key];
+          const resp = getStringResponses(literatureReviewData.responses)[key];
           if (resp) responsesArr.push(resp);
         }
         idx++;
@@ -160,13 +160,13 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   // Download as text
   const downloadOutline = () => {
     let text = `Thesis: ${finalThesis}\n\n`;
-    draftData?.outline?.forEach((section, sIdx) => {
+    literatureReviewData?.outline?.forEach((section, sIdx) => {
       text += `${romanNumeral(sIdx)}. ${section.section_title}\n`;
       section.subsections?.forEach((sub, subIdx) => {
         text += `  ${alpha(subIdx)}. ${sub.subsection_title}\n`;
         sub.questions?.forEach((q, qIdx) => {
           const key = `${sIdx}-${subIdx}-${qIdx}`;
-          const resp = getStringResponses(draftData.responses)[key];
+          const resp = getStringResponses(literatureReviewData.responses)[key];
           if (resp) text += `    ${qIdx + 1}. ${resp}\n`;
         });
       });
@@ -261,8 +261,8 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
   function buildReferenceIndex() {
     const allReferences = new Set();
     
-    if (draftData?.responses) {
-      Object.values(draftData.responses).forEach(responseArray => {
+    if (literatureReviewData?.responses) {
+      Object.values(literatureReviewData.responses).forEach(responseArray => {
         if (Array.isArray(responseArray)) {
           responseArray.forEach(response => {
             const refs = extractReferenceNumbers(response);
@@ -275,12 +275,12 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     return Array.from(allReferences).sort((a, b) => a - b);
   }
 
-  // Build citation mapping from draftData
+  // Build citation mapping from literatureReviewData
   function buildCitationMapping() {
     const citationMap = {};
     
-    if (draftData?.citationReferenceMap) {
-      Object.values(draftData.citationReferenceMap).forEach(questionRefs => {
+    if (literatureReviewData?.citationReferenceMap) {
+      Object.values(literatureReviewData.citationReferenceMap).forEach(questionRefs => {
         Object.values(questionRefs).forEach(refInfo => {
           if (refInfo.referenceNumber && refInfo.citation) {
             citationMap[refInfo.referenceNumber] = refInfo.citation;
@@ -344,7 +344,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
       <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
         Thesis: <span style={{ fontWeight: 'normal' }}>{finalThesis}</span>
       </div>
-      {draftData.outline?.map((section, sIdx) => {
+      {literatureReviewData.outline?.map((section, sIdx) => {
         if (level < 1) return null;
         const secNum = romanNumeral(sIdx);
         return (
@@ -372,7 +372,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
                   {(expandedSections[sIdx] || level > 2) && sub.questions?.map((q, qIdx) => {
                     if (level < 3) return null;
                     const key = `${sIdx}-${subIdx}-${qIdx}`;
-                    const rawResponse = getStringResponses(draftData.responses)[key];
+                    const rawResponse = getStringResponses(literatureReviewData.responses)[key];
                     const parsedContent = parseFusedResponseContent(rawResponse);
                     
                     // Maintain counters for each level to ensure proper numbering
@@ -438,11 +438,11 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
     </div>
   );
 
-  if (!draftData) {
+  if (!literatureReviewData) {
     return (
       <div className="text-center py-5">
         <h4>No outline data available</h4>
-        <p className="text-muted">Please complete the Outline Draft 1 first.</p>
+        <p className="text-muted">Please complete the Literature Review first.</p>
       </div>
     );
   }
@@ -545,7 +545,7 @@ const FinalOutline = ({ draftData, finalThesis, methodology, onEditOutline }) =>
               <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
                 Thesis: <span style={{ fontWeight: 'normal' }}>{finalThesis}</span>
               </div>
-              {draftData.outline?.map((section, sIdx) => (
+              {literatureReviewData.outline?.map((section, sIdx) => (
                 <div key={sIdx}>
                   <div style={{ fontWeight: 'bold' }}>{romanNumeral(sIdx)}. {section.section_title}</div>
                   {section.subsections?.map((sub, subIdx) => {

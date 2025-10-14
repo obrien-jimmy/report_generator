@@ -13,13 +13,13 @@ This is an AI-powered research paper generator with a **React + Vite frontend** 
 ## Critical Development Patterns
 
 ### Multi-Phase Component Pattern
-Components like `OutlineDraft2.jsx` use **sequential phases** controlled by `currentPhase` state:
+Components like `DataAndObservations.jsx` use **sequential phases** controlled by `currentPhase` state:
 - Phase 1: Analysis/Identification → Phase 2: Building/Generation → Phase 3: Review/Integration
 - Each phase has distinct UI, API calls, and state management
 - **Always declare ALL state variables** used across phases (common bug: missing `setErrorMessage`, `isAnalyzing` etc.)
 
 ### Backend Router Structure
-Each router follows this pattern (see `outlinedraft2.py`):
+Each router follows this pattern (see `data_and_observations.py`):
 - Import schemas from matching `/schemas` module 
 - Use `@router.post("/endpoint", response_model=Schema)` with Pydantic validation
 - Call `invoke_bedrock(prompt)` for AI generation with structured prompts
@@ -44,7 +44,7 @@ Critical patterns in `bedrock_service.py`:
 **Sequential phases** (must complete in order):
 1. **Framework**: `PaperTypeSelector` → `ThesisRefinement` → `SourceCategories` → `MethodologyGenerator`
 2. **Outline**: `OutlineFrameworkGenerator` creates structured outline from paper type templates
-3. **Draft**: `OutlineDraft1` → `OutlineDraft2` builds sections iteratively into academic prose
+3. **Draft**: `LiteratureReview` → `DataAndObservations` builds sections iteratively into academic prose
 4. **Final**: `FinalOutline` assembles complete paper with citations and formatting
 
 ### Paper Type System
@@ -104,7 +104,7 @@ Follow `/tests/test_bedrock_kb.py` approach:
 ## File Reference Patterns
 
 - **Complex State**: `App.jsx` (575 lines) - main state orchestration
-- **Multi-phase UI**: `OutlineDraft2.jsx` - sequential workflow pattern  
+- **Multi-phase UI**: `DataAndObservations.jsx` - sequential workflow pattern  
 - **AWS Integration**: `bedrock_service.py` - error handling and response parsing
-- **Schema Design**: `outlinedraft2.py` - nested Pydantic models with citations
+- **Schema Design**: `data_and_observations.py` - nested Pydantic models with citations
 - **Paper Templates**: `paper_structure_service.py` - predefined academic structures

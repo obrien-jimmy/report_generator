@@ -3,7 +3,7 @@
 ## Issues Fixed
 
 ### 1. **Runtime Error: `Cannot read properties of undefined (reading 'map')`**
-**Error Location:** Line 3518 in OutlineDraft2.jsx  
+**Error Location:** Line 3518 in DataAndObservations.jsx  
 **Cause:** The rendering code expected `logicItem.inclusions` and `logicItem.exclusions` arrays, but the AI analysis structure had different field names.
 
 **Fix Applied:**
@@ -97,7 +97,7 @@ Each subsection analysis now includes:
 
 ## Expected Workflow Now
 
-1. **User clicks "Transfer to Draft 2"** → Step 1 (Contextual Analysis) begins automatically
+1. **User clicks "Transfer to Data & Observations"** → Step 1 (Contextual Analysis) begins automatically
 2. **Step 1 completes** → Detailed thesis/methodology mapping shown → Auto-progress to Step 2
 3. **Step 2 begins** → Sequential data section processing:
    - "Processing data section 1/2: Current US Cybersecurity Framework..."

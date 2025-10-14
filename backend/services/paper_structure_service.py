@@ -582,7 +582,7 @@ class PaperStructureService:
     @staticmethod
     def categorize_section(section_title: str) -> str:
         """
-        Categorize a section based on its title and content type for Outline Draft 2 processing.
+        Categorize a section based on its title and content type for Data and Observations processing.
         
         Categories:
         - Admin: Administrative sections (Title, Abstract, References)

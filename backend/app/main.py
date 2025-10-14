@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import methodology, outline, outlinedraft1, outlinedraft2, refinement, structure, sources, general, finaloutline, citations, data_analysis
+from routers import methodology, outline, literature_review, data_and_observations, refinement, structure, sources, general, finaloutline, citations, data_analysis
 
 app = FastAPI(title="Socratic AI Backend")
 
@@ -16,8 +16,8 @@ app.add_middleware(
 # Include routers
 app.include_router(methodology.router, tags=["methodology"])
 app.include_router(outline.router, tags=["outline"])
-app.include_router(outlinedraft1.router, tags=["outlinedraft1"])
-app.include_router(outlinedraft2.router, tags=["outlinedraft2"])
+app.include_router(literature_review.router, tags=["literature_review"])
+app.include_router(data_and_observations.router, tags=["data_and_observations"])
 app.include_router(refinement.router, tags=["refinement"])
 app.include_router(structure.router, tags=["structure"])
 app.include_router(sources.router, tags=["sources"])

@@ -3,15 +3,15 @@ import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye, FaSearch, FaCog, FaE
 import axios from 'axios';
 import Modal from './Modal';
 
-const OutlineDraft2 = ({
+const DataAndObservations = ({
   outlineData,
   finalThesis,
   methodology,
   selectedPaperType,
-  draftData,
-  draft2Data, // Existing OutlineDraft2 data for loading saved state
-  onOutlineDraft2Complete,
-  onOutlineDraft2Update, // New prop for step-by-step updates
+  literatureReviewData,
+  dataAndObservationsData, // Existing DataAndObservations data for loading saved state
+  onDataAndObservationsComplete,
+  onDataAndObservationsUpdate, // New prop for step-by-step updates
   preIdentifiedDataSections = null, // Pre-identified data sections from outline framework
   identifiedDataSections = null     // Alternative prop name for data sections
 }) => {
@@ -87,73 +87,73 @@ const OutlineDraft2 = ({
     detailedOutlineBuilder: false
   });
 
-  // Restore state from saved draft2Data
+  // Restore state from saved dataAndObservationsData
   useEffect(() => {
-    if (draft2Data && typeof draft2Data === 'object') {
-      console.log('OutlineDraft2: Restoring saved state from draft2Data:', draft2Data);
+    if (dataAndObservationsData && typeof dataAndObservationsData === 'object') {
+      console.log('DataAndObservations: Restoring saved state from dataAndObservationsData:', dataAndObservationsData);
       setIsRestoring(true);
       
       // Restore step progress
-      if (draft2Data.currentStep) setCurrentStep(draft2Data.currentStep);
-      if (draft2Data.stepStatus) setStepStatus(draft2Data.stepStatus);
-      if (draft2Data.stepProgress) setStepProgress(draft2Data.stepProgress);
+      if (dataAndObservationsData.currentStep) setCurrentStep(dataAndObservationsData.currentStep);
+      if (dataAndObservationsData.stepStatus) setStepStatus(dataAndObservationsData.stepStatus);
+      if (dataAndObservationsData.stepProgress) setStepProgress(dataAndObservationsData.stepProgress);
       
       // Restore completion flags
-      if (draft2Data.contextAnalysisComplete) setContextAnalysisComplete(draft2Data.contextAnalysisComplete);
-      if (draft2Data.logicFrameworkComplete) setLogicFrameworkComplete(draft2Data.logicFrameworkComplete);
-      if (draft2Data.detailedOutlineBuilderComplete) setDetailedOutlineBuilderComplete(draft2Data.detailedOutlineBuilderComplete);
+      if (dataAndObservationsData.contextAnalysisComplete) setContextAnalysisComplete(dataAndObservationsData.contextAnalysisComplete);
+      if (dataAndObservationsData.logicFrameworkComplete) setLogicFrameworkComplete(dataAndObservationsData.logicFrameworkComplete);
+      if (dataAndObservationsData.detailedOutlineBuilderComplete) setDetailedOutlineBuilderComplete(dataAndObservationsData.detailedOutlineBuilderComplete);
       
       // Restore generated data (but don't override fresh completions)
       console.log('🔄 Restoration check - justCompleted:', justCompleted);
       
       // Only restore outline logic data if we haven't just completed Step 2
-      if (draft2Data.outlineLogicData && !justCompleted.logicFramework) {
-        console.log('✅ Restoring saved outline logic data:', draft2Data.outlineLogicData.length, 'items');
-        setOutlineLogicData(draft2Data.outlineLogicData);
+      if (dataAndObservationsData.outlineLogicData && !justCompleted.logicFramework) {
+        console.log('✅ Restoring saved outline logic data:', dataAndObservationsData.outlineLogicData.length, 'items');
+        setOutlineLogicData(dataAndObservationsData.outlineLogicData);
       } else if (justCompleted.logicFramework) {
         console.log('⏭️ Skipping outline logic restoration - just completed Step 2');
       }
       
-      if (draft2Data.contextMapData && !justCompleted.contextAnalysis) {
-        setContextMapData(draft2Data.contextMapData);
+      if (dataAndObservationsData.contextMapData && !justCompleted.contextAnalysis) {
+        setContextMapData(dataAndObservationsData.contextMapData);
       }
-      if (draft2Data.masterOutlines && !justCompleted.detailedOutlineBuilder) {
-        setMasterOutlines(draft2Data.masterOutlines);
+      if (dataAndObservationsData.masterOutlines && !justCompleted.detailedOutlineBuilder) {
+        setMasterOutlines(dataAndObservationsData.masterOutlines);
       }
-      if (draft2Data.refinedOutlines) setRefinedOutlines(draft2Data.refinedOutlines);
+      if (dataAndObservationsData.refinedOutlines) setRefinedOutlines(dataAndObservationsData.refinedOutlines);
       
       // Restore UI states
-      if (draft2Data.showOutlineLogic !== undefined) setShowOutlineLogic(draft2Data.showOutlineLogic);
-      if (draft2Data.showContextMap !== undefined) setShowContextMap(draft2Data.showContextMap);
+      if (dataAndObservationsData.showOutlineLogic !== undefined) setShowOutlineLogic(dataAndObservationsData.showOutlineLogic);
+      if (dataAndObservationsData.showContextMap !== undefined) setShowContextMap(dataAndObservationsData.showContextMap);
 
       
       // Auto-show sections based on current step and available data
-      if (draft2Data.currentStep >= 1 && draft2Data.contextMapData) {
+      if (dataAndObservationsData.currentStep >= 1 && dataAndObservationsData.contextMapData) {
         setShowContextMap(true);
       }
-      if (draft2Data.currentStep >= 2 && draft2Data.outlineLogicData?.length > 0) {
+      if (dataAndObservationsData.currentStep >= 2 && dataAndObservationsData.outlineLogicData?.length > 0) {
         setShowOutlineLogic(true);
       }
       
-      console.log('✅ OutlineDraft2: State restored from saved data');
+      console.log('✅ DataAndObservations: State restored from saved data');
       
       // Set restoration complete after a brief delay to allow all state updates to complete
       setTimeout(() => {
         setIsRestoring(false);
         
         // Auto-retry Step 2 if it was left in processing state (likely interrupted)
-        if (draft2Data.currentStep === 2 && draft2Data.stepStatus?.[2] === 'processing') {
+        if (dataAndObservationsData.currentStep === 2 && dataAndObservationsData.stepStatus?.[2] === 'processing') {
           console.log('🔄 Step 2 was in processing state - auto-retrying after restoration');
           setTimeout(() => {
-            startStep2LogicFramework(refinedOutlines || draft2Data.refinedOutlines);
+            startStep2LogicFramework(refinedOutlines || dataAndObservationsData.refinedOutlines);
           }, 1000);
         }
         
         // Check if Step 3 should be available after restoration
-        checkStep3Availability(draft2Data);
+        checkStep3Availability(dataAndObservationsData);
       }, 100);
     }
-  }, [draft2Data]);
+  }, [dataAndObservationsData]);
 
   // Check if Step 3 (Detailed Outline Builder) should be available
   const checkStep3Availability = (savedData = null) => {
@@ -205,7 +205,7 @@ const OutlineDraft2 = ({
   useEffect(() => {
     const initializeDataSections = () => {
       // Only reset if no saved state exists
-      if (!draft2Data || !draft2Data.currentStep) {
+      if (!dataAndObservationsData || !dataAndObservationsData.currentStep) {
         setIdentifiedSections([]);
         setRefinedOutlines([]);
         setBuiltSections([]);
@@ -226,16 +226,16 @@ const OutlineDraft2 = ({
       }
       
       // Debug logging for data flow analysis
-      console.log('OutlineDraft2: Debugging data sources:');
+      console.log('DataAndObservations: Debugging data sources:');
       console.log('- preIdentifiedDataSections:', preIdentifiedDataSections);
       console.log('- identifiedDataSections:', identifiedDataSections);  
       console.log('- outlineData type:', Array.isArray(outlineData) ? 'array' : typeof outlineData);
       console.log('- outlineData length:', Array.isArray(outlineData) ? outlineData.length : 'N/A');
-      console.log('- draftData:', draftData);
+      console.log('- literatureReviewData:', literatureReviewData);
       
       // First priority: Use pre-identified data sections passed from outline framework
       if (preIdentifiedDataSections && preIdentifiedDataSections.length > 0) {
-        console.log('OutlineDraft2: Using pre-identified data sections:', preIdentifiedDataSections.length);
+        console.log('DataAndObservations: Using pre-identified data sections:', preIdentifiedDataSections.length);
         setIdentifiedSections(preIdentifiedDataSections);
         prepareRefinedOutlines(preIdentifiedDataSections);
         return;
@@ -243,7 +243,7 @@ const OutlineDraft2 = ({
       
       // Second priority: Use alternative prop name
       if (identifiedDataSections && identifiedDataSections.length > 0) {
-        console.log('OutlineDraft2: Using identified data sections from prop:', identifiedDataSections.length);
+        console.log('DataAndObservations: Using identified data sections from prop:', identifiedDataSections.length);
         setIdentifiedSections(identifiedDataSections);
         prepareRefinedOutlines(identifiedDataSections);
         return;
@@ -254,46 +254,46 @@ const OutlineDraft2 = ({
         const extractedSections = extractDataSectionsFromOutlineFramework(outlineData);
         
         if (extractedSections.length > 0) {
-          console.log('OutlineDraft2: Found identified data sections in outlineData:', extractedSections.length);
+          console.log('DataAndObservations: Found identified data sections in outlineData:', extractedSections.length);
           setIdentifiedSections(extractedSections);
           prepareRefinedOutlines(extractedSections);
           return;
         }
       }
       
-      // Last resort: Extract from draftData, but only properly marked data sections
-      if (draftData) {
-        const draftOutline = draftData.outline || draftData;
+      // Last resort: Extract from literatureReviewData, but only properly marked data sections
+      if (literatureReviewData) {
+        const draftOutline = literatureReviewData.outline || literatureReviewData;
         const extractedSections = extractDataSectionsFromOutlineFramework(draftOutline);
         
         if (extractedSections.length > 0) {
-          console.log('OutlineDraft2: Found identified data sections in draftData:', extractedSections.length);
+          console.log('DataAndObservations: Found identified data sections in literatureReviewData:', extractedSections.length);
           setIdentifiedSections(extractedSections);
           prepareRefinedOutlines(extractedSections);
         } else {
-          console.warn('OutlineDraft2: No properly identified data sections found');
-          setErrorMessage('No data sections found. Please ensure the outline framework has properly identified data sections before proceeding to Outline Draft 2.');
+          console.warn('DataAndObservations: No properly identified data sections found');
+          setErrorMessage('No data sections found. Please ensure the outline framework has properly identified data sections before proceeding to Data and Observations.');
         }
       }
     };
     
     // Only initialize once and when we have valid data
-    if (!initialized && (preIdentifiedDataSections?.length > 0 || identifiedDataSections?.length > 0 || (outlineData && draftData))) {
-      console.log('OutlineDraft2: Initializing data sections (initialized=false)');
+    if (!initialized && (preIdentifiedDataSections?.length > 0 || identifiedDataSections?.length > 0 || (outlineData && literatureReviewData))) {
+      console.log('DataAndObservations: Initializing data sections (initialized=false)');
       initializeDataSections();
       setInitialized(true);
     }
-  }, [outlineData, draftData, preIdentifiedDataSections, identifiedDataSections, initialized]);
+  }, [outlineData, literatureReviewData, preIdentifiedDataSections, identifiedDataSections, initialized]);
 
   // Extract ONLY the properly identified data sections - no assessment on the fly
   const extractDataSectionsFromOutlineFramework = (draft1Data) => {
     if (!draft1Data || !Array.isArray(draft1Data)) {
-      console.log('OutlineDraft2: No draft1Data or not an array:', draft1Data);
+      console.log('DataAndObservations: No draft1Data or not an array:', draft1Data);
       return [];
     }
     
-    console.log('OutlineDraft2: Examining sections in draft1Data:', draft1Data.length);
-    console.log('OutlineDraft2: Section details:');
+    console.log('DataAndObservations: Examining sections in draft1Data:', draft1Data.length);
+    console.log('DataAndObservations: Section details:');
     draft1Data.forEach((section, index) => {
       console.log(`  ${index}: "${section.section_title}" - is_data_section:${section.is_data_section}, section_type:${section.section_type}, category:${section.category}`);
     });
@@ -306,19 +306,19 @@ const OutlineDraft2 = ({
                            section.category === 'data_section';
       
       if (isDataSection) {
-        console.log('OutlineDraft2: ✅ Found identified data section:', section.section_title);
+        console.log('DataAndObservations: ✅ Found identified data section:', section.section_title);
         return true;
       } else {
-        console.log('OutlineDraft2: ❌ Section not marked as data section:', section.section_title);
+        console.log('DataAndObservations: ❌ Section not marked as data section:', section.section_title);
         return false;
       }
     });
     
-    console.log('OutlineDraft2: Final identified data sections count:', dataSections.length);
+    console.log('DataAndObservations: Final identified data sections count:', dataSections.length);
     if (dataSections.length > 0) {
-      console.log('OutlineDraft2: Data sections found:', dataSections.map(s => s.section_title));
+      console.log('DataAndObservations: Data sections found:', dataSections.map(s => s.section_title));
     } else {
-      console.warn('OutlineDraft2: ⚠️ NO DATA SECTIONS IDENTIFIED - Check outline framework marking');
+      console.warn('DataAndObservations: ⚠️ NO DATA SECTIONS IDENTIFIED - Check outline framework marking');
     }
     return dataSections;
   };
@@ -345,7 +345,7 @@ const OutlineDraft2 = ({
     setRefineComplete(true);
     
     // Only start Step 1 if not restoring from saved state
-    if (!draft2Data || !draft2Data.currentStep) {
+    if (!dataAndObservationsData || !dataAndObservationsData.currentStep) {
       setTimeout(() => {
         startStep1ContextualAnalysis(sections);
       }, 500); // Small delay for UI to update
@@ -690,7 +690,7 @@ const OutlineDraft2 = ({
     console.log('Available logic data sections:', outlineLogicData?.length || 0);
     console.log('Fresh logic data passed directly:', freshLogicData?.length || 0);
     console.log('Available data sections:', sections?.length || 0);
-    console.log('Draft Outline 1 data available:', draftData ? 'Yes' : 'No');
+    console.log('Draft Outline 1 data available:', literatureReviewData ? 'Yes' : 'No');
     
     setCurrentStep(3);
     setStepStatus(prev => ({ ...prev, 3: 'processing' }));
@@ -744,8 +744,8 @@ const OutlineDraft2 = ({
         
         // Extract complete context from Draft Outline 1 - preserve ALL responses and citations
         let draftOutlineContext = null;
-        if (draftData?.outline) {
-          draftOutlineContext = draftData.outline.find(draft => 
+        if (literatureReviewData?.outline) {
+          draftOutlineContext = literatureReviewData.outline.find(draft => 
             draft.section_title === section.section_title
           );
           
@@ -2705,13 +2705,13 @@ const OutlineDraft2 = ({
           
           // Prepare the data for outline logic analysis - match backend schema
           const analysisRequest = {
-            draftData: draftData || {},
+            literatureReviewData: literatureReviewData || {},
             thesis: finalThesis || ""
           };
           
           console.log(`Sending data for outline logic analysis:`, {
             subsection: subsection.subsection_title,
-            draftData: !!analysisRequest.draftData,
+            literatureReviewData: !!analysisRequest.literatureReviewData,
             thesis: !!analysisRequest.thesis,
             request_structure: Object.keys(analysisRequest)
           });
@@ -3605,8 +3605,8 @@ const OutlineDraft2 = ({
     };
     
     // Use the project management auto-save system
-    if (onOutlineDraft2Update) {
-      onOutlineDraft2Update(progressData);
+    if (onDataAndObservationsUpdate) {
+      onDataAndObservationsUpdate(progressData);
     }
     
     console.log('✅ Progress auto-saved through project management');
@@ -3796,7 +3796,7 @@ const OutlineDraft2 = ({
 
   // Phase 1: Analyze and identify data sections
       const handleAnalyzeDataSections = async () => {
-        if (!outlineData || !draftData) {
+        if (!outlineData || !literatureReviewData) {
             setErrorMessage('Please complete the outline framework and draft phases first.');
             return;
         }
@@ -3805,8 +3805,8 @@ const OutlineDraft2 = ({
         setErrorMessage('');
         
         try {
-            // Extract the outline array from draftData if it's wrapped in an object
-            const draftOutline = draftData.outline || draftData;
+            // Extract the outline array from literatureReviewData if it's wrapped in an object
+            const draftOutline = literatureReviewData.outline || literatureReviewData;
             
             const requestData = {
                 outline_framework: outlineData || [],
@@ -3869,8 +3869,8 @@ const OutlineDraft2 = ({
     try {
       const indicesToBuild = sectionIndices || selectedSectionIndices;
       
-      // Extract the outline array from draftData if it's wrapped in an object
-      const draftOutline = draftData.outline || draftData;
+      // Extract the outline array from literatureReviewData if it's wrapped in an object
+      const draftOutline = literatureReviewData.outline || literatureReviewData;
       
       // Convert refined outlines back to the expected format for the backend
       const sectionsForBuilding = refinedOutlines.map(refined => ({
@@ -3896,8 +3896,8 @@ const OutlineDraft2 = ({
       
       if (response.data.completion_status === 'complete') {
         setCurrentPhase(3);
-        if (onOutlineDraft2Complete) {
-          onOutlineDraft2Complete(response.data);
+        if (onDataAndObservationsComplete) {
+          onDataAndObservationsComplete(response.data);
         }
         // Show success message
         alert('Data sections completed! Your factual evidence has been converted to academic prose. The next phase will use this data foundation for analysis.');
@@ -4459,7 +4459,7 @@ const OutlineDraft2 = ({
       {/* Step-based Content Display */}
       {currentStep >= 1 && (
         <div className="step-content">
-          {!outlineData || !draftData ? (
+          {!outlineData || !literatureReviewData ? (
             <div className="alert alert-warning">
               <strong>Missing Data:</strong> Please complete the Outline Framework and Literature Review phases first.
             </div>
@@ -4475,7 +4475,7 @@ const OutlineDraft2 = ({
               </ul>
               <p className="mb-0">
                 Please return to the <strong>Outline Framework</strong> phase to properly identify which sections contain research data 
-                before proceeding to Outline Draft 2.
+                before proceeding to Data and Observations.
               </p>
             </div>
           ) : refinedOutlines.length === 0 ? (
@@ -5236,4 +5236,4 @@ const OutlineDraft2 = ({
   );
 };
 
-export default OutlineDraft2;
+export default DataAndObservations;

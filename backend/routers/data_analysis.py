@@ -337,8 +337,8 @@ def analyze_inclusion_exclusion_criteria(request: InclusionExclusionRequest):
         
         # Extract draft content for analysis
         draft_content = ""
-        if request.draftData and "outline" in request.draftData:
-            for section in request.draftData["outline"]:
+        if request.literatureReviewData and "outline" in request.literatureReviewData:
+            for section in request.literatureReviewData["outline"]:
                 draft_content += f"SECTION: {section.get('section_title', '')}\n"
                 draft_content += f"CONTEXT: {section.get('section_context', '')}\n"
                 for subsection in section.get('subsections', []):

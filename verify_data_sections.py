@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Verification script to check that data sections are properly marked
-and ready for OutlineDraft2 to recognize them.
+and ready for Data and Observations to recognize them.
 """
 
 import json
@@ -60,7 +60,7 @@ def verify_project_data_sections():
         
         if len(data_sections) >= 2:
             print(f"   ✅ SUCCESS: {len(data_sections)} data sections properly marked!")
-            print(f"   🚀 OutlineDraft2 should now recognize these sections.")
+            print(f"   🚀 Data and Observations should now recognize these sections.")
             print()
             print(f"   Data sections:")
             for i, section in enumerate(data_sections, 1):
@@ -68,15 +68,15 @@ def verify_project_data_sections():
                 print(f"      {i}. {section['section_title']} ({component})")
         else:
             print(f"   ⚠️  WARNING: Only {len(data_sections)} data sections found.")
-            print(f"   🔧 OutlineDraft2 expects at least 2 data sections.")
+            print(f"   🔧 Data and Observations expects at least 2 data sections.")
         
         print()
         print("=" * 55)
         print("📋 NEXT STEPS FOR USER:")
         print("1. 🔄 Refresh your browser (Ctrl/Cmd + R)")
         print("2. 📁 Load the 'Cyber Paper' project if not already loaded")
-        print("3. 🧭 Navigate to the 'Outline Draft' tab")
-        print("4. ▶️ Go to OutlineDraft2 (should be Phase 2 button)")
+        print("3. 🧭 Navigate to the 'Literature Review' tab")
+        print("4. ▶️ Go to Data and Observations (should be Phase 2 button)")
         print("5. 👀 Check browser console (F12) for debug messages")
         print("6. ✅ Look for: 'Found identified data section' messages")
         print("7. ❌ Should NOT see: 'NO DATA SECTIONS IDENTIFIED' error")
@@ -93,27 +93,27 @@ def show_expected_console_output():
     print("\n" + "=" * 55)
     print("🖥️  EXPECTED BROWSER CONSOLE OUTPUT:")
     print("=" * 55)
-    print("When you navigate to OutlineDraft2, you should see:")
+    print("When you navigate to Data and Observations, you should see:")
     print()
-    print("OutlineDraft2: Debugging data sources:")
+    print("DataAndObservations: Debugging data sources:")
     print("- preIdentifiedDataSections: null")
     print("- identifiedDataSections: null")
     print("- outlineData type: array")
     print("- outlineData length: [number]")
     print("- draftData: [object]")
     print()
-    print("OutlineDraft2: Examining sections in draft1Data: [number]")
-    print("OutlineDraft2: Section details:")
+    print("DataAndObservations: Examining sections in draft1Data: [number]")
+    print("DataAndObservations: Section details:")
     print("  0: \"Title Page\" - is_data_section:undefined, section_type:undefined, category:undefined")
     print("  1: \"Abstract\" - is_data_section:undefined, section_type:undefined, category:undefined")
     print("  [...]")
     print("  X: \"Current US Cybersecurity Framework and Infrastructure\" - is_data_section:true, section_type:data, category:data_section")
     print("  Y: \"Policy Effectiveness and Strategic Gaps\" - is_data_section:true, section_type:data, category:data_section")
     print()
-    print("OutlineDraft2: ✅ Found identified data section: Current US Cybersecurity Framework and Infrastructure")
-    print("OutlineDraft2: ✅ Found identified data section: Policy Effectiveness and Strategic Gaps")
-    print("OutlineDraft2: Final identified data sections count: 2")
-    print("OutlineDraft2: Data sections found: [Array of section titles]")
+    print("DataAndObservations: ✅ Found identified data section: Current US Cybersecurity Framework and Infrastructure")
+    print("DataAndObservations: ✅ Found identified data section: Policy Effectiveness and Strategic Gaps")
+    print("DataAndObservations: Final identified data sections count: 2")
+    print("DataAndObservations: Data sections found: [Array of section titles]")
     print()
     print("🎉 If you see the ✅ messages above, the fix is working!")
 
@@ -122,6 +122,6 @@ if __name__ == "__main__":
     
     if success:
         show_expected_console_output()
-        print("\n🎊 ALL CHECKS PASSED! Your project is ready for OutlineDraft2! 🎊")
+        print("\n🎊 ALL CHECKS PASSED! Your project is ready for Data and Observations! 🎊")
     else:
         print("\n💥 VERIFICATION FAILED! Check the errors above and try running update_data_sections.py again.")
