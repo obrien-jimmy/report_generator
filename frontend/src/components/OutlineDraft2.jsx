@@ -61,7 +61,7 @@ const OutlineDraft2 = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
   const [expandedOutlines, setExpandedOutlines] = useState({});
-  const [expandedStepIntegrations, setExpandedStepIntegrations] = useState({});
+
   const [editingOutline, setEditingOutline] = useState(null);
   const [processedQAData, setProcessedQAData] = useState([]);
   
@@ -125,7 +125,7 @@ const OutlineDraft2 = ({
       // Restore UI states
       if (draft2Data.showOutlineLogic !== undefined) setShowOutlineLogic(draft2Data.showOutlineLogic);
       if (draft2Data.showContextMap !== undefined) setShowContextMap(draft2Data.showContextMap);
-      if (draft2Data.expandedStepIntegrations) setExpandedStepIntegrations(draft2Data.expandedStepIntegrations);
+
       
       // Auto-show sections based on current step and available data
       if (draft2Data.currentStep >= 1 && draft2Data.contextMapData) {
@@ -595,14 +595,7 @@ const OutlineDraft2 = ({
     setShowOutlineLogic(!showOutlineLogic);
   };
 
-  // Toggle Step Integration visibility
-  const toggleStepIntegrationView = (sectionIndex, subIndex) => {
-    const key = `${sectionIndex}-${subIndex}`;
-    setExpandedStepIntegrations(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
+
 
   // Step 2: Outline Logic Analysis - build logical framework from contextual analysis
   const startStep2LogicFramework = async (sections) => {
@@ -749,12 +742,21 @@ const OutlineDraft2 = ({
           continue;
         }
         
-        // Extract context from Draft Outline 1 if available
+        // Extract complete context from Draft Outline 1 - preserve ALL responses and citations
         let draftOutlineContext = null;
         if (draftData?.outline) {
           draftOutlineContext = draftData.outline.find(draft => 
             draft.section_title === section.section_title
           );
+          
+          // Ensure we preserve all response data from Draft 1
+          if (draftOutlineContext) {
+            console.log(`📋 Draft 1 context preserved for "${section.section_title}":`, {
+              subsections: draftOutlineContext.subsections?.length || 0,
+              responses: !!draftOutlineContext.responses,
+              combined_outlines: draftOutlineContext.subsections?.filter(sub => sub.combined_outline?.length > 0).length || 0
+            });
+          }
         }
         
         console.log(`Context from Draft Outline 1: ${draftOutlineContext ? 'Found' : 'Not found'}`);
@@ -805,11 +807,36 @@ const OutlineDraft2 = ({
     console.log(`Draft context: ${draftContext ? 'Available' : 'Not available'}`);
     
     try {
-      // Prepare comprehensive context for AI analysis
+      // Preserve essential Outline Draft 1 responses and citations while optimizing payload
+      const optimizedSubsections = section.subsections?.map(subsection => ({
+        subsection_title: subsection.subsection_title,
+        subsection_context: subsection.subsection_context,
+        // Preserve the combined outline responses from Draft 1 - these are critical!
+        combined_outline: subsection.combined_outline || [],
+        // Keep question responses but optimize citation payload
+        questions: subsection.questions?.map(q => ({
+          question: q.question,
+          // PRESERVE: Any response from Outline Draft 1
+          response: q.response || q.answer || '',
+          citation_count: q.citations?.length || 0,
+          // Keep essential citation info but optimize descriptions
+          citations: q.citations?.map(c => ({
+            apa: c.apa,
+            categories: c.categories,
+            methodology_points: c.methodologyPoints || c.methodology_points,
+            // Keep first 400 chars of description to preserve more context
+            description: c.description?.substring(0, 400) + (c.description?.length > 400 ? '...' : '') || 'No description'
+          })) || []
+        })) || [],
+        // Preserve any additional response data from Draft 1
+        responses: subsection.responses || {},
+        question_responses: subsection.question_responses || []
+      })) || [];
+
       const dataRequest = {
         section_title: section.section_title,
         section_context: section.section_context,
-        subsections: section.subsections,
+        subsections: optimizedSubsections,
         logic_framework: logicData,
         draft_outline_context: draftContext,
         thesis: finalThesis,
@@ -827,20 +854,34 @@ const OutlineDraft2 = ({
       };
       
       console.log(`Sending data outline request for "${section.section_title}"`);
-      console.log('Request data structure:', JSON.stringify(dataRequest, null, 2));
       
-      // Call AI endpoint for data outline building
+      // Log payload size to help with debugging
+      const payloadString = JSON.stringify(dataRequest);
+      const payloadSizeKB = (payloadString.length / 1024).toFixed(2);
+      console.log(`📦 Request payload size: ${payloadSizeKB} KB`);
+      console.log('Request data structure (first 500 chars):', payloadString.substring(0, 500) + '...');
+      
+      // Call AI endpoint for data outline building with timeout and better error handling
+      console.log('📤 Making fetch request to build-data-outline endpoint...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
       const response = await fetch('http://localhost:8000/data-analysis/build-data-outline', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dataRequest)
+        body: JSON.stringify(dataRequest),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      console.log('📥 Received response from build-data-outline endpoint:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Backend error details:`, errorText);
+        console.error(`❌ Backend error details:`, errorText);
         throw new Error(`Data outline building failed for "${section.section_title}": ${response.status} ${response.statusText} - ${errorText}`);
       }
       
@@ -891,7 +932,20 @@ const OutlineDraft2 = ({
       };
       
     } catch (error) {
-      console.error(`Error building data outline for "${section.section_title}":`, error);
+      console.error(`❌ Error building data outline for "${section.section_title}":`, error);
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        console.error('⏰ Request timed out after 2 minutes');
+        throw new Error(`Request timed out for "${section.section_title}". The AI processing is taking too long.`);
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('🌐 Network error occurred');
+        throw new Error(`Network error for "${section.section_title}". Please check if the backend server is running.`);
+      }
+      
       throw error;
     }
   };
@@ -3035,12 +3089,17 @@ const OutlineDraft2 = ({
     console.log('showSubsectionTooltip called with:', { section, subsection, sectionIndex, subIndex });
     const purposeData = generatePurposeExplanation(subsection, section, finalThesis, methodology);
     console.log('Generated purpose data:', purposeData);
+    
+    // Include 5-step integration data if available
+    const stepIntegrations = masterOutlines[sectionIndex]?.master_subsections?.[subIndex]?.step_integrations || null;
+    
     setTooltipData({
       ...purposeData,
       sectionIndex,
       subIndex,
       subsection_title: subsection.subsection_title,
-      section_title: section.section_title
+      section_title: section.section_title,
+      step_integrations: stepIntegrations
     });
     setShowTooltip(true);
     console.log('Tooltip should now be visible');
@@ -3532,7 +3591,7 @@ const OutlineDraft2 = ({
       // UI states
       showOutlineLogic,
       showContextMap,
-      expandedStepIntegrations,
+
       
       // Metadata
       savedAt: new Date().toISOString(),
@@ -4500,16 +4559,7 @@ const OutlineDraft2 = ({
                                       {expandedOutlines[`${sectionIndex}-${subIndex}`] ? <FaMinus /> : <FaPlus />}
                                     </button>
                                   )}
-                                  {masterOutlines[sectionIndex]?.master_subsections?.[subIndex]?.step_integrations && (
-                                    <button
-                                      className="btn btn-sm btn-outline-success ms-1"
-                                      onClick={() => toggleStepIntegrationView(sectionIndex, subIndex)}
-                                      title="View 5-Step Integration Process"
-                                      style={{ fontSize: '0.75rem' }}
-                                    >
-                                      5-Step
-                                    </button>
-                                  )}
+
                                   <button
                                     className="btn btn-outline-info btn-sm ms-2"
                                     onClick={() => showSubsectionTooltip(section, subsection, sectionIndex, subIndex)}
@@ -4528,46 +4578,7 @@ const OutlineDraft2 = ({
                                     onChange={(e) => handleSubsectionEdit(sectionIndex, subIndex, 'subsection_context', e.target.value)}
                                     placeholder="Subsection context and description"
                                   />
-                                  
-                                  {/* 5-Step Integration Process Display */}
-                                  {expandedStepIntegrations[`${sectionIndex}-${subIndex}`] && masterOutlines[sectionIndex]?.master_subsections?.[subIndex]?.step_integrations && (
-                                    <div className="step-integration-panel border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
-                                      <h6 className="fw-bold text-success mb-3">
-                                        <span className="me-2">📋</span>
-                                        5-Step Integration Process
-                                      </h6>
-                                      
-                                      <div className="integration-steps">
-                                        <div className="integration-step mb-2">
-                                          <strong className="text-primary">Step 1 - Context Integration:</strong>
-                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
-                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.context_integration}
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="integration-step mb-2">
-                                          <strong className="text-primary">Step 2 - Logic Integration:</strong>
-                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
-                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.logic_integration}
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="integration-step mb-2">
-                                          <strong className="text-primary">Step 3 - Draft Integration:</strong>
-                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
-                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.draft_integration}
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="integration-summary mt-3 pt-2 border-top">
-                                          <strong className="text-success">Integration Summary:</strong>
-                                          <div className="ms-3 text-dark" style={{ fontSize: '0.9rem' }}>
-                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.step_integration_notes}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
+
 
                                   {/* Expanded Master Outline Display */}
                                   {expandedOutlines[`${sectionIndex}-${subIndex}`] && masterOutlines[sectionIndex]?.master_subsections?.[subIndex] && (
@@ -5055,11 +5066,54 @@ const OutlineDraft2 = ({
             <div className="row">
               <div className="col-12">
                 <h5 className="text-primary mb-3">
-                  <FaInfoCircle className="me-2" />
                   {tooltipData.subsection_title}
                 </h5>
               </div>
             </div>
+
+            {/* 5-Step Integration Process - Now at the top */}
+            {tooltipData.step_integrations && (
+              <div className="row mb-4">
+                <div className="col-12">
+                  <div className="card border-success">
+                    <div className="card-header bg-success text-white">
+                      <h6 className="mb-0">5-Step Integration Process</h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="integration-steps">
+                        <div className="integration-step mb-2">
+                          <strong className="text-primary">Step 1 - Context Integration:</strong>
+                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                            {tooltipData.step_integrations.context_integration}
+                          </div>
+                        </div>
+                        
+                        <div className="integration-step mb-2">
+                          <strong className="text-primary">Step 2 - Logic Integration:</strong>
+                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                            {tooltipData.step_integrations.logic_integration}
+                          </div>
+                        </div>
+                        
+                        <div className="integration-step mb-2">
+                          <strong className="text-primary">Step 3 - Draft Integration:</strong>
+                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                            {tooltipData.step_integrations.draft_integration}
+                          </div>
+                        </div>
+                        
+                        <div className="integration-summary mt-3 pt-2 border-top">
+                          <strong className="text-success">Integration Summary:</strong>
+                          <div className="ms-3 text-dark" style={{ fontSize: '0.9rem' }}>
+                            {tooltipData.step_integrations.step_integration_notes}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="row mb-3">
               <div className="col-md-6">
@@ -5075,7 +5129,7 @@ const OutlineDraft2 = ({
               <div className="col-md-6">
                 <div className="card border-info">
                   <div className="card-header bg-info text-white">
-                    <h6 className="mb-0">🔗 Section Connection</h6>
+                    <h6 className="mb-0">Section Connection</h6>
                   </div>
                   <div className="card-body">
                     <p className="mb-0">{tooltipData.sectionConnection}</p>
@@ -5088,7 +5142,7 @@ const OutlineDraft2 = ({
               <div className="col-md-6">
                 <div className="card border-success">
                   <div className="card-header bg-success text-white">
-                    <h6 className="mb-0">🔬 Methodology Alignment</h6>
+                    <h6 className="mb-0">Methodology Alignment</h6>
                   </div>
                   <div className="card-body">
                     <p className="mb-0">{tooltipData.methodologyAlignment}</p>
@@ -5117,13 +5171,11 @@ const OutlineDraft2 = ({
                     <div className="row">
                       <div className="col-6">
                         <div className="d-flex align-items-center">
-                          <FaSearch className="text-primary me-2" />
                           <strong>Research Questions:</strong> {tooltipData.researchQuestions}
                         </div>
                       </div>
                       <div className="col-6">
                         <div className="d-flex align-items-center">
-                          <FaEye className="text-success me-2" />
                           <strong>Total Citations:</strong> {tooltipData.citationCount}
                         </div>
                       </div>
