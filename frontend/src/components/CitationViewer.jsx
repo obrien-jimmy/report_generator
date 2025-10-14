@@ -444,13 +444,6 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesi
             </div>
 
             <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={closeCitationDetails}
-              >
-                Close
-              </button>
               {onRemoveCitation && (
                 <button
                   type="button"
@@ -522,13 +515,6 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesi
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={closeAddMoreForm}
-                >
-                  Cancel
-                </button>
                 <button 
                   type="submit"
                   className="btn btn-primary"
@@ -608,13 +594,6 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesi
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={closeAddForm}
-                >
-                  Cancel
-                </button>
                 <button 
                   type="submit"
                   className="btn btn-primary"

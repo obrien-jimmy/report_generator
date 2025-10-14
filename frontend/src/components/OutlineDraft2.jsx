@@ -3087,6 +3087,12 @@ const OutlineDraft2 = ({
   // Handler functions for enhanced functionality
   const showSubsectionTooltip = (section, subsection, sectionIndex, subIndex) => {
     console.log('showSubsectionTooltip called with:', { section, subsection, sectionIndex, subIndex });
+    
+    // Close any other open modals to prevent overlap
+    setShowModal(false);
+    setSelectedCitation(null);
+    setShowDataWarning(false);
+    
     const purposeData = generatePurposeExplanation(subsection, section, finalThesis, methodology);
     console.log('Generated purpose data:', purposeData);
     
@@ -5056,12 +5062,42 @@ const OutlineDraft2 = ({
 
       {/* Comprehensive Purpose Tooltip Modal */}
       {showTooltip && tooltipData && (
-        <Modal 
-          show={showTooltip} 
-          onClose={() => setShowTooltip(false)}
-          title="Subsection Purpose & Methodology Alignment"
-          large={true}
+        <div 
+          className="modal-overlay" 
+          style={{ zIndex: 9999 }} 
+          onClick={() => setShowTooltip(false)}
         >
+          <div
+            className="modal-content-large"
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Subsection Purpose & Methodology Alignment</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowTooltip(false)}
+                aria-label="Close"
+                style={{ 
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#666',
+                  padding: 0,
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
           <div className="tooltip-content">
             <div className="row">
               <div className="col-12">
@@ -5191,17 +5227,10 @@ const OutlineDraft2 = ({
                 </div>
               </div>
             </div>
-
-            <div className="mt-3 text-center">
-              <button 
-                className="btn btn-primary"
-                onClick={() => setShowTooltip(false)}
-              >
-                Close
-              </button>
+          </div>
             </div>
           </div>
-        </Modal>
+        </div>
       )}
     </div>
   );

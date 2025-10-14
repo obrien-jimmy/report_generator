@@ -488,13 +488,6 @@ const ProjectManager = forwardRef(({
             </div>
 
             <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowSaveModal(false)}
-              >
-                Cancel
-              </button>
               <button 
                 type="button"
                 className="btn btn-success"
@@ -546,13 +539,6 @@ const ProjectManager = forwardRef(({
             </div>
 
             <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowSaveAsModal(false)}
-              >
-                Cancel
-              </button>
               <button 
                 type="button"
                 className="btn btn-success"
@@ -695,15 +681,7 @@ const ProjectManager = forwardRef(({
               )}
             </div>
 
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowLoadModal(false)}
-              >
-                Close
-              </button>
-            </div>
+
           </div>
         </div>
       )}
