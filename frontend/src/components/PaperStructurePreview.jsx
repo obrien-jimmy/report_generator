@@ -18,13 +18,10 @@ const PaperStructurePreview = ({
   const [editableStructure, setEditableStructure] = useState([]);
   const [editingMode, setEditingMode] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [generatingSections, setGeneratingSections] = useState(false);
+  const [sectionsGenerated, setSectionsGenerated] = useState(false);
 
-  // Calculate total pages based on default
-  const getTotalPages = () => {
-    return 15;  // Default page count
-  };
 
-  const totalPages = getTotalPages();
 
   useEffect(() => {
     if (paperType?.id && methodology) {
@@ -122,32 +119,10 @@ const PaperStructurePreview = ({
       }
       console.log('- Final isMethodology:', isMethodology);
       
-      // Calculate default percentage allocation
-      let defaultPercentage = 10;
-      if (isAdmin) {
-        defaultPercentage = 0; // Admin sections don't count toward percentage
-      } else if (isIntro) {
-        defaultPercentage = 15;
-      } else if (isSummary) {
-        defaultPercentage = 10;
-      } else {
-        // Distribute remaining percentage among content sections
-        const contentSections = data.structure.filter(s => 
-          !['Title Page', 'Abstract', 'References (APA 7th)'].includes(s) &&
-          !s.toLowerCase().includes('introduction') && 
-          !s.toLowerCase().includes('conclusion') &&
-          !s.toLowerCase().includes('summary')
-        ).length;
-        const remainingPercentage = 100 - 25; // 25% for intro/conclusion
-        defaultPercentage = Math.round(remainingPercentage / contentSections);
-      }
-
       return {
         id: `section-${index}`,
         title: section,
         context: '',
-        percentage: defaultPercentage,
-        pages: isAdmin ? 0 : Math.ceil((defaultPercentage / 100) * totalPages) || 1,
         isAdmin,
         isMethodology,
         isIntro,
@@ -171,12 +146,7 @@ const PaperStructurePreview = ({
   const updateSection = (sectionId, updates) => {
     const newStructure = editableStructure.map(section => {
       if (section.id === sectionId) {
-        const updatedSection = { ...section, ...updates };
-        // Recalculate pages when percentage changes
-        if (updates.percentage !== undefined) {
-          updatedSection.pages = updatedSection.isAdmin ? 0 : Math.ceil((updates.percentage / 100) * totalPages) || 1;
-        }
-        return updatedSection;
+        return { ...section, ...updates };
       }
       return section;
     });
@@ -192,8 +162,6 @@ const PaperStructurePreview = ({
       id: `section-${Date.now()}`,
       title: 'New Section',
       context: '',
-      percentage: 10,
-      pages: Math.ceil((10 / 100) * totalPages) || 1,
       isAdmin: false,
       isMethodology: false,
       isIntro: false,
@@ -240,11 +208,7 @@ const PaperStructurePreview = ({
     }
   };
 
-  const getTotalAllocatedPercentage = () => {
-    return editableStructure
-      .filter(section => !section.isAdmin)
-      .reduce((total, section) => total + section.percentage, 0);
-  };
+
 
   const getMethodologyDisplay = () => {
     if (!methodology) return 'Base structure';
@@ -307,6 +271,116 @@ const PaperStructurePreview = ({
     }
   };
 
+  const generateSections = async () => {
+    if (!paperType?.id || !methodology) {
+      setError('Paper type and methodology are required to generate sections.');
+      return;
+    }
+
+    setGeneratingSections(true);
+    setError(null);
+
+    try {
+      // Call the backend to generate sections and subsections
+      const response = await axios.post('http://localhost:8000/generate_sections_subsections', {
+        paper_type: paperType.id,
+        methodology: methodology,
+        structure: structureData?.structure || []
+      });
+
+      if (response.data && response.data.sections) {
+        // Convert the generated sections into the editable structure format
+        const generatedSections = response.data.sections.map((section, index) => {
+          const originalSection = editableStructure.find(s => s.title.toLowerCase() === section.title.toLowerCase());
+          
+          return {
+            ...originalSection, // Keep original properties like category, flags, etc.
+            id: originalSection?.id || `generated-section-${index}`,
+            title: section.title,
+            context: section.context || '',
+            subsections: section.subsections || [],
+            generated: true // Mark as generated
+          };
+        });
+
+        // Update the editable structure with generated content
+        setEditableStructure(prevStructure => {
+          return prevStructure.map(section => {
+            const generatedSection = generatedSections.find(gs => 
+              gs.title.toLowerCase() === section.title.toLowerCase()
+            );
+            
+            if (generatedSection) {
+              return {
+                ...section,
+                context: generatedSection.context,
+                subsections: generatedSection.subsections,
+                generated: true
+              };
+            }
+            
+            return section;
+          });
+        });
+
+        setSectionsGenerated(true);
+        console.log('Sections generated successfully:', generatedSections);
+      }
+    } catch (err) {
+      console.error('Error generating sections:', err);
+      setError(err.response?.data?.detail || 'Failed to generate sections. Please try again.');
+    } finally {
+      setGeneratingSections(false);
+    }
+  };
+
+  const updateSubsection = (sectionId, subsectionIndex, field, value) => {
+    setEditableStructure(prev => 
+      prev.map(section => {
+        if (section.id === sectionId) {
+          const updatedSubsections = [...(section.subsections || [])];
+          updatedSubsections[subsectionIndex] = {
+            ...updatedSubsections[subsectionIndex],
+            [field]: value
+          };
+          return { ...section, subsections: updatedSubsections };
+        }
+        return section;
+      })
+    );
+  };
+
+  const removeSubsection = (sectionId, subsectionIndex) => {
+    setEditableStructure(prev => 
+      prev.map(section => {
+        if (section.id === sectionId) {
+          const updatedSubsections = [...(section.subsections || [])];
+          updatedSubsections.splice(subsectionIndex, 1);
+          return { ...section, subsections: updatedSubsections };
+        }
+        return section;
+      })
+    );
+  };
+
+  const addSubsection = (sectionId) => {
+    setEditableStructure(prev => 
+      prev.map(section => {
+        if (section.id === sectionId) {
+          const newSubsection = {
+            subsection_title: 'New Subsection',
+            subsection_context: ''
+          };
+          return { 
+            ...section, 
+            subsections: [...(section.subsections || []), newSubsection] 
+          };
+        }
+        return section;
+      })
+    );
+  };
+
   if (loading) {
     return (
       <div className="alert alert-info">
@@ -327,9 +401,6 @@ const PaperStructurePreview = ({
     return null;
   }
 
-  const totalAllocated = getTotalAllocatedPercentage();
-  const percentageDifference = totalAllocated - 100;
-
   return (
     <div className="card mb-4">
       <div className="card-header d-flex justify-content-between align-items-center">
@@ -337,9 +408,6 @@ const PaperStructurePreview = ({
           <h5 className="mb-0">Paper Structure Preview</h5>
           <span className="badge bg-info ms-2">
             {editableStructure.length} sections
-          </span>
-          <span className={`badge ms-2 ${percentageDifference === 0 ? 'bg-success' : percentageDifference > 0 ? 'bg-warning' : 'bg-secondary'}`}>
-            {totalAllocated}% allocated
           </span>
         </div>
         <div className="d-flex gap-2">
@@ -399,19 +467,6 @@ const PaperStructurePreview = ({
             </div>
           </div>
 
-          {/* Percentage Allocation Warning */}
-          {percentageDifference !== 0 && (
-            <div className={`alert ${percentageDifference > 0 ? 'alert-warning' : 'alert-info'} mb-3`}>
-              <small>
-                <strong>Percentage Allocation:</strong> 
-                {percentageDifference > 0 
-                  ? ` You've allocated ${percentageDifference}% more than 100%.`
-                  : ` You have ${Math.abs(percentageDifference)}% remaining to allocate.`
-                }
-              </small>
-            </div>
-          )}
-
           {/* Editable Structure List */}
           <div className="mb-3">
             <h6 className="text-primary mb-2">
@@ -424,7 +479,8 @@ const PaperStructurePreview = ({
                 <div key={section.id} className="list-group-item">
                   {editingMode ? (
                     // Edit Mode for All Sections
-                    <div className="row align-items-center">
+                    <div>
+                      <div className="row align-items-center">
                       <div className="col-md-4">
                         <input
                           type="text"
@@ -434,25 +490,13 @@ const PaperStructurePreview = ({
                           placeholder="Section title"
                         />
                       </div>
-                      <div className="col-md-4">
+                      <div className="col-md-6">
                         <input
                           type="text"
                           className="form-control form-control-sm"
                           value={section.context}
                           onChange={(e) => updateSection(section.id, { context: e.target.value })}
                           placeholder="Context/focus (optional)"
-                        />
-                      </div>
-                      <div className="col-md-2">
-                        <input
-                          type="number"
-                          className="form-control form-control-sm"
-                          value={section.percentage}
-                          onChange={(e) => updateSection(section.id, { percentage: parseInt(e.target.value) || 0 })}
-                          min="0"
-                          max="100"
-                          disabled={section.isAdmin}
-                          placeholder={section.isAdmin ? "N/A" : "%"}
                         />
                       </div>
                       <div className="col-md-2">
@@ -484,6 +528,53 @@ const PaperStructurePreview = ({
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Subsections editing in edit mode */}
+                    {section.subsections && section.subsections.length > 0 && (
+                      <div className="mt-3 ps-4 border-start border-2 border-primary">
+                        <small className="text-primary fw-semibold d-block mb-2">Subsections:</small>
+                        {section.subsections.map((subsection, subIndex) => (
+                          <div key={subIndex} className="row mb-2 align-items-center">
+                            <div className="col-md-5">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                value={subsection.subsection_title}
+                                onChange={(e) => updateSubsection(section.id, subIndex, 'subsection_title', e.target.value)}
+                                placeholder="Subsection title"
+                              />
+                            </div>
+                            <div className="col-md-6">
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                value={subsection.subsection_context}
+                                onChange={(e) => updateSubsection(section.id, subIndex, 'subsection_context', e.target.value)}
+                                placeholder="Subsection description"
+                              />
+                            </div>
+                            <div className="col-md-1">
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => removeSubsection(section.id, subIndex)}
+                                title="Remove subsection"
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => addSubsection(section.id)}
+                          title="Add subsection"
+                        >
+                          <FaPlus className="me-1" />
+                          Add Subsection
+                        </button>
+                      </div>
+                    )}
+                    </div>
                   ) : (
                     // View Mode
                     <div className="d-flex justify-content-between align-items-center">
@@ -496,14 +587,23 @@ const PaperStructurePreview = ({
                               Focus: {section.context}
                             </div>
                           )}
+                          {section.subsections && section.subsections.length > 0 && (
+                            <div className="mt-2">
+                              <small className="text-primary fw-semibold">Subsections:</small>
+                              <ul className="list-unstyled ms-3 mb-0 small">
+                                {section.subsections.map((subsection, subIndex) => (
+                                  <li key={subIndex} className="mt-1">
+                                    <span className="fw-medium">{subsection.subsection_title}</span>
+                                    {subsection.subsection_context && (
+                                      <span className="text-muted"> - {subsection.subsection_context}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                         <div className="d-flex align-items-center gap-2 me-3">
-                          <span className="badge bg-light text-dark">
-                            {section.isAdmin ? 'Admin' : `${section.percentage}%`}
-                          </span>
-                          <span className="badge bg-light text-dark">
-                            {section.isAdmin ? 'N/A' : `${section.pages}p`}
-                          </span>
                           {section.isAdmin && (
                             <span className="badge bg-secondary" style={{ minWidth: '50px' }}>Admin</span>
                           )}
@@ -593,25 +693,37 @@ const PaperStructurePreview = ({
                   {editableStructure.filter(s => !s.isAdmin).length}
                 </small>
               </div>
-              <div className="col-md-3">
+              <div className="col-md-6">
                 <small className="text-muted">
                   <strong>Method Sections:</strong><br/>
                   {editableStructure.filter(s => s.isMethodology).length}
                 </small>
               </div>
-              <div className="col-md-3">
-                <small className="text-muted">
-                  <strong>Total Pages:</strong><br/>
-                  <span className={percentageDifference === 0 ? 'text-success' : 'text-warning'}>
-                    {editableStructure.filter(s => !s.isAdmin).reduce((total, s) => total + s.pages, 0)}/{totalPages}
-                  </span>
-                </small>
-              </div>
             </div>
           </div>
 
-          {/* Add the Generate Outline Framework button at the bottom */}
-          <div className="mt-4">
+          {/* Add the Generate Sections and Generate Outline Framework buttons at the bottom */}
+          <div className="mt-4 d-flex gap-3">
+            <button 
+              className="btn btn-outline-primary"
+              onClick={generateSections}
+              disabled={generatingSections || !paperType?.id || !methodology}
+            >
+              {generatingSections ? (
+                <>
+                  <FaSpinner className="fa-spin me-2" />
+                  Generating Sections...
+                </>
+              ) : sectionsGenerated ? (
+                <>
+                  <FaCheck className="me-2" />
+                  Sections Generated
+                </>
+              ) : (
+                'Generate Sections'
+              )}
+            </button>
+            
             <button 
               className="btn btn-primary"
               onClick={onGenerateOutline}

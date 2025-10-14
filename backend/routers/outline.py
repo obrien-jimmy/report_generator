@@ -473,3 +473,98 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating structured outline: {str(e)}")
+
+@router.post("/generate_sections_subsections")
+async def generate_sections_subsections(request: dict):
+    """
+    Generate sections and subsections for the paper structure preview.
+    Takes paper_type, methodology, and structure and returns detailed sections with subsections.
+    """
+    try:
+        paper_type = request.get('paper_type')
+        methodology = request.get('methodology')
+        structure = request.get('structure', [])
+        
+        if not paper_type or not methodology:
+            raise HTTPException(status_code=400, detail="Paper type and methodology are required")
+        
+        # Extract methodology information
+        methodology_description = ""
+        if isinstance(methodology, dict):
+            methodology_description = methodology.get('description', str(methodology))
+        else:
+            methodology_description = str(methodology)
+        
+        # Generate sections with context and subsections
+        generated_sections = []
+        
+        for section_title in structure:
+            # Skip administrative sections
+            if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)', 'references']:
+                continue
+                
+            # Generate context for this section
+            section_context_prompt = f"""
+            Generate a brief context description for the section "{section_title}" in a {paper_type} research paper.
+            
+            Paper Type: {paper_type}
+            Methodology: {methodology_description}
+            Section: {section_title}
+            
+            Provide a 1-2 sentence description of what this section should cover and how it relates to the overall paper structure.
+            Return only the context description, no additional formatting.
+            """
+            
+            section_context = invoke_bedrock(section_context_prompt).strip()
+            
+            # Generate subsections for content sections (skip intro/conclusion)
+            subsections = []
+            if section_title.lower() not in ['introduction', 'conclusion', 'abstract']:
+                subsection_prompt = f"""
+                Generate 3-4 subsection titles for the section "{section_title}" in a {paper_type} research paper.
+                
+                Paper Type: {paper_type}
+                Methodology: {methodology_description}
+                Section Title: {section_title}
+                Section Context: {section_context}
+                
+                Return as a JSON array of objects with "subsection_title" and "subsection_context":
+                [
+                  {{
+                    "subsection_title": "Subsection Title",
+                    "subsection_context": "Brief description of subsection focus"
+                  }}
+                ]
+                
+                Return only the JSON array.
+                """
+                
+                try:
+                    subsections_response = invoke_bedrock(subsection_prompt).strip()
+                    # Clean the response to ensure it's valid JSON
+                    subsections_response = subsections_response.replace('```json', '').replace('```', '').strip()
+                    subsections_data = json.loads(subsections_response)
+                    
+                    for sub_data in subsections_data:
+                        subsections.append({
+                            "subsection_title": sub_data.get("subsection_title", ""),
+                            "subsection_context": sub_data.get("subsection_context", "")
+                        })
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Error parsing subsections for {section_title}: {e}")
+                    # Fallback to basic subsections
+                    subsections = [
+                        {"subsection_title": f"{section_title} Overview", "subsection_context": "Overview and introduction"},
+                        {"subsection_title": f"{section_title} Analysis", "subsection_context": "Detailed analysis and discussion"}
+                    ]
+            
+            generated_sections.append({
+                "title": section_title,
+                "context": section_context,
+                "subsections": subsections
+            })
+        
+        return {"sections": generated_sections}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating sections and subsections: {str(e)}")
