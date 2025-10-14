@@ -63,3 +63,39 @@ class DataAnalysisResponse(BaseModel):
     generated_outline: GeneratedOutline = Field(..., description="AI-generated outline based on analysis")
     content_summary: str = Field(..., description="Summary of what was found in the data")
     analysis_confidence: str = Field(..., description="Confidence level in the analysis")
+
+# Build Data Outline Schemas
+class SectionPosition(BaseModel):
+    current: int = Field(..., description="Current section number")
+    total: int = Field(..., description="Total number of sections")
+
+class PreviousSection(BaseModel):
+    title: str = Field(..., description="Title of the previous section")
+    key_points: List[str] = Field(..., description="Key points from the previous section")
+
+class BuildDataOutlineRequest(BaseModel):
+    section_title: str = Field(..., description="Title of the section to build")
+    section_context: str = Field(..., description="Context/description of the section")
+    subsections: List[Dict[str, Any]] = Field(..., description="Subsections with questions and citations")
+    logic_framework: List[Dict[str, Any]] = Field(..., description="Logic analysis results from Step 2")
+    draft_outline_context: Optional[Dict[str, Any]] = Field(None, description="Context from Draft Outline 1")
+    thesis: str = Field(..., description="Main thesis statement")
+    methodology: str = Field(..., description="Research methodology")
+    paper_type: str = Field(..., description="Type of academic paper")
+    section_position: SectionPosition = Field(..., description="Position of this section in the paper")
+    previous_sections: List[PreviousSection] = Field(default_factory=list, description="Previous sections for context")
+
+class SubsectionOutline(BaseModel):
+    subsection_title: str = Field(..., description="Title of the subsection")
+    main_points: List[str] = Field(..., description="Main points to cover")
+    supporting_details: List[str] = Field(..., description="Supporting details and evidence")
+    transitions: List[str] = Field(..., description="Transition statements")
+    citations_used: List[int] = Field(..., description="Citation numbers referenced")
+
+class BuildDataOutlineResponse(BaseModel):
+    section_title: str = Field(..., description="Title of the section")
+    section_overview: str = Field(..., description="Overview of what this section will cover")
+    subsection_outlines: List[SubsectionOutline] = Field(..., description="Detailed outlines for each subsection")
+    logical_flow: str = Field(..., description="Description of the logical flow")
+    integration_notes: str = Field(..., description="How this integrates with Draft Outline 1 and other sections")
+    methodology_alignment: str = Field(..., description="How this section aligns with the research methodology")

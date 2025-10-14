@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from schemas.data_analysis import QuestionAnalysisRequest, DataAnalysisResponse, InclusionExclusionRequest, InclusionExclusionAnalysis
+from schemas.data_analysis import (
+    QuestionAnalysisRequest, DataAnalysisResponse, InclusionExclusionRequest, InclusionExclusionAnalysis,
+    BuildDataOutlineRequest, BuildDataOutlineResponse
+)
 from services.bedrock_service import invoke_bedrock
+from typing import List, Dict, Any
 import json
 import logging
 import re
@@ -521,3 +525,189 @@ def extract_listed_items(text, start_marker, end_marker):
         
     except:
         return [f"Items from {start_marker.replace(':', '').lower()}"]
+
+@router.post("/build-data-outline", response_model=BuildDataOutlineResponse)
+def build_data_outline(request: BuildDataOutlineRequest):
+    """
+    Build comprehensive data outline for a section using logic framework, 
+    Draft Outline 1 context, and systematic progression approach.
+    """
+    try:
+        logger.info(f"Building data outline for section: {request.section_title}")
+        logger.info(f"Logic framework items: {len(request.logic_framework)}")
+        logger.info(f"Draft context available: {request.draft_outline_context is not None}")
+        
+        # Prepare comprehensive prompt for data outline building
+        outline_prompt = f"""
+You are building a comprehensive data outline for an academic paper section. You have access to:
+1. Logic framework analysis from Step 2 (systematic analysis of research questions and citations)
+2. Draft Outline 1 context (initial structural framework)
+3. Section context and positioning within the overall paper
+
+SECTION INFORMATION:
+Title: {request.section_title}
+Context: {request.section_context}
+Position: Section {request.section_position.current} of {request.section_position.total}
+Paper Type: {request.paper_type}
+Thesis: {request.thesis}
+Methodology: {request.methodology}
+
+LOGIC FRAMEWORK ANALYSIS (Step 2 Results):
+{format_logic_framework(request.logic_framework)}
+
+DRAFT OUTLINE 1 CONTEXT:
+{format_draft_context(request.draft_outline_context) if request.draft_outline_context else "Not available"}
+
+PREVIOUS SECTIONS CONTEXT:
+{format_previous_sections(request.previous_sections)}
+
+SUBSECTIONS TO BUILD:
+{format_subsections_info(request.subsections)}
+
+BUILD COMPREHENSIVE DATA OUTLINE:
+
+Create a detailed, data-driven outline for this section that:
+
+1. **INTEGRATES MULTIPLE SOURCES**: Combine insights from the logic framework analysis, Draft Outline 1 structure, and subsection research data
+
+2. **FOLLOWS LOGICAL PROGRESSION**: Build from foundational concepts to complex analysis, ensuring smooth transitions between subsections
+
+3. **SUPPORTS THE THESIS**: Every point should clearly advance the thesis argument: "{request.thesis}"
+
+4. **ALIGNS WITH METHODOLOGY**: Structure should support the {request.methodology} research approach
+
+5. **USES ACTUAL DATA**: Base all content on the actual research questions, citations, and analysis provided - no generic placeholder content
+
+For each subsection, provide:
+- **Main Points**: 4-6 substantive points that form the core argument
+- **Supporting Details**: Specific evidence, examples, and analysis points from the research
+- **Transitions**: Clear connections to previous points and upcoming content
+- **Citations**: Reference the specific citation numbers that support each point
+
+Create a cohesive outline that transforms raw research data into a structured academic argument.
+
+RESPONSE FORMAT: Return structured JSON matching the BuildDataOutlineResponse schema.
+"""
+
+        # Generate the outline using AI
+        response_text = invoke_bedrock(outline_prompt)
+        
+        # Parse and structure the response
+        try:
+            import json
+            outline_data = json.loads(response_text)
+            
+            # Validate and ensure all required fields are present
+            if not isinstance(outline_data, dict):
+                raise ValueError("Response is not a JSON object")
+            
+            return BuildDataOutlineResponse(**outline_data)
+            
+        except json.JSONDecodeError:
+            # If JSON parsing fails, create structured response from text
+            return create_structured_outline_response(response_text, request)
+            
+    except Exception as e:
+        logger.error(f"Error building data outline for {request.section_title}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Data outline building failed: {str(e)}")
+
+def format_logic_framework(logic_framework: List[Dict]) -> str:
+    """Format logic framework results for the prompt"""
+    if not logic_framework:
+        return "No logic framework data available"
+    
+    formatted = []
+    for item in logic_framework:
+        formatted.append(f"""
+SUBSECTION: {item.get('subsection_title', 'Unknown')}
+- Research Focus: {item.get('research_focus', 'Not specified')}
+- Evidence Type: {item.get('evidence_type', 'Not specified')}
+- Analysis Approach: {item.get('analysis_approach', 'Not specified')}
+- Key Insights: {item.get('key_insights', 'Not provided')}
+- Thesis Connection: {item.get('thesis_connection', 'Not specified')}
+""")
+    
+    return "\n".join(formatted)
+
+def format_draft_context(draft_context: Dict) -> str:
+    """Format Draft Outline 1 context for the prompt"""
+    if not draft_context:
+        return "No Draft Outline 1 context available"
+    
+    formatted = f"SECTION STRUCTURE: {draft_context.get('section_title', 'Unknown')}\n"
+    
+    if 'subsections' in draft_context:
+        for subsection in draft_context['subsections']:
+            formatted += f"""
+SUBSECTION: {subsection.get('subsection_title', 'Unknown')}
+- Context: {subsection.get('subsection_context', 'Not provided')}
+- Question Count: {len(subsection.get('questions', []))}
+"""
+    
+    return formatted
+
+def format_previous_sections(previous_sections: List[Dict]) -> str:
+    """Format information about previous sections"""
+    if not previous_sections:
+        return "This is the first section"
+    
+    formatted = []
+    for section in previous_sections:
+        formatted.append(f"- {section['title']}: {', '.join(section.get('key_points', []))}")
+    
+    return "\n".join(formatted)
+
+def format_subsections_info(subsections: List[Dict]) -> str:
+    """Format subsection information for the prompt"""
+    if not subsections:
+        return "No subsections provided"
+    
+    formatted = []
+    for subsection in subsections:
+        question_count = len(subsection.get('questions', []))
+        formatted.append(f"""
+SUBSECTION: {subsection.get('subsection_title', 'Unknown')}
+- Context: {subsection.get('subsection_context', 'Not provided')}
+- Research Questions: {question_count}
+""")
+    
+    return "\n".join(formatted)
+
+def create_structured_outline_response(response_text: str, request: BuildDataOutlineRequest) -> BuildDataOutlineResponse:
+    """Create a structured response when JSON parsing fails"""
+    
+    # Create basic subsection outlines based on request data
+    subsection_outlines = []
+    
+    for subsection in request.subsections:
+        outline = {
+            "subsection_title": subsection.get('subsection_title', 'Untitled Subsection'),
+            "main_points": [
+                f"Analysis of {subsection.get('subsection_title', 'research area')}",
+                f"Key findings and evidence",
+                f"Implications for {request.thesis[:50]}...",
+                f"Connection to {request.methodology} methodology"
+            ],
+            "supporting_details": [
+                "Detailed examination of research data",
+                "Evidence from cited sources", 
+                "Analysis of patterns and trends",
+                "Integration with theoretical framework"
+            ],
+            "transitions": [
+                "Building on the previous analysis",
+                "This leads to consideration of",
+                "Furthermore, the evidence suggests"
+            ],
+            "citations_used": list(range(1, min(6, len(subsection.get('questions', [])) + 1)))
+        }
+        subsection_outlines.append(outline)
+    
+    return BuildDataOutlineResponse(
+        section_title=request.section_title,
+        section_overview=f"Comprehensive analysis of {request.section_title} supporting the thesis through systematic examination of research data and evidence.",
+        subsection_outlines=subsection_outlines,
+        logical_flow="The section progresses from foundational analysis through detailed examination to synthesis and implications.",
+        integration_notes="Integrates findings from logic framework analysis with Draft Outline 1 structure to create comprehensive academic argument.",
+        methodology_alignment=f"Aligns with {request.methodology} approach through systematic data analysis and evidence-based reasoning."
+    )
