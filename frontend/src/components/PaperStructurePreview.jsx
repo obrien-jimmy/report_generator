@@ -20,6 +20,10 @@ const PaperStructurePreview = ({
   const [refreshing, setRefreshing] = useState(false);
   const [generatingSections, setGeneratingSections] = useState(false);
   const [sectionsGenerated, setSectionsGenerated] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
 
 
 
@@ -42,6 +46,37 @@ const PaperStructurePreview = ({
       initializeEditableStructure(structureData);
     }
   }, [structureData]);
+
+  // Load saved structure on component mount
+  useEffect(() => {
+    if (!paperType?.id || !methodology) return;
+    
+    const saveKey = `paper_structure_${paperType.id}_${methodology}`;
+    try {
+      const saved = localStorage.getItem(saveKey);
+      if (saved) {
+        const savedData = JSON.parse(saved);
+        if (savedData.structure && savedData.structure.length > 0) {
+          setEditableStructure(savedData.structure);
+          setLastSaved(new Date(savedData.timestamp));
+          console.log('Loaded saved paper structure:', saveKey);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading saved structure:', err);
+    }
+  }, [paperType?.id, methodology]);
+
+  // Auto-save when structure changes (debounced)
+  useEffect(() => {
+    if (!autoSaveEnabled || editableStructure.length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      saveStructure(editableStructure, false);
+    }, 2000); // Auto-save after 2 seconds of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [editableStructure, autoSaveEnabled]);
 
   const fetchStructure = async () => {
     setError(null);
@@ -252,6 +287,72 @@ const PaperStructurePreview = ({
     return mainMethod;
   };
 
+  // Save/Load functionality
+  const getSaveKey = () => {
+    if (!paperType?.id || !methodology) return null;
+    return `paper_structure_${paperType.id}_${methodology}`;
+  };
+
+  const saveStructure = async (structure = editableStructure, manual = false) => {
+    const saveKey = getSaveKey();
+    if (!saveKey) return;
+
+    setSaving(true);
+    try {
+      const saveData = {
+        structure: structure,
+        paperType: paperType,
+        methodology: methodology,
+        timestamp: Date.now(),
+        version: '1.0'
+      };
+      
+      localStorage.setItem(saveKey, JSON.stringify(saveData));
+      setLastSaved(new Date());
+      
+      if (manual) {
+        // Show brief success indicator for manual saves
+        setTimeout(() => setSaving(false), 500);
+      } else {
+        // Show auto-save indicator briefly
+        setShowAutoSaveIndicator(true);
+        setTimeout(() => setShowAutoSaveIndicator(false), 2000);
+        setSaving(false);
+      }
+      
+      console.log('Paper structure saved:', saveKey);
+    } catch (err) {
+      console.error('Error saving structure:', err);
+      setSaving(false);
+    }
+  };
+
+  const loadStructure = () => {
+    const saveKey = getSaveKey();
+    if (!saveKey) return null;
+
+    try {
+      const saved = localStorage.getItem(saveKey);
+      if (saved) {
+        const saveData = JSON.parse(saved);
+        console.log('Loading saved structure:', saveKey);
+        return saveData;
+      }
+    } catch (err) {
+      console.error('Error loading structure:', err);
+    }
+    return null;
+  };
+
+  const deleteSavedStructure = () => {
+    const saveKey = getSaveKey();
+    if (saveKey) {
+      localStorage.removeItem(saveKey);
+      setLastSaved(null);
+      console.log('Saved structure deleted:', saveKey);
+    }
+  };
+
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const toggleEditingMode = () => setEditingMode(prev => !prev);
 
@@ -409,6 +510,16 @@ const PaperStructurePreview = ({
           <span className="badge bg-info ms-2">
             {editableStructure.length} sections
           </span>
+          {lastSaved && (
+            <span className="badge bg-success ms-2" title={`Last saved: ${lastSaved.toLocaleTimeString()}`}>
+              Saved
+            </span>
+          )}
+          {showAutoSaveIndicator && (
+            <span className="badge bg-info ms-2">
+              Auto-saved
+            </span>
+          )}
         </div>
         <div className="d-flex gap-2">
           <button
@@ -429,6 +540,14 @@ const PaperStructurePreview = ({
             title="Add new section"
           >
             <FaPlus />
+          </button>
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={() => saveStructure(editableStructure, true)}
+            title="Save structure manually"
+            disabled={saving}
+          >
+            {saving ? <FaSpinner className="fa-spin" /> : <FaSave />}
           </button>
           <button
             className="btn btn-sm btn-outline-secondary"
@@ -693,10 +812,36 @@ const PaperStructurePreview = ({
                   {editableStructure.filter(s => !s.isAdmin).length}
                 </small>
               </div>
-              <div className="col-md-6">
+              <div className="col-md-3">
                 <small className="text-muted">
                   <strong>Method Sections:</strong><br/>
                   {editableStructure.filter(s => s.isMethodology).length}
+                </small>
+              </div>
+              <div className="col-md-3">
+                <small className="text-muted">
+                  <strong>Auto-Save:</strong><br/>
+                  <label className="form-check-label d-flex align-items-center">
+                    <input
+                      type="checkbox"
+                      className="form-check-input me-1"
+                      checked={autoSaveEnabled}
+                      onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                    />
+                    {autoSaveEnabled ? 'On' : 'Off'}
+                  </label>
+                  {lastSaved && (
+                    <div className="mt-1">
+                      <button
+                        className="btn btn-xs btn-outline-danger"
+                        onClick={deleteSavedStructure}
+                        title="Clear saved data"
+                        style={{ fontSize: '10px', padding: '1px 4px' }}
+                      >
+                        Clear Saved
+                      </button>
+                    </div>
+                  )}
                 </small>
               </div>
             </div>

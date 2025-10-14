@@ -158,14 +158,19 @@ async def generate_subsections(request: SubsectionGenerationRequest):
         Methodology: {methodology_description}
         {source_categories_str}
         
-        Create subsections with titles and context descriptions that will help address the larger section's purpose.
-        Each subsection should connect to the methodology and support the thesis.
+        For each subsection, write a context statement that explains:
+        - How it supports its parent section
+        - Its connection to the thesis and methodology
+        
+        Each subsection context MUST include the exact phrase: "This supports the thesis by..."
+        
+        Be direct, academic, and explicitly linked to the thesis.
         
         Format as JSON array:
         [
           {{
             "subsection_title": "Subsection Title",
-            "subsection_context": "Brief description of what this subsection covers and how it supports the section and thesis"
+            "subsection_context": "1-2 sentences explaining how it supports its parent and thesis. Must include 'This supports the thesis by...'"
           }}
         ]
         
@@ -436,13 +441,18 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
                 
                 # Generate contextual description for content sections
                 context_prompt = f"""
-                Generate a brief context description for the section "{section_title}" in a {request.paper_type} paper.
+                Generate a context statement for the section "{section_title}" in a {request.paper_type} paper.
                 
                 Thesis: "{request.final_thesis}"
                 Methodology: {methodology_description}
                 
-                Provide a 1-2 sentence description of what this section should cover.
-                Return only the description, no additional text.
+                Write 1-3 sentences explaining:
+                - The section's purpose within the paper
+                - How it connects to the thesis and methodology
+                
+                The statement MUST include the exact phrase: "This supports the thesis by..."
+                
+                Be direct, academic, and explicitly link to the thesis. Return only the context statement.
                 """
                 
                 try:
@@ -452,7 +462,6 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
                     section_context = f"Analysis and discussion relevant to {section_title.lower()}"
                 
                 # Auto-categorize sections based on content
-                from ..services.paper_structure_service import PaperStructureService
                 section_category = PaperStructureService.categorize_section(section_title)
                 is_data_section = section_category == 'Data'
                 

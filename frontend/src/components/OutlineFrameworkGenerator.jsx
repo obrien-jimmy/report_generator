@@ -167,14 +167,15 @@ const OutlineGenerator = ({
           return section;
         });
 
-        console.log('OutlineGenerator: Subsections generated, now generating questions...');
+        console.log('OutlineGenerator: Subsections generated, now generating questions for Data sections...');
         setOutline(sections); // Update UI to show subsections
-        setGenerationProgress('Generating questions for subsections...');
+        setGenerationProgress('Generating questions for Data subsections...');
 
-        // Step 3: Generate questions for each subsection
+        // Step 3: Generate questions ONLY for Data sections and subsections
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
           const section = sections[sectionIndex];
-          if (section.is_administrative) continue;
+          // Skip administrative sections AND non-data sections
+          if (section.is_administrative || !section.is_data_section) continue;
 
           for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
             const subsection = section.subsections[subsectionIndex];
@@ -204,13 +205,14 @@ const OutlineGenerator = ({
           }
         }
 
-        console.log('OutlineGenerator: Questions generated, now generating citations...');
-        setGenerationProgress('Generating citations for questions...');
+        console.log('OutlineGenerator: Questions generated for Data sections, now generating citations...');
+        setGenerationProgress('Generating citations for Data section questions...');
 
-        // Step 4: Generate citations for each question
+        // Step 4: Generate citations ONLY for Data sections (where questions exist)
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
           const section = sections[sectionIndex];
-          if (section.is_administrative) continue;
+          // Skip administrative sections AND non-data sections
+          if (section.is_administrative || !section.is_data_section) continue;
 
           for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
             const subsection = section.subsections[subsectionIndex];
@@ -247,7 +249,7 @@ const OutlineGenerator = ({
         }
       }
 
-      console.log('OutlineGenerator: Complete detailed outline generated:', sections);
+      console.log('OutlineGenerator: Complete contextual outline generated with Data section questions/citations:', sections);
       setOutline(sections);
       setGenerationProgress('');
 
