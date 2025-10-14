@@ -982,23 +982,7 @@ const LiteratureReview = ({
               )}
             </button>
           )}
-          
-          {/* Skip to Step 3 button for testing - shows when in Step 2 */}
-          {(currentStep >= 1 && currentStep <= 2 && !questionAnsweringComplete) && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={skipToStep3}
-              title="Skip Step 2 and proceed directly to Step 3 (for testing)"
-              style={{
-                backgroundColor: '#0d6efd',
-                borderColor: '#0d6efd',
-                color: 'white'
-              }}
-            >
-              <FaFastForward className="me-1" />
-              Skip to Step 3 Now
-            </button>
-          )}
+
           
           {/* Step 2 Ready button - only when Step 2 is ready but no questions started yet */}
           {stepStatus[2] === 'ready' && getCompletedQuestions() === 0 && (
@@ -1034,6 +1018,24 @@ const LiteratureReview = ({
             >
               <FaPlay className="me-1" />
               Start Step 3
+            </button>
+          )}
+        </div>
+
+        {/* Test row - Skip to Step 3 button */}
+        <div className="d-flex gap-2 mt-2">
+          {(currentStep >= 1 && currentStep <= 2 && !questionAnsweringComplete) && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={skipToStep3}
+              title="Skip Step 2 and proceed directly to Step 3 (for testing)"
+              style={{
+                backgroundColor: '#0d6efd',
+                borderColor: '#0d6efd',
+                color: 'white'
+              }}
+            >
+              Test: Skip to Step 3 Now
             </button>
           )}
         </div>
@@ -1300,8 +1302,8 @@ const LiteratureReview = ({
           questions, 
           questionsKeys: questions ? Object.keys(questions) : 'no questions' 
         });
-        // Show contextual analysis results when Step 1 is complete but we're not actively in Step 2 interface
-        return contextAnalysisComplete && !showStep2Interface && questions && Object.keys(questions).length > 0;
+        // Show contextual analysis results only when context map is visible/selected
+        return contextAnalysisComplete && showContextMap && questions && Object.keys(questions).length > 0;
       })() && (
         <div className="card mb-4">
           <div className="card-header">
