@@ -37,6 +37,26 @@ class GeneratedOutline(BaseModel):
     logical_flow: str = Field(..., description="Description of the logical progression")
     evidence_integration: str = Field(..., description="How evidence was integrated")
 
+# Inclusion/Exclusion Analysis Schemas
+class InclusionExclusionRequest(BaseModel):
+    draftData: Dict[str, Any] = Field(..., description="Draft outline data to analyze")
+    thesis: str = Field(..., description="Main thesis statement")
+
+class ContentItem(BaseModel):
+    content: str = Field(..., description="Content description")
+    thesis_alignment: str = Field(..., description="How well this supports the thesis")
+    rationale: str = Field(..., description="Reasoning for inclusion/exclusion")
+    priority: str = Field(..., description="Priority level (high/medium/low)")
+
+class InclusionExclusionAnalysis(BaseModel):
+    section_purpose: str = Field(..., description="Overall purpose of this section")
+    inclusion_criteria: List[str] = Field(..., description="Criteria for content inclusion")
+    exclusion_criteria: List[str] = Field(..., description="Criteria for content exclusion")
+    content_to_include: List[ContentItem] = Field(..., description="Content that should be included")
+    content_to_exclude: List[ContentItem] = Field(..., description="Content that should be excluded")
+    content_priorities: List[ContentItem] = Field(..., description="Prioritized content recommendations")
+    narrative_flow: str = Field(..., description="How this fits into overall narrative")
+
 class DataAnalysisResponse(BaseModel):
     thematic_clusters: List[ThematicCluster] = Field(..., description="Identified themes from the data")
     logical_structure: LogicalStructure = Field(..., description="Recommended structure")

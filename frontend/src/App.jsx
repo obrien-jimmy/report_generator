@@ -174,8 +174,19 @@ function App() {
   };
 
   const handleOutlineDraft2Complete = (draft2Data) => {
+    console.log('App.jsx: OutlineDraft2 data received:', draft2Data);
     setDraft2Data(draft2Data);
-    triggerAutoSave();
+    triggerAutoSave(true); // Immediate save for step completion
+  };
+
+  // Auto-save function for OutlineDraft2 step updates
+  const handleOutlineDraft2Update = (stepData) => {
+    console.log('App.jsx: OutlineDraft2 step update:', stepData);
+    setDraft2Data(prevData => ({
+      ...prevData,
+      ...stepData
+    }));
+    triggerAutoSave(); // Debounced save for frequent updates
   };
 
   const handleAutoSaveDraft = (draft) => {
@@ -461,9 +472,14 @@ function App() {
                 methodology={methodology}
                 selectedPaperType={selectedPaperType}
                 draftData={draftData}
+                draft2Data={draft2Data}
                 onOutlineDraft2Complete={handleOutlineDraft2Complete}
-                // TODO: Add preIdentifiedDataSections from outline framework
-                // preIdentifiedDataSections={outlineData?.dataSections}
+                onOutlineDraft2Update={handleOutlineDraft2Update}
+                preIdentifiedDataSections={outlineData?.filter(section => 
+                  section.is_data_section === true || 
+                  section.section_type === 'data' ||
+                  section.category === 'data_section'
+                )}
               />
             </div>
           )}

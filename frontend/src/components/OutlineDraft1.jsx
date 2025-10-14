@@ -102,7 +102,15 @@ const OutlineDraft1 = ({
         number: toRomanNumeral(sectionIndex + 1),
         title: section.section_title,
         content: section.section_context,
-        children: []
+        children: [],
+        // Preserve data section metadata from outline framework
+        section_title: section.section_title,
+        section_context: section.section_context,
+        is_data_section: section.is_data_section || false,
+        section_type: section.section_type || 'content',
+        category: section.category || 'content_section',
+        is_administrative: section.is_administrative || false,
+        subsections: section.subsections || []
       };
       
       if (section.subsections) {

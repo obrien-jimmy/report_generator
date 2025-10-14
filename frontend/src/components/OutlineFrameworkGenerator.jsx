@@ -88,7 +88,10 @@ const OutlineGenerator = ({
         customStructure.filter(s => !s.isAdmin).map(s => ({
           section_title: s.title,
           section_context: s.context || `Analysis and discussion of ${s.title}`,
-          pages_allocated: s.pages
+          pages_allocated: s.pages,
+          is_data_section: s.isData,
+          section_type: s.isData ? 'data' : (s.isMethodology ? 'methodology' : (s.isAnalysis ? 'analysis' : 'content')),
+          category: s.isData ? 'data_section' : 'content_section'
         })) : null;
 
       // Step 1: Generate initial outline structure
@@ -110,7 +113,11 @@ const OutlineGenerator = ({
         section_context: section.section_context,
         subsections: [],
         is_administrative: section.is_administrative || false,
-        pages_allocated: section.pages_allocated || 2
+        pages_allocated: section.pages_allocated || 2,
+        // Preserve data section metadata from backend
+        is_data_section: section.is_data_section || false,
+        section_type: section.section_type || 'content',
+        category: section.category || 'content_section'
       }));
 
       console.log('OutlineGenerator: Initial structure generated:', sections);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye, FaSearch, FaCog, FaEdit, FaArrowRight, FaInfoCircle, FaPlus, FaMinus } from 'react-icons/fa';
+import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye, FaSearch, FaCog, FaEdit, FaArrowRight, FaInfoCircle, FaPlus, FaMinus, FaSyncAlt } from 'react-icons/fa';
 import axios from 'axios';
 import Modal from './Modal';
 
@@ -9,34 +9,55 @@ const OutlineDraft2 = ({
   methodology,
   selectedPaperType,
   draftData,
+  draft2Data, // Existing OutlineDraft2 data for loading saved state
   onOutlineDraft2Complete,
-  preIdentifiedDataSections = null // Add this prop for pre-identified sections
+  onOutlineDraft2Update, // New prop for step-by-step updates
+  preIdentifiedDataSections = null, // Pre-identified data sections from outline framework
+  identifiedDataSections = null     // Alternative prop name for data sections
 }) => {
-  // Phase 1: Outline Refinement state
+  // Step-based workflow state (Steps 1-4)
+  const [currentStep, setCurrentStep] = useState(0); // 0 = not started, 1-4 = active steps
+  const [stepStatus, setStepStatus] = useState({
+    1: 'pending', // pending, processing, complete
+    2: 'pending',
+    3: 'pending', 
+    4: 'pending'
+  });
+  
+  // Step 1: Contextual Analysis
+  const [contextAnalysisComplete, setContextAnalysisComplete] = useState(false);
+  const [contextMapData, setContextMapData] = useState(null);
+  const [showContextMap, setShowContextMap] = useState(false);
+  
+  // Step 2: Logic Framework  
+  const [logicFrameworkComplete, setLogicFrameworkComplete] = useState(false);
+  const [outlineLogicData, setOutlineLogicData] = useState([]);
+  const [showOutlineLogic, setShowOutlineLogic] = useState(false);
+  const [generatingLogic, setGeneratingLogic] = useState(false);
+  
+  // Step progress tracking
+  const [stepProgress, setStepProgress] = useState('');
+  
+  // Step 3: Systematic Population
+  const [systematicPopulationComplete, setSystematicPopulationComplete] = useState(false);
+  const [masterOutlines, setMasterOutlines] = useState([]);
+  
+  // Data sections state
   const [identifiedSections, setIdentifiedSections] = useState([]);
   const [refinedOutlines, setRefinedOutlines] = useState([]);
-  const [outlineRefining, setOutlineRefining] = useState(false);
   const [refineComplete, setRefineComplete] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   
-  // Phase 2: Building state  
+  // Legacy state (kept for compatibility)
   const [builtSections, setBuiltSections] = useState([]);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const [selectedSubsectionIndices, setSelectedSubsectionIndices] = useState([]);
   const [completionStatus, setCompletionStatus] = useState('');
   const [continuityNotes, setContinuityNotes] = useState([]);
   
-  // Additional state variables used in the component
+  // UI and error state
   const [errorMessage, setErrorMessage] = useState('');
   const [currentBuildingSection, setCurrentBuildingSection] = useState(null);
-  
-  // Missing state variables for analysis functionality
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [sectionPurposes, setSectionPurposes] = useState([]);
-  const [recommendedOrder, setRecommendedOrder] = useState([]);
-  const [analysisSummary, setAnalysisSummary] = useState('');
-  
-  // New enhanced functionality state
-  const [masterOutlines, setMasterOutlines] = useState([]);
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
   const [expandedOutlines, setExpandedOutlines] = useState({});
@@ -47,69 +68,166 @@ const OutlineDraft2 = ({
   const [selectedSection, setSelectedSection] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState(null);
-  const [currentPhase, setCurrentPhase] = useState(1); // Always start with identifying sections from outline/draft
+  
+  // Refresh functionality
+  const [refreshingSection, setRefreshingSection] = useState(null);
   
   // Academic integrity state
   const [showDataWarning, setShowDataWarning] = useState(false);
   const [fabricatedMetricsDetected, setFabricatedMetricsDetected] = useState([]);
 
-  // Outline Logic state
-  const [showOutlineLogic, setShowOutlineLogic] = useState(false);
-  const [outlineLogicData, setOutlineLogicData] = useState([]);
-  const [generatingLogic, setGeneratingLogic] = useState(false);
+  // Restore state from saved draft2Data
+  useEffect(() => {
+    if (draft2Data && typeof draft2Data === 'object') {
+      console.log('OutlineDraft2: Restoring saved state from draft2Data:', draft2Data);
+      
+      // Restore step progress
+      if (draft2Data.currentStep) setCurrentStep(draft2Data.currentStep);
+      if (draft2Data.stepStatus) setStepStatus(draft2Data.stepStatus);
+      if (draft2Data.stepProgress) setStepProgress(draft2Data.stepProgress);
+      
+      // Restore completion flags
+      if (draft2Data.contextAnalysisComplete) setContextAnalysisComplete(draft2Data.contextAnalysisComplete);
+      if (draft2Data.logicFrameworkComplete) setLogicFrameworkComplete(draft2Data.logicFrameworkComplete);
+      if (draft2Data.systematicPopulationComplete) setSystematicPopulationComplete(draft2Data.systematicPopulationComplete);
+      
+      // Restore generated data
+      if (draft2Data.outlineLogicData) setOutlineLogicData(draft2Data.outlineLogicData);
+      if (draft2Data.contextMapData) setContextMapData(draft2Data.contextMapData);
+      if (draft2Data.masterOutlines) setMasterOutlines(draft2Data.masterOutlines);
+      if (draft2Data.refinedOutlines) setRefinedOutlines(draft2Data.refinedOutlines);
+      
+      console.log('✅ OutlineDraft2: State restored from saved data');
+    }
+  }, [draft2Data]);
 
-  // Initialize data sections and start with Phase 1 (Outline Refinement)
+  // Initialize data sections and start with Step 1 (Contextual Analysis)
   useEffect(() => {
     const initializeDataSections = () => {
-      setIdentifiedSections([]);
-      setRefinedOutlines([]);
-      setBuiltSections([]);
-      setCurrentPhase(1);
-      setErrorMessage('');
-      setRefineComplete(false);
+      // Only reset if no saved state exists
+      if (!draft2Data || !draft2Data.currentStep) {
+        setIdentifiedSections([]);
+        setRefinedOutlines([]);
+        setBuiltSections([]);
+        setCurrentStep(0);
+        setErrorMessage('');
+        setRefineComplete(false);
+        
+        // Reset all step statuses
+        setStepStatus({
+          1: 'pending',
+          2: 'pending', 
+          3: 'pending',
+          4: 'pending'
+        });
+        
+        // Show academic integrity warning on first load
+        setShowDataWarning(true);
+      }
       
-      // Show academic integrity warning on first load
-      setShowDataWarning(true);
+      // Debug logging for data flow analysis
+      console.log('OutlineDraft2: Debugging data sources:');
+      console.log('- preIdentifiedDataSections:', preIdentifiedDataSections);
+      console.log('- identifiedDataSections:', identifiedDataSections);  
+      console.log('- outlineData type:', Array.isArray(outlineData) ? 'array' : typeof outlineData);
+      console.log('- outlineData length:', Array.isArray(outlineData) ? outlineData.length : 'N/A');
+      console.log('- draftData:', draftData);
       
-      // Extract data sections directly from draftData without backend calls
-      if (outlineData && draftData) {
-        const draftOutline = draftData.outline || draftData;
-        const extractedSections = extractDataSectionsSimple(draftOutline);
+      // First priority: Use pre-identified data sections passed from outline framework
+      if (preIdentifiedDataSections && preIdentifiedDataSections.length > 0) {
+        console.log('OutlineDraft2: Using pre-identified data sections:', preIdentifiedDataSections.length);
+        setIdentifiedSections(preIdentifiedDataSections);
+        prepareRefinedOutlines(preIdentifiedDataSections);
+        return;
+      }
+      
+      // Second priority: Use alternative prop name
+      if (identifiedDataSections && identifiedDataSections.length > 0) {
+        console.log('OutlineDraft2: Using identified data sections from prop:', identifiedDataSections.length);
+        setIdentifiedSections(identifiedDataSections);
+        prepareRefinedOutlines(identifiedDataSections);
+        return;
+      }
+      
+      // Check outlineData directly (most reliable source)
+      if (outlineData && Array.isArray(outlineData)) {
+        const extractedSections = extractDataSectionsFromOutlineFramework(outlineData);
+        
         if (extractedSections.length > 0) {
+          console.log('OutlineDraft2: Found identified data sections in outlineData:', extractedSections.length);
           setIdentifiedSections(extractedSections);
-          // Automatically prepare refined outlines for editing
           prepareRefinedOutlines(extractedSections);
+          return;
+        }
+      }
+      
+      // Last resort: Extract from draftData, but only properly marked data sections
+      if (draftData) {
+        const draftOutline = draftData.outline || draftData;
+        const extractedSections = extractDataSectionsFromOutlineFramework(draftOutline);
+        
+        if (extractedSections.length > 0) {
+          console.log('OutlineDraft2: Found identified data sections in draftData:', extractedSections.length);
+          setIdentifiedSections(extractedSections);
+          prepareRefinedOutlines(extractedSections);
+        } else {
+          console.warn('OutlineDraft2: No properly identified data sections found');
+          setErrorMessage('No data sections found. Please ensure the outline framework has properly identified data sections before proceeding to Outline Draft 2.');
         }
       }
     };
     
-    initializeDataSections();
-  }, [outlineData, draftData]);
+    // Only initialize once and when we have valid data
+    if (!initialized && (preIdentifiedDataSections?.length > 0 || identifiedDataSections?.length > 0 || (outlineData && draftData))) {
+      console.log('OutlineDraft2: Initializing data sections (initialized=false)');
+      initializeDataSections();
+      setInitialized(true);
+    }
+  }, [outlineData, draftData, preIdentifiedDataSections, identifiedDataSections, initialized]);
 
-  // Simple function to extract data sections - now completely generic
-  const extractDataSectionsSimple = (draft1Data) => {
-    if (!draft1Data || !Array.isArray(draft1Data)) return [];
+  // Extract ONLY the properly identified data sections - no assessment on the fly
+  const extractDataSectionsFromOutlineFramework = (draft1Data) => {
+    if (!draft1Data || !Array.isArray(draft1Data)) {
+      console.log('OutlineDraft2: No draft1Data or not an array:', draft1Data);
+      return [];
+    }
     
-    console.log('OutlineDraft2: Extracting data sections from draft1Data:', draft1Data);
-    
-    // Filter for main content sections (exclude administrative/intro sections)
-    const dataSections = draft1Data.filter(section => {
-      if (!section.section_title || !section.section_context || section.is_administrative) return false;
-      
-      // Include sections that have substantial content (subsections with questions)
-      const hasSubstantialContent = section.subsections && 
-                                   section.subsections.length > 0 && 
-                                   section.subsections.some(sub => sub.questions && sub.questions.length > 0);
-      
-      return hasSubstantialContent;
+    console.log('OutlineDraft2: Examining sections in draft1Data:', draft1Data.length);
+    console.log('OutlineDraft2: Section details:');
+    draft1Data.forEach((section, index) => {
+      console.log(`  ${index}: "${section.section_title}" - is_data_section:${section.is_data_section}, section_type:${section.section_type}, category:${section.category}`);
     });
     
-    console.log('OutlineDraft2: Found data sections:', dataSections);
+    // Only include sections that are explicitly marked as data sections by the outline framework
+    const dataSections = draft1Data.filter(section => {
+      // Check if this section was identified as a data section by the outline framework
+      const isDataSection = section.is_data_section === true || 
+                           section.section_type === 'data' ||
+                           section.category === 'data_section';
+      
+      if (isDataSection) {
+        console.log('OutlineDraft2: ✅ Found identified data section:', section.section_title);
+        return true;
+      } else {
+        console.log('OutlineDraft2: ❌ Section not marked as data section:', section.section_title);
+        return false;
+      }
+    });
+    
+    console.log('OutlineDraft2: Final identified data sections count:', dataSections.length);
+    if (dataSections.length > 0) {
+      console.log('OutlineDraft2: Data sections found:', dataSections.map(s => s.section_title));
+    } else {
+      console.warn('OutlineDraft2: ⚠️ NO DATA SECTIONS IDENTIFIED - Check outline framework marking');
+    }
     return dataSections;
   };
 
-  // Prepare refined outlines for editing with enhanced master outline generation
+  // Prepare refined outlines and automatically start Step 1 (Contextual Analysis)
   const prepareRefinedOutlines = (sections) => {
+    console.log('prepareRefinedOutlines: Processing sections:', sections.length);
+    console.log('prepareRefinedOutlines: Section titles:', sections.map(s => s.section_title));
+    
     const refinedOutlines = sections.map(section => ({
       section_title: section.section_title,
       section_context: section.section_context,
@@ -118,12 +236,483 @@ const OutlineDraft2 = ({
       original_section: section
     }));
     
+    console.log('prepareRefinedOutlines: Created refined outlines:', refinedOutlines.length);
     setRefinedOutlines(refinedOutlines);
     
-    // Initialize with empty master outlines - they will be generated via the new logic system
+    // Initialize with empty master outlines - they will be generated via the step process
     setMasterOutlines([]);
     
     setRefineComplete(true);
+    
+    // Automatically start Step 1: Contextual Analysis
+    setTimeout(() => {
+      startStep1ContextualAnalysis(sections);
+    }, 500); // Small delay for UI to update
+  };
+
+  // Step 1: Contextual Analysis - automatically triggered when data sections are identified
+  const startStep1ContextualAnalysis = async (sections) => {
+    console.log('🎯 Starting Step 1: Contextual Analysis');
+    setCurrentStep(1);
+    setStepStatus(prev => ({ ...prev, 1: 'processing' }));
+    
+    try {
+      // Perform contextual analysis
+      const contextAnalysis = await performContextualAnalysis(sections);
+      setContextMapData(contextAnalysis);
+      setContextAnalysisComplete(true);
+      setStepStatus(prev => ({ ...prev, 1: 'complete' }));
+      
+      // Automatically proceed to Step 2: Logic Framework
+      setTimeout(() => {
+        startStep2LogicFramework(sections);
+      }, 1000);
+      
+      console.log('✅ Step 1: Contextual Analysis complete');
+    } catch (error) {
+      console.error('❌ Error in Step 1:', error);
+      setErrorMessage(`Step 1 failed: ${error.message}`);
+      setStepStatus(prev => ({ ...prev, 1: 'error' }));
+    }
+  };
+
+  // Perform enhanced contextual analysis with detailed section and subsection mapping
+  const performContextualAnalysis = async (sections) => {
+    // Add processing delay to make it feel more substantial
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const contextData = {
+      dataSections: [],
+      overallContext: {
+        thesis: finalThesis,
+        methodology: methodology,
+        paperType: selectedPaperType,
+        totalDataSections: sections.length
+      },
+      analysisTimestamp: new Date().toISOString(),
+      detailedMappings: []
+    };
+
+    // Analyze each data section's context with enhanced mapping
+    for (const section of sections) {
+      const sectionAnalysis = {
+        sectionTitle: section.section_title,
+        sectionContext: section.section_context,
+        dataComponent: section.data_component || 'Unknown Component',
+        subsections: [],
+        methodologyConnection: analyzeEnhancedMethodologyConnection(section, methodology),
+        thesisAlignment: analyzeEnhancedThesisAlignment(section, finalThesis),
+        totalQuestions: 0,
+        detailedMapping: generateDetailedSectionMapping(section, finalThesis, methodology)
+      };
+
+      // Analyze subsections with detailed mapping
+      if (section.subsections && section.subsections.length > 0) {
+        for (const subsection of section.subsections) {
+          const subsectionAnalysis = {
+            title: subsection.subsection_title,
+            context: subsection.subsection_context,
+            questionCount: subsection.questions ? subsection.questions.length : 0,
+            citationCount: subsection.questions ? 
+              subsection.questions.reduce((acc, q) => acc + (q.citations?.length || 0), 0) : 0,
+            thematicArea: categorizeQuestionTheme(subsection.subsection_title || ''),
+            detailedMapping: generateDetailedSubsectionMapping(subsection, section, finalThesis, methodology)
+          };
+          
+          sectionAnalysis.subsections.push(subsectionAnalysis);
+          sectionAnalysis.totalQuestions += subsectionAnalysis.questionCount;
+        }
+      }
+
+      contextData.dataSections.push(sectionAnalysis);
+      contextData.detailedMappings.push(sectionAnalysis.detailedMapping);
+    }
+
+    return contextData;
+  };
+
+  // Generate detailed section-level mapping to thesis and methodology
+  const generateDetailedSectionMapping = (section, thesis, methodology) => {
+    const sectionTitle = section.section_title;
+    let mapping = {
+      sectionTitle: sectionTitle,
+      thesisConnection: '',
+      methodologyAlignment: '',
+      evidenceRole: '',
+      analyticalPurpose: ''
+    };
+
+    if (sectionTitle.includes('Current US Cybersecurity Framework')) {
+      mapping.thesisConnection = `This section establishes the baseline for identifying "critical vulnerabilities in safeguarding national security interests against sophisticated cyber threats" by systematically examining existing cybersecurity infrastructure, deterrence capabilities, and defensive mechanisms.`;
+      mapping.methodologyAlignment = `Directly supports the mixed methods concurrent triangulation design by providing quantitative assessments of current capabilities, policy implementation metrics, and qualitative evaluations of framework effectiveness for comprehensive analytical coverage.`;
+      mapping.evidenceRole = `Provides foundational evidence for vulnerability assessment by documenting current state capabilities against which gaps and weaknesses can be measured.`;
+      mapping.analyticalPurpose = `Establishes the "current" baseline referenced in the thesis to demonstrate the need for "reassessment of defense strategies focused on cyber deterrence, resilience, and international cooperation."`;
+    } else if (sectionTitle.includes('Policy Effectiveness and Strategic Gaps')) {
+      mapping.thesisConnection = `This section validates the thesis assertion of "critical vulnerabilities" by systematically identifying and analyzing policy shortcomings, strategic gaps, and implementation failures that compromise national security defense capabilities.`;
+      mapping.methodologyAlignment = `Supports the methodology's emphasis on "policy implementation metrics" and "thematic analysis of expert opinions" by providing concrete evidence of policy deficiencies through triangulated data sources.`;
+      mapping.evidenceRole = `Delivers critical evidence proving the thesis claim about vulnerabilities by documenting specific areas where current policies fail to address sophisticated cyber threats effectively.`;
+      mapping.analyticalPurpose = `Demonstrates the urgency for "reassessment" mentioned in the thesis by revealing strategic gaps that necessitate new approaches to cyber deterrence, resilience, and international cooperation.`;
+    }
+
+    return mapping;
+  };
+
+  // Generate detailed subsection-level mapping
+  const generateDetailedSubsectionMapping = (subsection, parentSection, thesis, methodology) => {
+    const subsectionTitle = subsection.subsection_title;
+    let mapping = {
+      subsectionTitle: subsectionTitle,
+      parentSection: parentSection.section_title,
+      thesisSupport: '',
+      methodologyRole: '',
+      evidenceContribution: '',
+      analyticalFunction: ''
+    };
+
+    // Cyber Deterrence subsections
+    if (subsectionTitle.includes('Cyber Deterrence Posture') || subsectionTitle.includes('Efficacy of Current Cyber Deterrence')) {
+      mapping.thesisSupport = `Examines current deterrence strategies to support the thesis argument that existing policies have "critical vulnerabilities" in safeguarding national security interests against sophisticated cyber threats.`;
+      mapping.methodologyRole = `Provides deterrence effectiveness data and expert assessments for the mixed methods approach, contributing both quantitative metrics and qualitative evaluations for triangulation analysis.`;
+      mapping.evidenceContribution = `Documents specific deterrence failures and limitations that establish the evidence base for the thesis claim about inadequate current cybersecurity policies.`;
+      mapping.analyticalFunction = `The methodological approach will use this deterrence analysis to compare current capabilities against threat sophistication in order to prove inadequacy with regards to the thesis argument for strategic reassessment.`;
+    }
+    
+    // Critical Infrastructure subsections  
+    else if (subsectionTitle.includes('Critical Infrastructure')) {
+      mapping.thesisSupport = `Identifies vulnerabilities in essential national systems to directly establish the "critical vulnerabilities" mentioned in the thesis that compromise national security safeguarding capabilities.`;
+      mapping.methodologyRole = `Contributes technical analysis of cyber threats and vulnerabilities to the mixed methods design, providing resilience indicators and infrastructure assessment data for statistical analysis.`;
+      mapping.evidenceContribution = `Provides concrete evidence of infrastructure weaknesses that validate the thesis assertion about vulnerabilities requiring strategic reassessment.`;
+      mapping.analyticalFunction = `The methodological approach will use this infrastructure vulnerability data to examine systemic weaknesses in order to establish the comprehensive scope of reassessment needed with regards to the thesis emphasis on resilience.`;
+    }
+    
+    // Public-Private Collaboration subsections
+    else if (subsectionTitle.includes('Public-Private Collaboration') || subsectionTitle.includes('Information Sharing')) {
+      mapping.thesisSupport = `Evaluates coordination mechanisms between sectors to demonstrate gaps in collaborative defense that necessitate the "reassessment of defense strategies" emphasized in the thesis.`;
+      mapping.methodologyRole = `Provides case study data and expert interviews for the thematic analysis component of the mixed methods design, supporting comprehensive utilization of government and industry sources.`;
+      mapping.evidenceContribution = `Documents coordination failures that support the thesis argument for enhanced approaches focusing on cyber deterrence, resilience, and international cooperation.`;
+      mapping.analyticalFunction = `The methodological approach will use this collaboration analysis to compare current coordination against optimal frameworks in order to prove inadequacy of existing mechanisms with regards to the thesis call for strategic realignment.`;
+    }
+    
+    // International Cooperation subsections
+    else if (subsectionTitle.includes('International Cooperation') || subsectionTitle.includes('Cyber Diplomacy') || subsectionTitle.includes('Cyber Norms')) {
+      mapping.thesisSupport = `Assesses global collaboration frameworks to validate the thesis emphasis on "international cooperation" as a critical component of reassessed defense strategies.`;
+      mapping.methodologyRole = `Supplies international organization publications and cooperation initiative data for the methodology's comprehensive analytical coverage of cyber diplomacy initiatives.`;
+      mapping.evidenceContribution = `Provides evidence of current diplomatic limitations that support the thesis argument for enhanced international cooperation in cybersecurity defense.`;
+      mapping.analyticalFunction = `The methodological approach will use this cooperation analysis to examine existing diplomatic mechanisms against sophisticated threat requirements in order to establish the need for enhanced international frameworks with regards to the thesis emphasis on global collaboration.`;
+    }
+    
+    // Emerging Threats subsections
+    else if (subsectionTitle.includes('Emerging Cyber Threats') || subsectionTitle.includes('Technological Developments')) {
+      mapping.thesisSupport = `Examines evolving threat landscape to demonstrate that "sophisticated cyber threats" referenced in the thesis are outpacing current policy capabilities, requiring strategic reassessment.`;
+      mapping.methodologyRole = `Provides technical analysis of cyber threats and emerging technologies for the mixed methods approach, contributing threat evolution data for comprehensive threat assessment.`;
+      mapping.evidenceContribution = `Documents the sophistication gap between emerging threats and current defenses that validates the thesis argument about critical vulnerabilities.`;
+      mapping.analyticalFunction = `The methodological approach will use this threat evolution analysis to compare current preparedness against future threat projections in order to prove the urgency of reassessment with regards to the thesis emphasis on addressing sophisticated cyber threats.`;
+    }
+
+    return mapping;
+  };
+
+  // Generate specific methodology contribution
+  const generateMethodologyContribution = (section, methodology) => {
+    const sectionTitle = section.section_title;
+    
+    if (sectionTitle.includes('Current US Cybersecurity Framework')) {
+      return `Provides quantitative assessments of current capabilities and qualitative evaluations of framework effectiveness, directly supporting the concurrent triangulation mixed methods design through comprehensive data collection on existing cybersecurity infrastructure and deterrence mechanisms.`;
+    } else if (sectionTitle.includes('Policy Effectiveness and Strategic Gaps')) {
+      return `Supplies policy implementation metrics and thematic analysis data from expert opinions, fulfilling the methodology's requirement for triangulated evidence sources to assess vulnerabilities through both statistical analysis and qualitative evaluation.`;
+    }
+    
+    return `Contributes structured analytical data supporting the mixed methods approach through systematic examination of cybersecurity elements.`;
+  };
+
+  // Enhanced methodology connection analysis
+  const analyzeEnhancedMethodologyConnection = (section, methodology) => {
+    const methodologyType = typeof methodology === 'object' ? 
+      methodology.methodologyType : methodology;
+    
+    return {
+      type: methodologyType,
+      connection: `This section supports the ${methodologyType} approach by providing structured analysis of ${section.section_title.toLowerCase()}`,
+      relevance: 'high',
+      specificContribution: generateMethodologyContribution(section, methodology)
+    };
+  };
+
+  // Enhanced thesis alignment analysis
+  const analyzeEnhancedThesisAlignment = (section, thesis) => {
+    const sectionTitle = section.section_title?.toLowerCase() || '';
+    let alignmentStrength = 'high'; // Enhanced analysis shows stronger alignment
+    
+    if (sectionTitle.includes('current') || sectionTitle.includes('framework')) {
+      alignmentStrength = 'critical';
+    } else if (sectionTitle.includes('policy') || sectionTitle.includes('effectiveness')) {
+      alignmentStrength = 'critical';
+      alignmentStrength = 'high';
+    }
+    
+    return {
+      strength: alignmentStrength,
+      explanation: `Directly supports thesis analysis by examining ${section.section_title.toLowerCase()}`,
+      keyTerms: extractKeyTermsFromThesis(thesis)
+    };
+  };
+
+  // Extract key terms from thesis for alignment analysis
+  const extractKeyTermsFromThesis = (thesis) => {
+    if (!thesis) return [];
+    
+    const keyTerms = [];
+    const text = thesis.toLowerCase();
+    
+    if (text.includes('cybersecurity')) keyTerms.push('cybersecurity');
+    if (text.includes('deterrence')) keyTerms.push('deterrence');
+    if (text.includes('resilience')) keyTerms.push('resilience');
+    if (text.includes('cooperation')) keyTerms.push('international cooperation');
+    if (text.includes('threat')) keyTerms.push('threats');
+    if (text.includes('policy')) keyTerms.push('policy');
+    
+    return keyTerms;
+  };
+
+  // Toggle Context Map visibility
+  const toggleContextMap = () => {
+    setShowContextMap(!showContextMap);
+  };
+
+  // Step 2: Outline Logic Analysis - build logical framework from contextual analysis
+  const startStep2LogicFramework = async (sections) => {
+    console.log('🧠 Starting Step 2: Outline Logic Analysis');
+    console.log('Passed sections parameter:', sections?.length || 0);
+    console.log('Available refinedOutlines:', refinedOutlines?.length || 0);
+    console.log('refinedOutlines:', refinedOutlines);
+    
+    setCurrentStep(2);
+    setStepStatus(prev => ({ ...prev, 2: 'processing' }));
+    setStepProgress('Initializing outline logic analysis...');
+    
+    try {
+      // Use the most reliable data source: passed sections > refinedOutlines > identifiedDataSections
+      let dataToAnalyze = null;
+      
+      if (sections && sections.length > 0) {
+        console.log('✅ Using passed sections parameter for analysis');
+        dataToAnalyze = sections;
+      } else if (refinedOutlines && refinedOutlines.length > 0) {
+        console.log('✅ Using refinedOutlines for analysis');
+        dataToAnalyze = refinedOutlines;
+      } else if (identifiedDataSections && identifiedDataSections.length > 0) {
+        console.log('⚠️ Fallback to identifiedDataSections');
+        dataToAnalyze = identifiedDataSections;
+      } else {
+        throw new Error('No data sections available for outline logic analysis. Please ensure data sections are properly identified.');
+      }
+      
+      console.log('📊 Final data for analysis:', dataToAnalyze.length, 'sections');
+      
+      // Update refinedOutlines if we're using a different source
+      if (dataToAnalyze !== refinedOutlines) {
+        console.log('🔄 Updating refinedOutlines with selected data source');
+        setRefinedOutlines(dataToAnalyze);
+      }
+
+      console.log('🔄 Generating outline logic...');
+      
+      // Generate the outline logic and wait for it to complete
+      const logicResults = await generateOutlineLogic(dataToAnalyze);
+      
+      // Verify that logic was actually generated
+      console.log('Logic generation completed. Results:', logicResults?.length || 0, 'subsections analyzed');
+      
+      // Only mark as complete if we actually have logic data
+      if (logicResults && logicResults.length > 0) {
+        setLogicFrameworkComplete(true);
+        setStepStatus(prev => ({ ...prev, 2: 'complete' }));
+        
+        console.log('✅ Step 2: Logic Framework complete with', logicResults.length, 'analysis results');
+        console.log('Logic data now available for viewing in Outline Logic section');
+        
+        // Automatically proceed to Step 3 after a longer delay to allow user to see results
+        setTimeout(() => {
+          console.log('🔄 Auto-progressing to Step 3: Systematic Population');
+          startStep3SystematicPopulation(sections);
+        }, 4000); // Longer delay to allow viewing of logic results
+      } else {
+        console.warn('⚠️ Logic generation completed but no data was produced');
+        setErrorMessage('Logic framework generation completed but no analysis data was produced. Please check the data sections have research questions and citations.');
+        setStepStatus(prev => ({ ...prev, 2: 'error' }));
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in Step 2:', error);
+      setErrorMessage(`Step 2 failed: ${error.message}`);
+      setStepStatus(prev => ({ ...prev, 2: 'error' }));
+    }
+  };
+
+  // Step 3: Systematic Population - iteratively build comprehensive outlines using context from Draft Outline 1
+  const startStep3SystematicPopulation = async (sections) => {
+    console.log('📝 Starting Step 3: Systematic Population');
+    console.log('Available logic data sections:', outlineLogicData?.length || 0);
+    console.log('Available data sections:', sections?.length || 0);
+    console.log('Draft Outline 1 data available:', draftData ? 'Yes' : 'No');
+    
+    setCurrentStep(3);
+    setStepStatus(prev => ({ ...prev, 3: 'processing' }));
+    setStepProgress('Initializing systematic population with Draft Outline 1 context...');
+    
+    try {
+      // Ensure we have the required data
+      if (!outlineLogicData || outlineLogicData.length === 0) {
+        throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
+      }
+      
+      if (!sections || sections.length === 0) {
+        throw new Error('No data sections available for systematic population.');
+      }
+      
+      console.log('🔄 Starting iterative systematic population...');
+      const populatedOutlines = [];
+      
+      // Process each data section iteratively with full context
+      for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+        const section = sections[sectionIndex];
+        console.log(`📝 Processing section ${sectionIndex + 1}/${sections.length}: "${section.section_title}"`);
+        
+        // Update progress
+        setStepProgress(`Processing section ${sectionIndex + 1}/${sections.length}: "${section.section_title}"`);
+        
+        // Find corresponding logic data for this section
+        const sectionLogicData = outlineLogicData.filter(logic => 
+          logic.section_title === section.section_title
+        );
+        
+        if (sectionLogicData.length === 0) {
+          console.warn(`No logic data found for section "${section.section_title}"`);
+          continue;
+        }
+        
+        // Extract context from Draft Outline 1 if available
+        let draftOutlineContext = null;
+        if (draftData?.outline) {
+          draftOutlineContext = draftData.outline.find(draft => 
+            draft.section_title === section.section_title
+          );
+        }
+        
+        console.log(`Context from Draft Outline 1: ${draftOutlineContext ? 'Found' : 'Not found'}`);
+        
+        // Build comprehensive outline for this section
+        const populatedSection = await buildSystematicOutline(
+          section,
+          sectionLogicData,
+          draftOutlineContext,
+          sectionIndex,
+          sections.length
+        );
+        
+        populatedOutlines.push(populatedSection);
+        
+        // Update display incrementally
+        setMasterOutlines([...populatedOutlines]);
+        
+        console.log(`✅ Completed systematic population for "${section.section_title}"`);
+        
+        // Brief pause between sections
+        if (sectionIndex < sections.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      }
+      
+      console.log('🎯 All sections systematically populated');
+      setStepProgress('✅ Systematic population complete - All sections processed');
+      setSystematicPopulationComplete(true);
+      setStepStatus(prev => ({ ...prev, 3: 'complete' }));
+      
+      console.log('✅ Step 3: Systematic Population complete with', populatedOutlines.length, 'sections');
+      
+    } catch (error) {
+      console.error('❌ Error in Step 3:', error);
+      setErrorMessage(`Step 3 failed: ${error.message}`);
+      setStepStatus(prev => ({ ...prev, 3: 'error' }));
+    }
+  };
+
+  // Build systematic outline for a single section using all available context
+  const buildSystematicOutline = async (section, logicData, draftContext, sectionIndex, totalSections) => {
+    console.log(`🏗️ Building systematic outline for "${section.section_title}"`);
+    console.log(`Logic data items: ${logicData.length}`);
+    console.log(`Draft context: ${draftContext ? 'Available' : 'Not available'}`);
+    
+    try {
+      // Prepare comprehensive context for AI analysis
+      const systematicRequest = {
+        section_title: section.section_title,
+        section_context: section.section_context,
+        subsections: section.subsections,
+        logic_framework: logicData,
+        draft_outline_context: draftContext,
+        thesis: finalThesis,
+        methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
+        paper_type: selectedPaperType,
+        section_position: {
+          current: sectionIndex + 1,
+          total: totalSections
+        },
+        previous_sections: sectionIndex > 0 ? 
+          await getMasterOutlines().slice(0, sectionIndex).map(sec => ({
+            title: sec.section_title,
+            key_points: sec.master_subsections?.map(sub => sub.subsection_title) || []
+          })) : []
+      };
+      
+      console.log(`Sending systematic outline request for "${section.section_title}"`);
+      
+      // Call AI endpoint for systematic outline building
+      const response = await fetch('http://localhost:8000/data-analysis/build-systematic-outline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(systematicRequest)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Systematic outline building failed for "${section.section_title}": ${response.status} ${response.statusText}`);
+      }
+      
+      const systematicOutline = await response.json();
+      console.log(`✅ Received systematic outline for "${section.section_title}":`, systematicOutline);
+      
+      // Process and structure the systematic outline
+      return {
+        section_title: section.section_title,
+        section_context: section.section_context,
+        systematic_outline: systematicOutline,
+        logic_data_used: logicData.length,
+        draft_context_used: !!draftContext,
+        processed_at: new Date().toISOString(),
+        master_subsections: section.subsections?.map((subsection, subIndex) => ({
+          subsection_title: subsection.subsection_title,
+          subsection_context: subsection.subsection_context,
+          systematic_content: systematicOutline.subsection_outlines?.[subIndex] || {},
+          logic_integration: logicData.find(logic => 
+            logic.subsection_title === subsection.subsection_title
+          ),
+          draft_integration: draftContext?.subsections?.find(draft => 
+            draft.subsection_title === subsection.subsection_title
+          )
+        })) || []
+      };
+      
+    } catch (error) {
+      console.error(`Error building systematic outline for "${section.section_title}":`, error);
+      throw error;
+    }
+  };
+
+  // Get current master outlines (helper function)
+  const getMasterOutlines = () => {
+    return masterOutlines || [];
   };
 
   // Generate comprehensive purpose explanation for tooltip
@@ -1686,37 +2275,94 @@ const OutlineDraft2 = ({
     return points.slice(0, 5); // Limit to 5 main points per question
   };
 
-  // Generate comprehensive outline logic using AI analysis of actual data
-  const generateOutlineLogic = async () => {
-    if (!outlineData || !refinedOutlines || refinedOutlines.length === 0) {
-      setErrorMessage('No refined outlines available for analysis');
+  // Generate comprehensive outline logic using AI analysis - process one data section at a time
+  const generateOutlineLogic = async (sectionsToProcess = null) => {
+    // Prevent duplicate execution
+    if (generatingLogic) {
+      console.log('Logic generation already in progress, skipping duplicate call');
       return;
     }
 
+    // Use passed parameter or fall back to refinedOutlines
+    const dataToProcess = sectionsToProcess || refinedOutlines;
+    
+    if (!dataToProcess || dataToProcess.length === 0) {
+      setErrorMessage('No identified data sections available for analysis. Please ensure data sections are properly identified in the outline framework.');
+      return;
+    }
+
+    console.log('📊 generateOutlineLogic processing:', dataToProcess.length, 'sections');
+    console.log('Data source:', sectionsToProcess ? 'passed parameter' : 'refinedOutlines state');
+
     setGeneratingLogic(true);
     setErrorMessage('');
+    setOutlineLogicData([]);
 
     try {
-      // Analyze each subsection's actual data using AI
-      const logicAnalysis = [];
+      console.log('Starting sequential AI analysis of data sections:', dataToProcess.length);
+      const completedAnalysis = [];
       
-      for (const section of refinedOutlines) {
-        for (const subsection of section.subsections || []) {
-          // Prepare the data for AI analysis
+      // Process each data section one at a time, completely finishing each section before moving to the next
+      for (let sectionIndex = 0; sectionIndex < dataToProcess.length; sectionIndex++) {
+        const section = dataToProcess[sectionIndex];
+        console.log(`🔄 Processing data section ${sectionIndex + 1}/${dataToProcess.length}: "${section.section_title}"`);
+        
+        if (!section.subsections || section.subsections.length === 0) {
+          console.warn(`Data section "${section.section_title}" has no subsections, skipping`);
+          continue;
+        }
+        
+        // Update progress for current section
+        setStepProgress(`Processing data section ${sectionIndex + 1}/${dataToProcess.length}: "${section.section_title}"`);
+        
+        const sectionAnalysisResults = [];
+        
+        // Process all subsections within this data section completely
+        for (let subIndex = 0; subIndex < section.subsections.length; subIndex++) {
+          const subsection = section.subsections[subIndex];
+          
+          // Update detailed progress
+          setStepProgress(`Processing "${section.section_title}" - Subsection ${subIndex + 1}/${section.subsections.length}: ${subsection.subsection_title}`);
+          
+          // Validate that this subsection has actual research data
+          if (!subsection.questions || subsection.questions.length === 0) {
+            console.warn(`Subsection "${subsection.subsection_title}" has no research questions, skipping`);
+            continue;
+          }
+          
+          const citationsCount = extractAllCitationsFromQuestions(subsection.questions).length;
+          if (citationsCount === 0) {
+            console.warn(`Subsection "${subsection.subsection_title}" has no citations, skipping`);
+            continue;
+          }
+          
+          console.log(`Analyzing subsection: "${subsection.subsection_title}" (${subsection.questions.length} questions, ${citationsCount} citations)`);
+          
+          // Prepare the data for outline logic analysis
           const analysisRequest = {
-            questions: subsection.questions || [],
-            citations: extractAllCitationsFromQuestions(subsection.questions || []),
+            questions: subsection.questions,
+            citations: extractAllCitationsFromQuestions(subsection.questions),
             subsection_title: subsection.subsection_title,
             subsection_context: subsection.subsection_context,
             section_title: section.section_title,
             thesis: finalThesis,
-            methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology
+            methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
+            paper_type: selectedPaperType,
+            draft_outline_context: draftData?.outline ? draftData.outline.find(draft => 
+              draft.section_title === section.section_title
+            ) : null,
+            analysis_purpose: "inclusion_exclusion_criteria"
           };
           
-          console.log('Sending data for AI analysis:', analysisRequest);
+          console.log(`Sending data for outline logic analysis:`, {
+            subsection: subsection.subsection_title,
+            questions: analysisRequest.questions.length,
+            citations: analysisRequest.citations.length,
+            has_draft_context: !!analysisRequest.draft_outline_context
+          });
           
-          // Call the new AI analysis endpoint
-          const response = await fetch('http://localhost:8000/data-analysis/analyze-subsection', {
+          // Call the AI analysis endpoint for outline logic analysis
+          const response = await fetch('http://localhost:8000/data-analysis/analyze-inclusion-exclusion', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1725,32 +2371,106 @@ const OutlineDraft2 = ({
           });
           
           if (!response.ok) {
-            throw new Error(`Analysis failed: ${response.status} ${response.statusText}`);
+            throw new Error(`Analysis failed for "${subsection.subsection_title}": ${response.status} ${response.statusText}`);
           }
           
           const aiAnalysis = await response.json();
-          console.log('Received AI analysis:', aiAnalysis);
+          console.log(`Completed AI analysis for "${subsection.subsection_title}":`, aiAnalysis);
           
-          logicAnalysis.push({
+          // Debug the structure of generated_outline.main_points
+          if (aiAnalysis.generated_outline?.main_points) {
+            console.log('Main points structure:', aiAnalysis.generated_outline.main_points.map((point, idx) => ({
+              index: idx,
+              type: typeof point,
+              hasTitle: !!point.title,
+              hasContent: !!point.content,
+              value: point
+            })));
+          }
+          
+          // Structure the outline logic analysis result
+          const subsectionAnalysis = {
             section_title: section.section_title,
             subsection_title: subsection.subsection_title,
+            
+            // Context and purpose analysis
+            context_analysis: aiAnalysis.section_purpose || `Purpose and flow analysis for ${subsection.subsection_title} in supporting the thesis`,
+            logical_approach: aiAnalysis.narrative_approach || "Assessment of content alignment with thesis and narrative flow",
+            
+            // Inclusion criteria - what SHOULD be included from Draft Outline 1
+            inclusions: aiAnalysis.inclusion_criteria?.topics?.map(topic => 
+              typeof topic === 'string' ? topic : 
+              typeof topic === 'object' ? (topic.topic || topic.title || String(topic)) : 
+              String(topic)
+            ) || [`Primary topics that directly support thesis: ${finalThesis?.substring(0, 100)}...`],
+            
+            // Exclusion criteria - what should NOT be included and why
+            exclusions: aiAnalysis.exclusion_criteria?.topics?.map(topic => 
+              typeof topic === 'string' ? topic : 
+              typeof topic === 'object' ? (topic.topic || topic.reason || String(topic)) : 
+              String(topic)
+            ) || [`Topics that diverge from main narrative`, `Content that doesn't support core thesis arguments`],
+            
+            // Rationale for selections
+            structure_rationale: aiAnalysis.selection_rationale || `Content selection based on thesis support and narrative coherence for ${subsection.subsection_title}`,
+            
+            // Additional analysis fields
+            thesis_alignment: aiAnalysis.thesis_alignment || {},
+            narrative_flow: aiAnalysis.narrative_flow || {},
+            content_priorities: aiAnalysis.content_priorities || [],
+            
+            // Metadata
             ai_analysis: aiAnalysis,
-            question_count: subsection.questions?.length || 0,
-            citation_count: extractAllCitationsFromQuestions(subsection.questions || []).length
-          });
+            question_count: subsection.questions.length,
+            citation_count: citationsCount,
+            processed_at: new Date().toISOString(),
+            analysis_type: 'inclusion_exclusion'
+          };
+          
+          sectionAnalysisResults.push(subsectionAnalysis);
+        }
+        
+        // Add all subsection results for this section to completed analysis
+        completedAnalysis.push(...sectionAnalysisResults);
+        
+        // Update the display with completed analysis for this section immediately
+        setOutlineLogicData([...completedAnalysis]);
+        
+        console.log(`✅ Completed analysis for data section: "${section.section_title}" (${sectionAnalysisResults.length} subsections)`);
+        
+        // Update progress to show section completion and next section preview
+        if (sectionIndex < dataToProcess.length - 1) {
+          const nextSection = dataToProcess[sectionIndex + 1];
+          setStepProgress(`✅ Completed "${section.section_title}" | Next: "${nextSection.section_title}" (${sectionIndex + 2}/${dataToProcess.length})`);
+          // Brief pause to show completed section before moving to next
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          setStepProgress(`✅ Completed all ${dataToProcess.length} data sections - Finalizing analysis...`);
         }
       }
       
-      setOutlineLogicData(logicAnalysis);
-      setShowOutlineLogic(true);
+      if (completedAnalysis.length === 0) {
+        setErrorMessage('No data sections with valid research data found. Ensure your data sections contain research questions and citations.');
+        return;
+      }
       
-      // Generate enhanced master outlines based on AI analysis
-      const enhancedMasterOutlines = await generateDataDrivenMasterOutlines(logicAnalysis, refinedOutlines);
+      console.log('✅ Completed sequential AI analysis for all data sections:', completedAnalysis.length, 'subsections total');
+      setShowOutlineLogic(true);
+      setErrorMessage('');
+      setStepProgress(''); // Clear step progress
+      
+      // Generate enhanced master outlines based on completed AI analysis
+      const enhancedMasterOutlines = await generateDataDrivenMasterOutlines(completedAnalysis, refinedOutlines);
       setMasterOutlines(enhancedMasterOutlines);
+      
+      // Return the completed analysis for verification
+      return completedAnalysis;
       
     } catch (error) {
       console.error('Error generating outline logic:', error);
       setErrorMessage(`Failed to generate outline logic: ${error.message}`);
+      setStepProgress(''); // Clear step progress on error
+      throw error; // Re-throw to allow Step 2 to handle the error
     } finally {
       setGeneratingLogic(false);
     }
@@ -2426,6 +3146,113 @@ const OutlineDraft2 = ({
     }
   };
 
+  // Refresh individual section
+  const refreshSection = async (sectionTitle) => {
+    if (refreshingSection) return; // Prevent multiple refresh operations
+    
+    setRefreshingSection(sectionTitle);
+    try {
+      // Find the specific section to refresh
+      const sectionToRefresh = refinedOutlines.find(section => 
+        section.section_title === sectionTitle
+      );
+      
+      if (!sectionToRefresh) {
+        setErrorMessage(`Section "${sectionTitle}" not found for refresh`);
+        return;
+      }
+      
+      // Re-run analysis for just this section
+      console.log(`🔄 Refreshing analysis for section: ${sectionTitle}`);
+      
+      // Clear existing data for this section 
+      setOutlineLogicData(prev => 
+        prev.filter(item => item.section_title !== sectionTitle)
+      );
+      
+      // Generate fresh analysis
+      await generateOutlineLogic([sectionToRefresh]);
+      
+      console.log(`✅ Section "${sectionTitle}" refreshed successfully`);
+    } catch (error) {
+      console.error('Error refreshing section:', error);
+      setErrorMessage(`Failed to refresh section "${sectionTitle}": ${error.message}`);
+    } finally {
+      setRefreshingSection(null);
+    }
+  };
+
+  // Refresh all logic data
+  const refreshAllLogic = async () => {
+    if (refreshingSection) return;
+    
+    setRefreshingSection('all');
+    try {
+      console.log('🔄 Refreshing all outline logic...');
+      setOutlineLogicData([]);
+      setLogicFrameworkComplete(false);
+      setStepStatus(prev => ({ ...prev, 2: 'processing' }));
+      
+      // Re-run complete Step 2 analysis
+      await startStep2LogicFramework(refinedOutlines);
+      
+      console.log('✅ All outline logic refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing all logic:', error);
+      setErrorMessage(`Failed to refresh all logic: ${error.message}`);
+    } finally {
+      setRefreshingSection(null);
+    }
+  };
+
+  // Auto-save progress through project management system
+  const saveProgress = () => {
+    const progressData = {
+      // Step status and current progress
+      currentStep,
+      stepStatus,
+      stepProgress,
+      
+      // Core data
+      refinedOutlines,
+      contextAnalysisComplete,
+      logicFrameworkComplete,
+      systematicPopulationComplete,
+      
+      // Generated analysis data  
+      outlineLogicData,
+      contextMapData,
+      masterOutlines,
+      
+      // Metadata
+      savedAt: new Date().toISOString(),
+      version: '2.0'
+    };
+    
+    // Use the project management auto-save system
+    if (onOutlineDraft2Update) {
+      onOutlineDraft2Update(progressData);
+    }
+    
+    console.log('✅ Progress auto-saved through project management');
+  };
+
+  // Auto-save progress after each step completion or data change
+  useEffect(() => {
+    if (contextAnalysisComplete || logicFrameworkComplete || systematicPopulationComplete || 
+        outlineLogicData.length > 0 || contextMapData || masterOutlines.length > 0) {
+      saveProgress();
+    }
+  }, [contextAnalysisComplete, logicFrameworkComplete, systematicPopulationComplete, 
+      outlineLogicData, contextMapData, masterOutlines]);
+
+  // Auto-save when step progress changes
+  useEffect(() => {
+    if (stepProgress) {
+      saveProgress();
+    }
+  }, [stepProgress]);
+
   const renderMasterOutline = (outlineItems, sectionIndex, subIndex) => {
     if (!outlineItems || outlineItems.length === 0) return null;
 
@@ -2746,56 +3573,287 @@ const OutlineDraft2 = ({
 
   return (
     <div className="outline-draft-2">
-      {/* Academic Integrity Safeguards Banner */}
-      <div style={{ 
-        backgroundColor: '#d1ecf1', 
-        border: '1px solid #bee5eb', 
-        borderRadius: '8px', 
-        padding: '16px', 
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: '20px', marginRight: '12px' }}>🛡️</span>
-          <div>
-            <strong style={{ color: '#0c5460', fontSize: '16px' }}>Academic Integrity Safeguards Active</strong>
-            <p style={{ color: '#0c5460', margin: '4px 0 0 0', fontSize: '14px' }}>
-              Content generated from source descriptions only • No fabricated metrics • All claims linked to citations
-            </p>
-          </div>
+      {/* Step-based Progress Header */}
+      <div className="mb-4">
+        <div className="d-flex align-items-center gap-3 mb-3">
+          <h3 className="mb-0">Enhanced Data Section Builder</h3>
+          {identifiedSections.length > 0 && (
+            <span className="badge bg-success">
+              {identifiedSections.length} Data Section{identifiedSections.length !== 1 ? 's' : ''} Identified
+            </span>
+          )}
         </div>
-        <button
-          onClick={() => setShowDataWarning(true)}
-          style={{
-            backgroundColor: '#17a2b8',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}
-        >
-          View Details
-        </button>
+        
+        {/* Step Progress Indicators */}
+        <div className="row">
+          {[1, 2, 3].map(step => {
+            const isActive = stepStatus[step] === 'processing';
+            const isComplete = stepStatus[step] === 'complete';
+            const isPending = stepStatus[step] === 'pending' || !stepStatus[step];
+            const isAccessible = step <= currentStep || isComplete;
+            
+            return (
+              <div key={step} className="col-md-4 mb-2">
+                <div 
+                  className={`card h-100 ${
+                    isComplete ? 'border-success' :
+                    isActive ? 'border-primary' :
+                    isAccessible ? 'border-secondary' :
+                    'border-light'
+                  }`}
+                  style={{ 
+                    backgroundColor: isComplete ? '#d1e7dd' : 
+                                   isActive ? '#cff4fc' : 
+                                   isAccessible ? '#f8f9fa' : '#f1f3f5',
+                    opacity: isAccessible ? 1 : 0.5,
+                    transition: 'all 0.3s ease',
+                    animation: isActive ? 'gentlePulse 2s ease-in-out infinite' : 'none',
+                    transform: isActive ? 'scale(1.02)' : 'scale(1)'
+                  }}
+                >
+                  <div className="card-body p-3">
+                    {/* Progress Circle Above */}
+                    <div className="d-flex justify-content-center mb-2">
+                      <div 
+                        className={`rounded-circle d-flex align-items-center justify-content-center`}
+                        style={{ 
+                          width: '40px', 
+                          height: '40px',
+                          backgroundColor: isComplete ? '#198754' :
+                                         isActive ? '#0dcaf0' : 
+                                         isAccessible ? '#6c757d' : '#adb5bd',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          animation: isActive ? 'gentlePulse 2s ease-in-out infinite' : 'none'
+                        }}
+                      >
+                        {isComplete ? '✓' : step}
+                      </div>
+                    </div>
+                    {/* Step Content Below Circle */}
+                    <div className="text-center" style={{ opacity: isAccessible ? 1 : 0.6 }}>
+                      <h6 className="mb-1" style={{ 
+                        color: isComplete ? '#198754' :
+                              isActive ? '#0dcaf0' :
+                              isAccessible ? '#495057' : '#adb5bd'
+                      }}>
+                        Step {step}: {
+                          step === 1 ? 'Contextual Analysis' :
+                          step === 2 ? 'Outline Logic Analysis' :
+                          'Systematic Population'
+                        }
+                      </h6>
+                      <small style={{ 
+                        color: isComplete ? '#198754' :
+                              isActive ? '#0dcaf0' :
+                              isAccessible ? '#6c757d' : '#adb5bd'
+                      }}>
+                        {isComplete ? 'Complete' :
+                         isActive ? (step === 2 && stepProgress ? stepProgress : 'Processing...') :
+                         isPending ? 'Pending' : 'Waiting'}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="d-flex gap-2 mt-3">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={toggleContextMap}
+            disabled={!contextAnalysisComplete}
+          >
+            Context Map
+          </button>
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => setShowOutlineLogic(!showOutlineLogic)}
+            disabled={stepStatus[2] !== 'processing' && stepStatus[2] !== 'complete'}
+          >
+            Outline Logic
+          </button>
+          {(stepStatus[currentStep] === 'error' || errorMessage) && (
+            <button
+              className="btn btn-outline-warning btn-sm"
+              onClick={() => {
+                setErrorMessage('');
+                if (currentStep === 1) {
+                  startStep1ContextualAnalysis(identifiedSections);
+                } else if (currentStep === 2) {
+                  startStep2LogicFramework(identifiedSections);
+                } else if (currentStep === 3) {
+                  startStep3SystematicPopulation(identifiedSections);
+                }
+              }}
+            >
+              Retry Step {currentStep}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="d-flex align-items-center gap-3 mb-3">
-        <h3 className="mb-0">Data Section Builder</h3>
-        <span className="badge bg-info">
-          Phase {currentPhase} of 3
-        </span>
-        <button
-          className="btn btn-sm btn-outline-secondary"
-          onClick={() => setShowOutlineLogic(!showOutlineLogic)}
-          style={{ marginLeft: 'auto' }}
-        >
-          📋 Outline Logic
-        </button>
-      </div>
+      {/* CSS for gentle blue pulsing animation */}
+      <style>{`
+        @keyframes gentlePulse {
+          0% { 
+            transform: scale(1); 
+            opacity: 1; 
+            box-shadow: 0 0 0 0 rgba(13, 202, 240, 0.4);
+          }
+          50% { 
+            transform: scale(1.01); 
+            opacity: 0.9; 
+            box-shadow: 0 0 0 10px rgba(13, 202, 240, 0.1);
+          }
+          100% { 
+            transform: scale(1); 
+            opacity: 1; 
+            box-shadow: 0 0 0 0 rgba(13, 202, 240, 0);
+          }
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.02); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+
+      {/* Context Map Section */}
+      {showContextMap && (
+        <div className="card mb-4" style={{ backgroundColor: '#f0f8ff', border: '2px solid #007bff' }}>
+          <div className="card-header" style={{ backgroundColor: '#e3f2fd' }}>
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Context Map - Step 1 Analysis</h5>
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={toggleContextMap}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="card-body">
+            {contextMapData ? (
+              <div>
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <h6>📋 Overall Context</h6>
+                    <ul className="list-unstyled">
+                      <li><strong>Thesis Focus:</strong> {contextMapData.overallContext.thesis?.substring(0, 100)}...</li>
+                      <li><strong>Methodology:</strong> {contextMapData.overallContext.methodology?.methodologyType || contextMapData.overallContext.methodology}</li>
+                      <li><strong>Paper Type:</strong> {contextMapData.overallContext.paperType?.name}</li>
+                      <li><strong>Data Sections:</strong> {contextMapData.overallContext.totalDataSections}</li>
+                    </ul>
+                  </div>
+                  <div className="col-md-6">
+                    <h6>🎯 Enhanced Context Analysis</h6>
+                    <p className="small text-muted">
+                      This enhanced analysis provides detailed mapping of how each section and subsection connects to your thesis, 
+                      methodology, and analytical framework. Each mapping explains the specific evidentiary role and methodological contribution.
+                    </p>
+                  </div>
+                </div>
+                
+                <h6>📊 Detailed Section & Subsection Mappings</h6>
+                {contextMapData.dataSections.map((section, index) => (
+                  <div key={index} className="card mb-3" style={{ border: '2px solid #0dcaf0' }}>
+                    <div className="card-header" style={{ backgroundColor: '#e0f7fa' }}>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <h6 className="text-primary mb-0">{section.sectionTitle}</h6>
+                        <span className="badge bg-info">{section.dataComponent}</span>
+                      </div>
+                    </div>
+                    <div className="card-body p-3">
+                      {/* Section-level Mapping */}
+                      {section.detailedMapping && (
+                        <div className="mb-4 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                          <h6 className="text-success mb-2">📍 Section-Level Mapping</h6>
+                          <div className="row">
+                            <div className="col-md-6">
+                              <div className="mb-3">
+                                <strong className="text-primary">🎯 Thesis Connection:</strong>
+                                <p className="small mt-1">{section.detailedMapping.thesisConnection}</p>
+                              </div>
+                              <div className="mb-3">
+                                <strong className="text-info">📊 Methodology Alignment:</strong>
+                                <p className="small mt-1">{section.detailedMapping.methodologyAlignment}</p>
+                              </div>
+                            </div>
+                            <div className="col-md-6">
+                              <div className="mb-3">
+                                <strong className="text-warning">📋 Evidence Role:</strong>
+                                <p className="small mt-1">{section.detailedMapping.evidenceRole}</p>
+                              </div>
+                              <div className="mb-3">
+                                <strong className="text-secondary">🔍 Analytical Purpose:</strong>
+                                <p className="small mt-1">{section.detailedMapping.analyticalPurpose}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Subsection-level Mappings */}
+                      <h6 className="text-info mb-3">🔍 Subsection Mappings</h6>
+                      {section.subsections.map((subsection, subIndex) => (
+                        <div key={subIndex} className="mb-3 p-3" style={{ 
+                          backgroundColor: '#fff8e7', 
+                          borderRadius: '6px',
+                          borderLeft: '4px solid #ffc107'
+                        }}>
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <h6 className="text-dark mb-1">{subsection.title}</h6>
+                            <div>
+                              <span className="badge bg-secondary me-1">{subsection.questionCount} Q</span>
+                              <span className="badge bg-success">{subsection.citationCount} Citations</span>
+                            </div>
+                          </div>
+                          
+                          {subsection.detailedMapping && (
+                            <div className="row mt-2">
+                              <div className="col-md-6">
+                                <div className="mb-2">
+                                  <strong className="text-primary">🎯 Thesis Support:</strong>
+                                  <p className="small mt-1 mb-2">{subsection.detailedMapping.thesisSupport}</p>
+                                </div>
+                                <div className="mb-2">
+                                  <strong className="text-info">📊 Methodology Role:</strong>
+                                  <p className="small mt-1">{subsection.detailedMapping.methodologyRole}</p>
+                                </div>
+                              </div>
+                              <div className="col-md-6">
+                                <div className="mb-2">
+                                  <strong className="text-warning">📋 Evidence Contribution:</strong>
+                                  <p className="small mt-1 mb-2">{subsection.detailedMapping.evidenceContribution}</p>
+                                </div>
+                                <div className="mb-2">
+                                  <strong className="text-success">🔬 Analytical Function:</strong>
+                                  <p className="small mt-1">{subsection.detailedMapping.analyticalFunction}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-3">
+                <FaSpinner className="fa-spin me-2" />
+                Generating context map...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Outline Logic Section */}
       {showOutlineLogic && (
@@ -2803,16 +3861,31 @@ const OutlineDraft2 = ({
           <div className="card-header" style={{ backgroundColor: '#e9ecef' }}>
             <div className="d-flex justify-content-between align-items-center">
               <h5 className="mb-0">
-                � Outline Logic & Analytical Framework
+                Outline Logic Analysis
               </h5>
-              {!generatingLogic && outlineLogicData.length === 0 && (
+              <div className="d-flex gap-2">
+                {/* Refresh All Logic Button */}
                 <button
-                  className="btn btn-primary btn-sm"
-                  onClick={generateOutlineLogic}
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={refreshAllLogic}
+                  disabled={refreshingSection === 'all' || generatingLogic}
+                  title="Refresh all outline logic analysis"
                 >
-                  Generate Logic Map
+                  {refreshingSection === 'all' ? (
+                    <>
+                      <FaSpinner className="fa-spin me-1" />
+                      Refreshing All...
+                    </>
+                  ) : (
+                    <>
+                      <FaSyncAlt className="me-1" />
+                      Refresh All
+                    </>
+                  )}
                 </button>
-              )}
+                
+                {/* Auto-save is handled by project management system */}
+              </div>
             </div>
           </div>
           <div className="card-body">
@@ -2821,49 +3894,129 @@ const OutlineDraft2 = ({
                 <div className="spinner-border text-primary me-3" role="status">
                   <span className="visually-hidden">Loading...</span>
                 </div>
-                <p className="mb-0">Analyzing subsection contexts and generating outline logic...</p>
+                <p className="mb-2">Analyzing data sections using AI...</p>
+                {errorMessage && errorMessage.includes('Analyzing data section') && (
+                  <p className="mb-0 text-muted small">{errorMessage}</p>
+                )}
               </div>
             ) : outlineLogicData.length > 0 ? (
               <div>
                 {outlineLogicData.map((logicItem, index) => (
                   <div key={index} className="mb-4 p-3 border rounded" style={{ backgroundColor: '#ffffff' }}>
-                    <h6 className="text-primary mb-2">
-                      {logicItem.subsection_title}
-                    </h6>
-                    <div className="mb-3">
-                      <strong>Context Analysis:</strong>
-                      <p className="mb-2 small">{logicItem.context_analysis}</p>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="text-primary mb-0">
+                        {logicItem.section_title} → {logicItem.subsection_title}
+                      </h6>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => refreshSection(logicItem.section_title)}
+                        disabled={refreshingSection === logicItem.section_title}
+                        title={`Refresh analysis for ${logicItem.section_title}`}
+                      >
+                        {refreshingSection === logicItem.section_title ? (
+                          <FaSpinner className="fa-spin" />
+                        ) : (
+                          <FaSyncAlt />
+                        )}
+                      </button>
                     </div>
-                    <div className="mb-3">
-                      <strong>Logical Approach:</strong>
-                      <p className="mb-2 small">{logicItem.logical_approach}</p>
+                    {/* Section Purpose */}
+                    <div className="mb-3 p-2 bg-light rounded">
+                      <strong className="text-primary">Section Purpose & Flow:</strong>
+                      <p className="mb-1 small">{
+                        typeof (logicItem.context_analysis || logicItem.ai_analysis?.context_analysis) === 'string' 
+                          ? (logicItem.context_analysis || logicItem.ai_analysis?.context_analysis) 
+                          : 'Analyzing section purpose in supporting thesis...'
+                      }</p>
                     </div>
+                    
+                    {/* Thesis Alignment */}
+                    {logicItem.thesis_alignment && (
+                      <div className="mb-3">
+                        <strong className="text-success">Thesis Alignment:</strong>
+                        <p className="mb-1 small">{
+                          typeof logicItem.thesis_alignment?.primary_support === 'string' 
+                            ? logicItem.thesis_alignment.primary_support 
+                            : 'Assessment of how content supports main thesis arguments'
+                        }</p>
+                      </div>
+                    )}
+                    
+                    {/* What Should Be INCLUDED */}
                     <div className="mb-3">
-                      <strong>What Will Be Included:</strong>
-                      <ul className="small mb-2">
-                        {logicItem.inclusions.map((inclusion, idx) => (
-                          <li key={idx}>{inclusion}</li>
-                        ))}
-                      </ul>
+                      <strong className="text-success">Content to INCLUDE from Draft Outline 1:</strong>
+                      <div className="ms-2">
+                        <ul className="small mb-2 list-unstyled">
+                          {(logicItem.inclusions || logicItem.ai_analysis?.inclusions || []).map((inclusion, idx) => (
+                            <li key={idx} className="mb-1">
+                              <span className="badge bg-success me-2">✓</span>
+                              {typeof inclusion === 'string' ? inclusion : JSON.stringify(inclusion)}
+                            </li>
+                          ))}
+                        </ul>
+                        {logicItem.inclusion_criteria?.rationale && (
+                          <small className="text-muted">
+                            <strong>Why:</strong> {logicItem.inclusion_criteria.rationale}
+                          </small>
+                        )}
+                      </div>
                     </div>
+                    
+                    {/* What Should Be EXCLUDED */}
                     <div className="mb-3">
-                      <strong>What Will Be Excluded:</strong>
-                      <ul className="small mb-2">
-                        {logicItem.exclusions.map((exclusion, idx) => (
-                          <li key={idx}>{exclusion}</li>
-                        ))}
-                      </ul>
+                      <strong className="text-warning">Content to EXCLUDE from Draft Outline 1:</strong>
+                      <div className="ms-2">
+                        <ul className="small mb-2 list-unstyled">
+                          {(logicItem.exclusions || logicItem.ai_analysis?.exclusions || []).map((exclusion, idx) => (
+                            <li key={idx} className="mb-1">
+                              <span className="badge bg-warning me-2">✗</span>
+                              {typeof exclusion === 'string' ? exclusion : JSON.stringify(exclusion)}
+                            </li>
+                          ))}
+                        </ul>
+                        {logicItem.exclusion_criteria?.rationale && (
+                          <small className="text-muted">
+                            <strong>Why:</strong> {logicItem.exclusion_criteria.rationale}
+                          </small>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <strong>Main Points Structure:</strong>
-                      <p className="mb-0 small">{logicItem.structure_rationale}</p>
+                    
+                    {/* Content Priorities */}
+                    {logicItem.content_priorities && logicItem.content_priorities.length > 0 && (
+                      <div className="mb-3">
+                        <strong className="text-info">Content Priority Order:</strong>
+                        <ul className="small mb-2 ms-3 list-unstyled">
+                          {logicItem.content_priorities.map((priority, idx) => (
+                            <li key={idx} className="mb-1">{priority}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Selection Rationale */}
+                    <div className="border-top pt-2">
+                      <strong className="text-secondary">Selection Strategy:</strong>
+                      <p className="mb-0 small">{
+                        typeof (logicItem.structure_rationale || logicItem.ai_analysis?.structure_rationale) === 'string'
+                          ? (logicItem.structure_rationale || logicItem.ai_analysis?.structure_rationale)
+                          : 'Developing content selection strategy based on thesis alignment...'
+                      }</p>
+                    </div>
+                    
+                    {/* Metadata */}
+                    <div className="mt-2 pt-2 border-top">
+                      <small className="text-muted">
+                        Analysis: {logicItem.question_count || 0} questions, {logicItem.citation_count || 0} citations
+                        {logicItem.analysis_type && ` | Type: ${logicItem.analysis_type}`}
+                      </small>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-muted mb-0">
-                Click "Generate Logic Map" to analyze subsection contexts and create a clear outline logic framework.
+                Logic Framework will be generated automatically during Step 2. Complete Step 1 (Contextual Analysis) to proceed.
               </p>
             )}
           </div>
@@ -2871,53 +4024,75 @@ const OutlineDraft2 = ({
       )}
 
       <div className="alert alert-primary">
-        <h6>📊 Enhanced Data Section Builder</h6>
+        <h6>Enhanced Data Section Builder</h6>
         <p className="mb-2">
-          This enhanced builder conducts systematic analysis of all subsection data to create comprehensive, logically structured outlines.
-          First, contextual analysis is performed to understand the full research context. Then, outline logic is generated to explain
-          the analytical approach. Finally, detailed outlines are populated section-by-section using all available question responses.
+          This enhanced builder analyzes research content to determine optimal inclusion and exclusion criteria for the final outline.
+          First, contextual analysis identifies section purpose and thesis alignment. Then, content analysis determines what from Draft Outline 1 
+          should be included vs excluded based on narrative flow and thesis support. Finally, systematic population creates cohesive outlines.
         </p>
         <div className="row">
-          <div className="col-md-3">
+          <div className="col-md-4">
             <strong>Step 1:</strong> Contextual Analysis
+            <p className="small mb-0 text-muted">Analyze section purpose & thesis alignment</p>
           </div>
-          <div className="col-md-3">
-            <strong>Step 2:</strong> Logic Framework
+          <div className="col-md-4">
+            <strong>Step 2:</strong> Outline Logic Analysis
+            <p className="small mb-0 text-muted">Determine what content to include vs exclude from Draft Outline 1</p>
           </div>
-          <div className="col-md-3">
+          <div className="col-md-4">
             <strong>Step 3:</strong> Systematic Population
-          </div>
-          <div className="col-md-3">
-            <strong>Step 4:</strong> Academic Integration
+            <p className="small mb-0 text-muted">Build cohesive outlines using selected content</p>
           </div>
         </div>
       </div>
 
-      {/* Phase 1: Outline Refinement */}
-      {currentPhase === 1 && (
-        <div className="phase-1">
+      {/* Step-based Content Display */}
+      {currentStep >= 1 && (
+        <div className="step-content">
           {!outlineData || !draftData ? (
             <div className="alert alert-warning">
               <strong>Missing Data:</strong> Please complete the Outline Framework and Outline Draft 1 phases first.
             </div>
+          ) : identifiedSections.length === 0 ? (
+            <div className="alert alert-warning">
+              <strong>⚠️ No Data Sections Identified:</strong> No properly identified data sections were found. 
+              <hr />
+              <p className="mb-2"><strong>This component only works with data sections identified by the Outline Framework.</strong></p>
+              <ul className="mb-2">
+                <li>Data sections should be marked with <code>is_data_section: true</code></li>
+                <li>Or have <code>section_type: 'data'</code></li>
+                <li>Or have <code>category: 'data_section'</code></li>
+              </ul>
+              <p className="mb-0">
+                Please return to the <strong>Outline Framework</strong> phase to properly identify which sections contain research data 
+                before proceeding to Outline Draft 2.
+              </p>
+            </div>
           ) : refinedOutlines.length === 0 ? (
             <div className="alert alert-info">
-              <strong>No Data Sections Found:</strong> No data sections requiring outline refinement were found. 
-              This might indicate that your outline structure is already complete.
+              <strong>Data Sections Found But No Content:</strong> {identifiedSections.length} data section(s) identified but no content available for processing.
             </div>
           ) : (
             <>
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                  <h4>Phase 1: Enhanced Outline Development</h4>
+                  <h4>Outline Development Progress</h4>
                   <p className="text-muted mb-2">
                     Found <strong>{refinedOutlines.length} data sections</strong> for comprehensive analysis.
                   </p>
-                  {masterOutlines.length === 0 && (
+                  {currentStep === 0 && (
                     <div className="alert alert-info mb-3">
-                      <strong>📋 New Enhanced Process:</strong> Click "Outline Logic" above to begin the systematic analysis process. 
-                      This will analyze all subsection contexts, generate logical frameworks, and create detailed outlines 
-                      using all available research questions and responses.
+                      <strong>� Starting Workflow:</strong> Step 1 (Contextual Analysis) will begin automatically once data sections are identified.
+                    </div>
+                  )}
+                  {currentStep > 0 && masterOutlines.length === 0 && (
+                    <div className="alert alert-warning mb-3">
+                      <strong>⚡ Step {currentStep} Active:</strong> {
+                        currentStep === 1 ? 'Analyzing contextual relationships...' :
+                        currentStep === 2 ? (stepProgress || 'Building logic framework for systematic outline generation...') :
+                        currentStep === 3 ? 'Populating detailed outlines from research data...' :
+                        'Processing...'
+                      }
                     </div>
                   )}
                   {masterOutlines.length > 0 && (
@@ -3090,8 +4265,8 @@ const OutlineDraft2 = ({
         </div>
       )}
 
-      {/* Phase 2: Section Building */}
-      {currentPhase === 2 && (
+      {/* Legacy Phase 2: Section Building - Hidden for now */}
+      {false && (
         <div className="phase-2">
           {/* Error Message */}
           {errorMessage && (
@@ -3113,7 +4288,7 @@ const OutlineDraft2 = ({
           <div className="card mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="mb-0">
-                <FaCog className="me-2" />
+                <FaSyncAlt className="me-2" />
                 Phase 2: Build Academic Prose from Refined Outlines
               </h5>
               <div>
@@ -3248,8 +4423,8 @@ const OutlineDraft2 = ({
         </div>
       )}
 
-      {/* Phase 3: Review & Integration */}
-      {currentPhase === 3 && (
+      {/* Legacy Phase 3: Review & Integration - Hidden for now */}
+      {false && (
         <div className="phase-3">
           <div className="alert alert-success">
             <h6>

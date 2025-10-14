@@ -1,19 +1,24 @@
 from fastapi import APIRouter, HTTPException
-from schemas.data_analysis import QuestionAnalysisRequest, DataAnalysisResponse
+from schemas.data_analysis import QuestionAnalysisRequest, DataAnalysisResponse, InclusionExclusionRequest, InclusionExclusionAnalysis
 from services.bedrock_service import invoke_bedrock
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/data-analysis", tags=["Data Analysis"])
 
 @router.post("/analyze-subsection", response_model=DataAnalysisResponse)
-async def analyze_subsection_data(request: QuestionAnalysisRequest):
+def analyze_subsection_data(request: QuestionAnalysisRequest):
     """
     Analyze research questions and citations to generate data-driven outline content.
     This is completely dynamic and works for any research topic.
     """
     try:
+        logger.info(f"Starting analysis for subsection: {request.subsection_title}")
+        logger.info(f"Number of questions: {len(request.questions)}")
+        logger.info(f"Number of citations: {len(request.citations)}")
+        
         # Prepare the analysis prompt - completely generic, no hardcoded content
         analysis_prompt = f"""
 You are analyzing research data for academic paper writing. Analyze the following research questions and citations to extract themes, patterns, and logical structures from the ACTUAL DATA provided.
@@ -58,16 +63,24 @@ IMPORTANT:
 Respond with a structured analysis that identifies what themes and patterns actually exist in this specific research data.
 """
 
+        logger.info("Calling Bedrock service...")
+        
         # Get AI analysis of the actual data
-        response = await invoke_bedrock(analysis_prompt)
+        response = invoke_bedrock(analysis_prompt)
+        
+        logger.info(f"Received response from Bedrock, length: {len(response) if response else 0}")
         
         # Parse the response into structured data
         analysis_data = parse_analysis_response(response, request)
         
+        logger.info("Successfully parsed response into analysis data")
         return analysis_data
         
     except Exception as e:
         logger.error(f"Error analyzing subsection data: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 def format_questions_and_citations(questions, citations):
@@ -142,6 +155,7 @@ def parse_unstructured_response(response_text, request):
 def extract_themes_from_ai_response(response_text, request):
     """Extract thematic clusters from AI response"""
     import re
+    from schemas.data_analysis import ThematicCluster
     
     themes = []
     
@@ -154,24 +168,24 @@ def extract_themes_from_ai_response(response_text, request):
             # Extract key concepts for this theme
             concepts = extract_key_concepts_from_section(response_text, theme_name)
             
-            themes.append({
-                "theme_name": theme_name.strip(),
-                "theme_description": f"Analysis of {theme_name.strip().lower()} based on research data",
-                "questions": [f"Q{j+1}" for j in range(min(3, len(request.questions)))],
-                "key_concepts": concepts,
-                "evidence_types": ["research_analysis", "citation_content"],
-                "temporal_scope": extract_temporal_scope_from_text(response_text)
-            })
+            themes.append(ThematicCluster(
+                theme_name=theme_name.strip(),
+                theme_description=f"Analysis of {theme_name.strip().lower()} based on research data",
+                questions=[f"Q{j+1}" for j in range(min(3, len(request.questions)))],
+                key_concepts=concepts,
+                evidence_types=["research_analysis", "citation_content"],
+                temporal_scope=extract_temporal_scope_from_text(response_text)
+            ))
     else:
         # Fallback: create themes based on subsection context
-        themes.append({
-            "theme_name": f"{request.subsection_title} Analysis",
-            "theme_description": f"Comprehensive analysis of {request.subsection_title.lower()}",
-            "questions": [f"Q{i+1}" for i in range(len(request.questions))],
-            "key_concepts": extract_key_concepts_from_text(response_text),
-            "evidence_types": ["citation_analysis"],
-            "temporal_scope": None
-        })
+        themes.append(ThematicCluster(
+            theme_name=f"{request.subsection_title} Analysis",
+            theme_description=f"Comprehensive analysis of {request.subsection_title.lower()}",
+            questions=[f"Q{i+1}" for i in range(len(request.questions))],
+            key_concepts=extract_key_concepts_from_text(response_text),
+            evidence_types=["citation_analysis"],
+            temporal_scope=None
+        ))
     
     return themes
 
@@ -219,21 +233,28 @@ def extract_temporal_scope_from_text(text):
     """Extract temporal scope from text"""
     import re
     
-    # Look for year ranges
-    year_ranges = re.findall(r'\b(19|20)\d{2}\s*[-–]\s*(19|20)\d{2}\b', text)
+    # Look for year ranges (like 2020-2023 or 2020–2023)
+    year_range_pattern = r'\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b'
+    year_ranges = re.findall(year_range_pattern, text)
     if year_ranges:
-        return f"{year_ranges[0][0]}{year_ranges[0][1][-2:]}-{year_ranges[0][2]}{year_ranges[0][3][-2:]}"
+        start_year, end_year = year_ranges[0]
+        return f"{start_year}-{end_year}"
     
     # Look for individual years
-    years = re.findall(r'\b(19|20)\d{2}\b', text)
+    years = re.findall(r'\b((?:19|20)\d{2})\b', text)
     if len(years) >= 2:
-        return f"{min(years)}-{max(years)}"
+        # Get unique years and sort them
+        unique_years = sorted(list(set(years)))
+        return f"{unique_years[0]}-{unique_years[-1]}"
+    elif len(years) == 1:
+        return years[0]
     
     return None
 
 def extract_logical_structure_from_ai_response(response_text):
     """Extract logical structure from AI response"""
     import re
+    from schemas.data_analysis import LogicalStructure
     
     # Look for structural recommendations in the AI response
     approach_match = re.search(r'(?i)approach:?\s*([^\n]+)', response_text)
@@ -246,16 +267,17 @@ def extract_logical_structure_from_ai_response(response_text):
     sequence_items = re.findall(r'(?i)(?:theme|point)\s*\d*:?\s*([^\n]+)', response_text)
     sequence = [item.strip() for item in sequence_items[:4]] if sequence_items else ["Primary Analysis", "Supporting Evidence", "Implications"]
     
-    return {
-        "approach": approach,
-        "reasoning": reasoning,
-        "sequence": sequence,
-        "transitions": ["Building from foundational analysis", "Progressing through evidence", "Synthesizing findings"]
-    }
+    return LogicalStructure(
+        approach=approach,
+        reasoning=reasoning,
+        sequence=sequence,
+        transitions=["Building from foundational analysis", "Progressing through evidence", "Synthesizing findings"]
+    )
 
 def extract_outline_from_ai_response(response_text, themes):
     """Extract outline structure from AI response"""
     import re
+    from schemas.data_analysis import GeneratedOutline, OutlinePoint
     
     main_points = []
     
@@ -274,28 +296,228 @@ def extract_outline_from_ai_response(response_text, themes):
                 
                 # Skip very short or generic content
                 if len(content.strip()) > 20 and not content.lower().startswith(('this ', 'the ', 'it ')):
-                    main_points.append({
-                        "level": str(len(main_points) + 1),
-                        "content": content.strip(),
-                        "supporting_evidence": [f"Evidence from research analysis {len(main_points) + 1}"],
-                        "citations": [i + 1 for i in range(min(3, len(themes)))],
-                        "rationale": f"Key finding from thematic analysis of research data"
-                    })
+                    main_points.append(OutlinePoint(
+                        level=str(len(main_points) + 1),
+                        content=content.strip(),
+                        supporting_evidence=[f"Evidence from research analysis {len(main_points) + 1}"],
+                        citations=[i + 1 for i in range(min(3, len(themes)))],
+                        rationale="Key finding from thematic analysis of research data"
+                    ))
     
     # Fallback if no clear outline found
     if not main_points:
         for i, theme in enumerate(themes[:3]):
-            main_points.append({
-                "level": str(i + 1),
-                "content": theme["theme_description"],
-                "supporting_evidence": theme["key_concepts"][:2],
-                "citations": [i + 1],
-                "rationale": f"Based on {theme['theme_name']} analysis"
-            })
+            main_points.append(OutlinePoint(
+                level=str(i + 1),
+                content=theme.theme_description,
+                supporting_evidence=theme.key_concepts[:2],
+                citations=[i + 1],
+                rationale=f"Based on {theme.theme_name} analysis"
+            ))
     
-    return {
-        "main_points": main_points,
-        "thematic_basis": f"Organization based on {len(themes)} identified themes from research data",
-        "logical_flow": "Systematic progression through research findings",
-        "evidence_integration": "All points derived from citation analysis and research content"
-    }
+    return GeneratedOutline(
+        main_points=main_points,
+        thematic_basis=f"Organization based on {len(themes)} identified themes from research data",
+        logical_flow="Systematic progression through research findings",
+        evidence_integration="All points derived from citation analysis and research content"
+    )
+
+@router.post("/analyze-inclusion-exclusion", response_model=InclusionExclusionAnalysis)
+def analyze_inclusion_exclusion_criteria(request: InclusionExclusionRequest):
+    """
+    Analyze research content to determine what should be included vs excluded in the final outline,
+    based on thesis support and narrative flow from Draft Outline 1.
+    """
+    try:
+        logger.info(f"Starting inclusion/exclusion analysis")
+        
+        # Extract draft content for analysis
+        draft_content = ""
+        if request.draftData and "outline" in request.draftData:
+            for section in request.draftData["outline"]:
+                draft_content += f"SECTION: {section.get('section_title', '')}\n"
+                draft_content += f"CONTEXT: {section.get('section_context', '')}\n"
+                for subsection in section.get('subsections', []):
+                    draft_content += f"  SUBSECTION: {subsection.get('subsection_title', '')}\n"
+                    draft_content += f"  CONTEXT: {subsection.get('subsection_context', '')}\n"
+                    for question in subsection.get('questions', []):
+                        draft_content += f"    QUESTION: {question.get('question', '')}\n"
+                draft_content += "\n"
+        
+        # Enhanced prompt for inclusion/exclusion analysis
+        analysis_prompt = f"""
+You are analyzing content from Draft Outline 1 to determine what should be INCLUDED vs EXCLUDED in the final research paper based on thesis alignment and narrative coherence.
+
+THESIS: {request.thesis}
+
+DRAFT OUTLINE 1 CONTENT:
+{draft_content}
+
+Your task is to provide a comprehensive inclusion/exclusion analysis with the following structure:
+
+1. Section Purpose & Flow:
+Explain the overall purpose of this section and how it fits into the thesis narrative. Identify what key arguments this section needs to establish.
+
+2. Thesis Alignment:
+Analyze how this section supports the main thesis.
+
+3. Content to INCLUDE from Draft Outline 1:
+For each subsection/topic that should be included, provide:
+- SPECIFIC CONTENT: Name the exact subsection, research question, or topic area
+- INCLUSION RATIONALE: Why this content strongly supports the thesis
+- NARRATIVE FIT: How it fits into the overall argument flow
+- SUPPORTING EVIDENCE: Which specific research questions/citations validate this content
+
+4. Content to EXCLUDE from Draft Outline 1:  
+For each subsection/topic that should be excluded, provide:
+- SPECIFIC CONTENT: Name the exact subsection, research question, or topic area being excluded
+- EXCLUSION RATIONALE: Detailed explanation of why this content should be omitted (e.g., "Technical implementation details of encryption protocols" should be excluded because "they focus on granular technical specifications rather than policy effectiveness analysis required by the thesis")
+
+5. Content Priority Order:
+Provide a single numbered list ranking ALL included content by importance to the thesis argument (1 = most critical, 2 = very important, etc.).
+
+6. Selection Strategy:
+Explain the overall strategy for content selection and how it maintains narrative coherence.
+
+Be specific about WHAT content to include/exclude with clear identification of subsection titles, research question topics, or content areas. Avoid vague references."""
+
+        # Call Bedrock for analysis
+        response_text = invoke_bedrock(analysis_prompt)
+        logger.info("Inclusion/exclusion analysis completed")
+        
+        # Parse the response into structured data
+        return parse_inclusion_exclusion_response(response_text)
+        
+    except Exception as e:
+        logger.error(f"Error in inclusion/exclusion analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+def parse_inclusion_exclusion_response(response_text):
+    """Parse the AI response for inclusion/exclusion analysis"""
+    try:
+        # Extract content to include
+        content_to_include = []
+        include_section = extract_section_between_markers(response_text, "Content to INCLUDE", "Content to EXCLUDE") or ""
+        include_items = include_section.split('\n')
+        for item in include_items:
+            if item.strip() and (item.startswith('✓') or item.startswith('-') or item.startswith('•')):
+                clean_item = item.strip().lstrip('✓-•').strip()
+                if clean_item:
+                    content_to_include.append({
+                        "content": clean_item,
+                        "thesis_alignment": "Strong support",
+                        "rationale": "Directly supports thesis argument",
+                        "priority": "high"
+                    })
+        
+        # Extract content to exclude
+        content_to_exclude = []
+        exclude_section = extract_section_between_markers(response_text, "Content to EXCLUDE", "Content Priority") or ""
+        exclude_items = exclude_section.split('\n')
+        for item in exclude_items:
+            if item.strip() and (item.startswith('✗') or item.startswith('-') or item.startswith('•')):
+                clean_item = item.strip().lstrip('✗-•').strip()
+                if clean_item:
+                    content_to_exclude.append({
+                        "content": clean_item,
+                        "thesis_alignment": "Weak or no support", 
+                        "rationale": "Does not directly support thesis",
+                        "priority": "low"
+                    })
+        
+        # Extract content priorities
+        content_priorities = []
+        priority_section = extract_section_between_markers(response_text, "Content Priority Order", "Selection Strategy") or ""
+        priority_items = priority_section.split('\n')
+        for item in priority_items:
+            if item.strip() and any(item.startswith(f"{i}.") for i in range(1, 10)):
+                clean_item = re.sub(r'^\d+\.\s*', '', item.strip())
+                if clean_item:
+                    content_priorities.append({
+                        "content": clean_item,
+                        "thesis_alignment": "High support",
+                        "rationale": "Critical to thesis argument",
+                        "priority": "critical"
+                    })
+        
+        return InclusionExclusionAnalysis(
+            section_purpose=extract_section_between_markers(response_text, "Section Purpose", "Thesis Alignment") or "Analysis of content alignment with thesis",
+            inclusion_criteria=["Direct thesis support", "Narrative coherence", "Strong evidence base"],
+            exclusion_criteria=["Tangential content", "Weak thesis connection", "Scope limitations"],
+            content_to_include=content_to_include,
+            content_to_exclude=content_to_exclude,
+            content_priorities=content_priorities,
+            narrative_flow=extract_section_between_markers(response_text, "Selection Strategy", None) or "Maintains logical progression and thesis focus"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error parsing inclusion/exclusion response: {str(e)}")
+        # Return fallback structure
+        return InclusionExclusionAnalysis(
+            section_purpose="Content analysis for thesis alignment",
+            inclusion_criteria=["Thesis support", "Evidence strength"],
+            exclusion_criteria=["Scope limitations", "Weak connections"],
+            content_to_include=[{
+                "content": "Primary thesis-supporting content",
+                "thesis_alignment": "Strong",
+                "rationale": "Direct support",
+                "priority": "high"
+            }],
+            content_to_exclude=[{
+                "content": "Tangential material",
+                "thesis_alignment": "Weak",
+                "rationale": "Limited relevance", 
+                "priority": "low"
+            }],
+            content_priorities=[{
+                "content": "Core arguments",
+                "thesis_alignment": "Critical",
+                "rationale": "Essential to thesis",
+                "priority": "critical"
+            }],
+            narrative_flow="Logical progression maintaining thesis focus"
+        )
+
+def extract_section_between_markers(text, start_marker, end_marker):
+    """Extract text between two markers"""
+    try:
+        start_idx = text.find(start_marker)
+        if start_idx == -1:
+            return None
+        start_idx += len(start_marker)
+        
+        if end_marker:
+            end_idx = text.find(end_marker, start_idx)
+            if end_idx == -1:
+                return text[start_idx:].strip()
+            return text[start_idx:end_idx].strip()
+        else:
+            return text[start_idx:].strip()
+    except:
+        return None
+
+def extract_listed_items(text, start_marker, end_marker):
+    """Extract list items between markers"""
+    try:
+        section_text = extract_section_between_markers(text, start_marker, end_marker)
+        if not section_text:
+            return []
+        
+        # Split by lines and extract items that look like list items
+        lines = section_text.split('\n')
+        items = []
+        for line in lines:
+            line = line.strip()
+            if line and (line.startswith('-') or line.startswith('•') or line.startswith('*') or 
+                        any(line.startswith(f"{i}.") for i in range(1, 10))):
+                # Clean up list markers
+                clean_item = line.lstrip('-•*').strip()
+                if clean_item and not clean_item.startswith(('1.', '2.', '3.', '4.', '5.')):
+                    clean_item = re.sub(r'^\d+\.\s*', '', clean_item)
+                if clean_item:
+                    items.append(clean_item)
+        
+        return items[:6] if items else [f"Analysis items from {start_marker.replace(':', '').lower()}"]
+        
+    except:
+        return [f"Items from {start_marker.replace(':', '').lower()}"]

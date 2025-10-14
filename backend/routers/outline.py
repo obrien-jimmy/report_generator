@@ -400,40 +400,72 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
         
         # Generate contextual sections
         outline_sections = []
-        for section_title in structure_sections:
-            # Skip administrative sections
-            if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)']:
+        
+        # Use custom structure if provided, otherwise use default structure
+        if request.custom_structure:
+            print(f"Using custom structure with {len(request.custom_structure)} sections")
+            for custom_section in request.custom_structure:
+                section_title = custom_section["section_title"]
+                section_context = custom_section.get("section_context", f"Analysis and discussion of {section_title}")
+                
                 outline_sections.append({
                     "section_title": section_title,
-                    "section_context": f"Standard {section_title.lower()} section",
+                    "section_context": section_context,
                     "subsections": [],
-                    "is_administrative": True
+                    "is_administrative": False,
+                    "pages_allocated": custom_section.get("pages_allocated", 2),
+                    # Preserve data section metadata from paper structure preview
+                    "is_data_section": custom_section.get("is_data_section", False),
+                    "section_type": custom_section.get("section_type", "content"),
+                    "category": custom_section.get("category", "content_section")
                 })
-                continue
-            
-            # Generate contextual description for content sections
-            context_prompt = f"""
-            Generate a brief context description for the section "{section_title}" in a {request.paper_type} paper.
-            
-            Thesis: "{request.final_thesis}"
-            Methodology: {methodology_description}
-            
-            Provide a 1-2 sentence description of what this section should cover.
-            Return only the description, no additional text.
-            """
-            
-            try:
-                context_response = invoke_bedrock(context_prompt)
-                section_context = context_response.strip()
-            except:
-                section_context = f"Analysis and discussion relevant to {section_title.lower()}"
-            
-            outline_sections.append({
-                "section_title": section_title,
-                "section_context": section_context,
-                "subsections": [],
-                "is_administrative": False
-            })
+        else:
+            # Default structure generation (for backward compatibility)
+            for section_title in structure_sections:
+                # Skip administrative sections
+                if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)']:
+                    outline_sections.append({
+                        "section_title": section_title,
+                        "section_context": f"Standard {section_title.lower()} section",
+                        "subsections": [],
+                        "is_administrative": True,
+                        "is_data_section": False,
+                        "section_type": "administrative",
+                        "category": "admin_section"
+                    })
+                    continue
+                
+                # Generate contextual description for content sections
+                context_prompt = f"""
+                Generate a brief context description for the section "{section_title}" in a {request.paper_type} paper.
+                
+                Thesis: "{request.final_thesis}"
+                Methodology: {methodology_description}
+                
+                Provide a 1-2 sentence description of what this section should cover.
+                Return only the description, no additional text.
+                """
+                
+                try:
+                    context_response = invoke_bedrock(context_prompt)
+                    section_context = context_response.strip()
+                except:
+                    section_context = f"Analysis and discussion relevant to {section_title.lower()}"
+                
+                # Auto-categorize sections based on content
+                from ..services.paper_structure_service import PaperStructureService
+                section_category = PaperStructureService.categorize_section(section_title)
+                is_data_section = section_category == 'Data'
+                
+                outline_sections.append({
+                    "section_title": section_title,
+                    "section_context": section_context,
+                    "subsections": [],
+                    "is_administrative": False,
+                    "is_data_section": is_data_section,
+                    "section_type": section_category.lower(),
+                    "category": "data_section" if is_data_section else "content_section"
+                })
         
         return StructuredOutlineResponse(
             outline=outline_sections,
