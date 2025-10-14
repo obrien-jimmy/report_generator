@@ -38,8 +38,8 @@ const OutlineDraft2 = ({
   // Step progress tracking
   const [stepProgress, setStepProgress] = useState('');
   
-  // Step 3: Systematic Population
-  const [systematicPopulationComplete, setSystematicPopulationComplete] = useState(false);
+  // Step 3: Detailed Outline Builder
+  const [detailedOutlineBuilderComplete, setDetailedOutlineBuilderComplete] = useState(false);
   const [masterOutlines, setMasterOutlines] = useState([]);
   
   // Data sections state
@@ -89,7 +89,7 @@ const OutlineDraft2 = ({
       // Restore completion flags
       if (draft2Data.contextAnalysisComplete) setContextAnalysisComplete(draft2Data.contextAnalysisComplete);
       if (draft2Data.logicFrameworkComplete) setLogicFrameworkComplete(draft2Data.logicFrameworkComplete);
-      if (draft2Data.systematicPopulationComplete) setSystematicPopulationComplete(draft2Data.systematicPopulationComplete);
+      if (draft2Data.detailedOutlineBuilderComplete) setDetailedOutlineBuilderComplete(draft2Data.detailedOutlineBuilderComplete);
       
       // Restore generated data
       if (draft2Data.outlineLogicData) setOutlineLogicData(draft2Data.outlineLogicData);
@@ -533,8 +533,8 @@ const OutlineDraft2 = ({
         
         // Automatically proceed to Step 3 after a longer delay to allow user to see results
         setTimeout(() => {
-          console.log('🔄 Auto-progressing to Step 3: Systematic Population');
-          startStep3SystematicPopulation(sections);
+          console.log('🔄 Auto-progressing to Step 3: Detailed Outline Builder');
+          startStep3DataOutlineBuilder(sections);
         }, 4000); // Longer delay to allow viewing of logic results
       } else {
         console.warn('⚠️ Logic generation completed but no data was produced');
@@ -549,16 +549,16 @@ const OutlineDraft2 = ({
     }
   };
 
-  // Step 3: Systematic Population - iteratively build comprehensive outlines using context from Draft Outline 1
-  const startStep3SystematicPopulation = async (sections) => {
-    console.log('📝 Starting Step 3: Systematic Population');
+  // Step 3: Detailed Outline Builder - iteratively build comprehensive outlines using context from Draft Outline 1
+  const startStep3DataOutlineBuilder = async (sections) => {
+    console.log('📝 Starting Step 3: Detailed Outline Builder');
     console.log('Available logic data sections:', outlineLogicData?.length || 0);
     console.log('Available data sections:', sections?.length || 0);
     console.log('Draft Outline 1 data available:', draftData ? 'Yes' : 'No');
     
     setCurrentStep(3);
     setStepStatus(prev => ({ ...prev, 3: 'processing' }));
-    setStepProgress('Initializing systematic population with Draft Outline 1 context...');
+    setStepProgress('Initializing data outline builder with Draft Outline 1 context...');
     
     try {
       // Ensure we have the required data
@@ -567,10 +567,10 @@ const OutlineDraft2 = ({
       }
       
       if (!sections || sections.length === 0) {
-        throw new Error('No data sections available for systematic population.');
+        throw new Error('No data sections available for data outline building.');
       }
       
-      console.log('🔄 Starting iterative systematic population...');
+      console.log('🔄 Starting iterative data outline building...');
       const populatedOutlines = [];
       
       // Process each data section iteratively with full context
@@ -602,7 +602,7 @@ const OutlineDraft2 = ({
         console.log(`Context from Draft Outline 1: ${draftOutlineContext ? 'Found' : 'Not found'}`);
         
         // Build comprehensive outline for this section
-        const populatedSection = await buildSystematicOutline(
+        const populatedSection = await buildDataOutline(
           section,
           sectionLogicData,
           draftOutlineContext,
@@ -615,7 +615,7 @@ const OutlineDraft2 = ({
         // Update display incrementally
         setMasterOutlines([...populatedOutlines]);
         
-        console.log(`✅ Completed systematic population for "${section.section_title}"`);
+        console.log(`✅ Completed data outline building for "${section.section_title}"`);
         
         // Brief pause between sections
         if (sectionIndex < sections.length - 1) {
@@ -623,12 +623,12 @@ const OutlineDraft2 = ({
         }
       }
       
-      console.log('🎯 All sections systematically populated');
-      setStepProgress('✅ Systematic population complete - All sections processed');
-      setSystematicPopulationComplete(true);
+      console.log('🎯 All sections data outline building complete');
+      setStepProgress('✅ Data outline builder complete - All sections processed');
+      setDetailedOutlineBuilderComplete(true);
       setStepStatus(prev => ({ ...prev, 3: 'complete' }));
       
-      console.log('✅ Step 3: Systematic Population complete with', populatedOutlines.length, 'sections');
+      console.log('✅ Step 3: Detailed Outline Builder complete with', populatedOutlines.length, 'sections');
       
     } catch (error) {
       console.error('❌ Error in Step 3:', error);
@@ -637,15 +637,15 @@ const OutlineDraft2 = ({
     }
   };
 
-  // Build systematic outline for a single section using all available context
-  const buildSystematicOutline = async (section, logicData, draftContext, sectionIndex, totalSections) => {
-    console.log(`🏗️ Building systematic outline for "${section.section_title}"`);
+  // Build data outline for a single section using all available context
+  const buildDataOutline = async (section, logicData, draftContext, sectionIndex, totalSections) => {
+    console.log(`🏗️ Building data outline for "${section.section_title}"`);
     console.log(`Logic data items: ${logicData.length}`);
     console.log(`Draft context: ${draftContext ? 'Available' : 'Not available'}`);
     
     try {
       // Prepare comprehensive context for AI analysis
-      const systematicRequest = {
+      const dataRequest = {
         section_title: section.section_title,
         section_context: section.section_context,
         subsections: section.subsections,
@@ -665,36 +665,36 @@ const OutlineDraft2 = ({
           })) : []
       };
       
-      console.log(`Sending systematic outline request for "${section.section_title}"`);
+      console.log(`Sending data outline request for "${section.section_title}"`);
       
-      // Call AI endpoint for systematic outline building
-      const response = await fetch('http://localhost:8000/data-analysis/build-systematic-outline', {
+      // Call AI endpoint for data outline building
+      const response = await fetch('http://localhost:8000/data-analysis/build-data-outline', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(systematicRequest)
+        body: JSON.stringify(dataRequest)
       });
       
       if (!response.ok) {
-        throw new Error(`Systematic outline building failed for "${section.section_title}": ${response.status} ${response.statusText}`);
+        throw new Error(`Data outline building failed for "${section.section_title}": ${response.status} ${response.statusText}`);
       }
       
-      const systematicOutline = await response.json();
-      console.log(`✅ Received systematic outline for "${section.section_title}":`, systematicOutline);
+      const dataOutline = await response.json();
+      console.log(`✅ Received data outline for "${section.section_title}":`, dataOutline);
       
-      // Process and structure the systematic outline
+      // Process and structure the data outline
       return {
         section_title: section.section_title,
         section_context: section.section_context,
-        systematic_outline: systematicOutline,
+        data_outline: dataOutline,
         logic_data_used: logicData.length,
         draft_context_used: !!draftContext,
         processed_at: new Date().toISOString(),
         master_subsections: section.subsections?.map((subsection, subIndex) => ({
           subsection_title: subsection.subsection_title,
           subsection_context: subsection.subsection_context,
-          systematic_content: systematicOutline.subsection_outlines?.[subIndex] || {},
+          data_content: dataOutline.subsection_outlines?.[subIndex] || {},
           logic_integration: logicData.find(logic => 
             logic.subsection_title === subsection.subsection_title
           ),
@@ -705,7 +705,7 @@ const OutlineDraft2 = ({
       };
       
     } catch (error) {
-      console.error(`Error building systematic outline for "${section.section_title}":`, error);
+      console.error(`Error building data outline for "${section.section_title}":`, error);
       throw error;
     }
   };
@@ -3217,7 +3217,7 @@ const OutlineDraft2 = ({
       refinedOutlines,
       contextAnalysisComplete,
       logicFrameworkComplete,
-      systematicPopulationComplete,
+      detailedOutlineBuilderComplete,
       
       // Generated analysis data  
       outlineLogicData,
@@ -3239,11 +3239,11 @@ const OutlineDraft2 = ({
 
   // Auto-save progress after each step completion or data change
   useEffect(() => {
-    if (contextAnalysisComplete || logicFrameworkComplete || systematicPopulationComplete || 
+    if (contextAnalysisComplete || logicFrameworkComplete || detailedOutlineBuilderComplete || 
         outlineLogicData.length > 0 || contextMapData || masterOutlines.length > 0) {
       saveProgress();
     }
-  }, [contextAnalysisComplete, logicFrameworkComplete, systematicPopulationComplete, 
+  }, [contextAnalysisComplete, logicFrameworkComplete, detailedOutlineBuilderComplete, 
       outlineLogicData, contextMapData, masterOutlines]);
 
   // Auto-save when step progress changes
@@ -3641,7 +3641,7 @@ const OutlineDraft2 = ({
                         Step {step}: {
                           step === 1 ? 'Contextual Analysis' :
                           step === 2 ? 'Outline Logic Analysis' :
-                          'Systematic Population'
+                          'Detailed Outline Builder'
                         }
                       </h6>
                       <small style={{ 
@@ -3687,7 +3687,7 @@ const OutlineDraft2 = ({
                 } else if (currentStep === 2) {
                   startStep2LogicFramework(identifiedSections);
                 } else if (currentStep === 3) {
-                  startStep3SystematicPopulation(identifiedSections);
+                  startStep3DataOutlineBuilder(identifiedSections);
                 }
               }}
             >
@@ -3743,7 +3743,7 @@ const OutlineDraft2 = ({
               <div>
                 <div className="row mb-3">
                   <div className="col-md-6">
-                    <h6>📋 Overall Context</h6>
+                    <h6>Overall Context</h6>
                     <ul className="list-unstyled">
                       <li><strong>Thesis Focus:</strong> {contextMapData.overallContext.thesis?.substring(0, 100)}...</li>
                       <li><strong>Methodology:</strong> {contextMapData.overallContext.methodology?.methodologyType || contextMapData.overallContext.methodology}</li>
@@ -3752,7 +3752,7 @@ const OutlineDraft2 = ({
                     </ul>
                   </div>
                   <div className="col-md-6">
-                    <h6>🎯 Enhanced Context Analysis</h6>
+                    <h6>Enhanced Context Analysis</h6>
                     <p className="small text-muted">
                       This enhanced analysis provides detailed mapping of how each section and subsection connects to your thesis, 
                       methodology, and analytical framework. Each mapping explains the specific evidentiary role and methodological contribution.
@@ -3760,7 +3760,7 @@ const OutlineDraft2 = ({
                   </div>
                 </div>
                 
-                <h6>📊 Detailed Section & Subsection Mappings</h6>
+                <h6>Detailed Section & Subsection Mappings</h6>
                 {contextMapData.dataSections.map((section, index) => (
                   <div key={index} className="card mb-3" style={{ border: '2px solid #0dcaf0' }}>
                     <div className="card-header" style={{ backgroundColor: '#e0f7fa' }}>
@@ -3773,25 +3773,25 @@ const OutlineDraft2 = ({
                       {/* Section-level Mapping */}
                       {section.detailedMapping && (
                         <div className="mb-4 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                          <h6 className="text-success mb-2">📍 Section-Level Mapping</h6>
+                          <h6 className="text-success mb-2">Section-Level Mapping</h6>
                           <div className="row">
                             <div className="col-md-6">
                               <div className="mb-3">
-                                <strong className="text-primary">🎯 Thesis Connection:</strong>
+                                <strong className="text-primary">Thesis Connection:</strong>
                                 <p className="small mt-1">{section.detailedMapping.thesisConnection}</p>
                               </div>
                               <div className="mb-3">
-                                <strong className="text-info">📊 Methodology Alignment:</strong>
+                                <strong className="text-info">Methodology Alignment:</strong>
                                 <p className="small mt-1">{section.detailedMapping.methodologyAlignment}</p>
                               </div>
                             </div>
                             <div className="col-md-6">
                               <div className="mb-3">
-                                <strong className="text-warning">📋 Evidence Role:</strong>
+                                <strong className="text-warning">Evidence Role:</strong>
                                 <p className="small mt-1">{section.detailedMapping.evidenceRole}</p>
                               </div>
                               <div className="mb-3">
-                                <strong className="text-secondary">🔍 Analytical Purpose:</strong>
+                                <strong className="text-secondary">Analytical Purpose:</strong>
                                 <p className="small mt-1">{section.detailedMapping.analyticalPurpose}</p>
                               </div>
                             </div>
@@ -3800,7 +3800,7 @@ const OutlineDraft2 = ({
                       )}
                       
                       {/* Subsection-level Mappings */}
-                      <h6 className="text-info mb-3">🔍 Subsection Mappings</h6>
+                      <h6 className="text-info mb-3">Subsection Mappings</h6>
                       {section.subsections.map((subsection, subIndex) => (
                         <div key={subIndex} className="mb-3 p-3" style={{ 
                           backgroundColor: '#fff8e7', 
@@ -3819,21 +3819,21 @@ const OutlineDraft2 = ({
                             <div className="row mt-2">
                               <div className="col-md-6">
                                 <div className="mb-2">
-                                  <strong className="text-primary">🎯 Thesis Support:</strong>
+                                  <strong className="text-primary">Thesis Support:</strong>
                                   <p className="small mt-1 mb-2">{subsection.detailedMapping.thesisSupport}</p>
                                 </div>
                                 <div className="mb-2">
-                                  <strong className="text-info">📊 Methodology Role:</strong>
+                                  <strong className="text-info">Methodology Role:</strong>
                                   <p className="small mt-1">{subsection.detailedMapping.methodologyRole}</p>
                                 </div>
                               </div>
                               <div className="col-md-6">
                                 <div className="mb-2">
-                                  <strong className="text-warning">📋 Evidence Contribution:</strong>
+                                  <strong className="text-warning">Evidence Contribution:</strong>
                                   <p className="small mt-1 mb-2">{subsection.detailedMapping.evidenceContribution}</p>
                                 </div>
                                 <div className="mb-2">
-                                  <strong className="text-success">🔬 Analytical Function:</strong>
+                                  <strong className="text-success">Analytical Function:</strong>
                                   <p className="small mt-1">{subsection.detailedMapping.analyticalFunction}</p>
                                 </div>
                               </div>
@@ -3857,8 +3857,8 @@ const OutlineDraft2 = ({
 
       {/* Outline Logic Section */}
       {showOutlineLogic && (
-        <div className="card mb-4" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
-          <div className="card-header" style={{ backgroundColor: '#e9ecef' }}>
+        <div className="card mb-4" style={{ backgroundColor: '#f0f8ff', border: '2px solid #007bff' }}>
+          <div className="card-header" style={{ backgroundColor: '#e3f2fd' }}>
             <div className="d-flex justify-content-between align-items-center">
               <h5 className="mb-0">
                 Outline Logic Analysis
@@ -4028,7 +4028,7 @@ const OutlineDraft2 = ({
         <p className="mb-2">
           This enhanced builder analyzes research content to determine optimal inclusion and exclusion criteria for the final outline.
           First, contextual analysis identifies section purpose and thesis alignment. Then, content analysis determines what from Draft Outline 1 
-          should be included vs excluded based on narrative flow and thesis support. Finally, systematic population creates cohesive outlines.
+          should be included vs excluded based on narrative flow and thesis support. Finally, data outline builder creates cohesive outlines.
         </p>
         <div className="row">
           <div className="col-md-4">
@@ -4040,7 +4040,7 @@ const OutlineDraft2 = ({
             <p className="small mb-0 text-muted">Determine what content to include vs exclude from Draft Outline 1</p>
           </div>
           <div className="col-md-4">
-            <strong>Step 3:</strong> Systematic Population
+            <strong>Step 3:</strong> Detailed Outline Builder
             <p className="small mb-0 text-muted">Build cohesive outlines using selected content</p>
           </div>
         </div>
@@ -4678,7 +4678,7 @@ const OutlineDraft2 = ({
               <div className="col-md-6">
                 <div className="card border-primary">
                   <div className="card-header bg-primary text-white">
-                    <h6 className="mb-0">📋 Subsection Purpose</h6>
+                    <h6 className="mb-0">Subsection Purpose</h6>
                   </div>
                   <div className="card-body">
                     <p className="mb-0">{tooltipData.subsectionPurpose}</p>
@@ -4711,7 +4711,7 @@ const OutlineDraft2 = ({
               <div className="col-md-6">
                 <div className="card border-warning">
                   <div className="card-header bg-warning text-white">
-                    <h6 className="mb-0">🎯 Thesis Support</h6>
+                    <h6 className="mb-0">Thesis Support</h6>
                   </div>
                   <div className="card-body">
                     <p className="mb-0">{tooltipData.thesisSupport}</p>
@@ -4724,7 +4724,7 @@ const OutlineDraft2 = ({
               <div className="col-12">
                 <div className="card border-secondary">
                   <div className="card-header bg-secondary text-white">
-                    <h6 className="mb-0">📊 Research Foundation</h6>
+                    <h6 className="mb-0">Research Foundation</h6>
                   </div>
                   <div className="card-body">
                     <div className="row">
