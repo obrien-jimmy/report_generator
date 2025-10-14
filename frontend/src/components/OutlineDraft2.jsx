@@ -61,6 +61,7 @@ const OutlineDraft2 = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
   const [expandedOutlines, setExpandedOutlines] = useState({});
+  const [expandedStepIntegrations, setExpandedStepIntegrations] = useState({});
   const [editingOutline, setEditingOutline] = useState(null);
   const [processedQAData, setProcessedQAData] = useState([]);
   
@@ -124,6 +125,7 @@ const OutlineDraft2 = ({
       // Restore UI states
       if (draft2Data.showOutlineLogic !== undefined) setShowOutlineLogic(draft2Data.showOutlineLogic);
       if (draft2Data.showContextMap !== undefined) setShowContextMap(draft2Data.showContextMap);
+      if (draft2Data.expandedStepIntegrations) setExpandedStepIntegrations(draft2Data.expandedStepIntegrations);
       
       // Auto-show sections based on current step and available data
       if (draft2Data.currentStep >= 1 && draft2Data.contextMapData) {
@@ -588,6 +590,20 @@ const OutlineDraft2 = ({
     setShowContextMap(!showContextMap);
   };
 
+  // Toggle Outline Logic visibility
+  const toggleOutlineLogic = () => {
+    setShowOutlineLogic(!showOutlineLogic);
+  };
+
+  // Toggle Step Integration visibility
+  const toggleStepIntegrationView = (sectionIndex, subIndex) => {
+    const key = `${sectionIndex}-${subIndex}`;
+    setExpandedStepIntegrations(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   // Step 2: Outline Logic Analysis - build logical framework from contextual analysis
   const startStep2LogicFramework = async (sections) => {
     console.log('🧠 Starting Step 2: Outline Logic Analysis');
@@ -798,19 +814,20 @@ const OutlineDraft2 = ({
         draft_outline_context: draftContext,
         thesis: finalThesis,
         methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
-        paper_type: selectedPaperType,
+        paper_type: typeof selectedPaperType === 'object' ? selectedPaperType.id : selectedPaperType,
         section_position: {
           current: sectionIndex + 1,
           total: totalSections
         },
         previous_sections: sectionIndex > 0 ? 
-          await getMasterOutlines().slice(0, sectionIndex).map(sec => ({
+          getMasterOutlines().slice(0, sectionIndex).map(sec => ({
             title: sec.section_title,
             key_points: sec.master_subsections?.map(sub => sub.subsection_title) || []
           })) : []
       };
       
       console.log(`Sending data outline request for "${section.section_title}"`);
+      console.log('Request data structure:', JSON.stringify(dataRequest, null, 2));
       
       // Call AI endpoint for data outline building
       const response = await fetch('http://localhost:8000/data-analysis/build-data-outline', {
@@ -822,7 +839,9 @@ const OutlineDraft2 = ({
       });
       
       if (!response.ok) {
-        throw new Error(`Data outline building failed for "${section.section_title}": ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`Backend error details:`, errorText);
+        throw new Error(`Data outline building failed for "${section.section_title}": ${response.status} ${response.statusText} - ${errorText}`);
       }
       
       const dataOutline = await response.json();
@@ -836,23 +855,170 @@ const OutlineDraft2 = ({
         logic_data_used: logicData.length,
         draft_context_used: !!draftContext,
         processed_at: new Date().toISOString(),
-        master_subsections: section.subsections?.map((subsection, subIndex) => ({
-          subsection_title: subsection.subsection_title,
-          subsection_context: subsection.subsection_context,
-          data_content: dataOutline.subsection_outlines?.[subIndex] || {},
-          logic_integration: logicData.find(logic => 
-            logic.subsection_title === subsection.subsection_title
-          ),
-          draft_integration: draftContext?.subsections?.find(draft => 
-            draft.subsection_title === subsection.subsection_title
-          )
-        })) || []
+        integration_overview: {
+          section_overview: dataOutline.section_overview || 'No section overview provided',
+          logical_flow: dataOutline.logical_flow || 'No logical flow description provided',
+          integration_notes: dataOutline.integration_notes || 'No integration notes provided'
+        },
+        master_subsections: section.subsections?.map((subsection, subIndex) => {
+          const aiSubsectionOutline = dataOutline.subsection_outlines?.[subIndex];
+          
+          // Convert AI response to expected master_outline format
+          const masterOutline = convertAIResponseToMasterOutline(aiSubsectionOutline);
+          
+          return {
+            subsection_title: subsection.subsection_title,
+            subsection_context: subsection.subsection_context,
+            master_outline: masterOutline, // This is what the UI expects
+            data_content: aiSubsectionOutline || {},
+            // NEW: 5-Step Integration Data
+            step_integrations: {
+              context_integration: aiSubsectionOutline?.context_integration || 'No context integration notes',
+              logic_integration: aiSubsectionOutline?.logic_integration || 'No logic integration notes', 
+              draft_integration: aiSubsectionOutline?.draft_integration || 'No draft integration notes',
+              step_integration_notes: aiSubsectionOutline?.step_integration_notes || 'No step integration summary'
+            },
+            logic_integration: logicData.find(logic => 
+              logic.subsection_title === subsection.subsection_title
+            ),
+            draft_integration: draftContext?.subsections?.find(draft => 
+              draft.subsection_title === subsection.subsection_title
+            ),
+            question_count: subsection.questions?.length || 0,
+            citation_count: subsection.questions?.reduce((acc, q) => acc + (q.citations?.length || 0), 0) || 0
+          };
+        }) || []
       };
       
     } catch (error) {
       console.error(`Error building data outline for "${section.section_title}":`, error);
       throw error;
     }
+  };
+
+  // Convert AI response to the expected master outline format
+  const convertAIResponseToMasterOutline = (aiSubsectionOutline) => {
+    if (!aiSubsectionOutline) {
+      console.log('⚠️ convertAIResponseToMasterOutline: No AI subsection outline provided');
+      return [];
+    }
+    
+    console.log('🔍 convertAIResponseToMasterOutline: Processing AI response:', aiSubsectionOutline);
+    console.log('🔍 Available properties:', Object.keys(aiSubsectionOutline));
+    
+    const masterOutline = [];
+    let pointCounter = 1;
+    
+    // Convert main_points to numbered outline items
+    if (aiSubsectionOutline.main_points && Array.isArray(aiSubsectionOutline.main_points)) {
+      console.log('✅ Found main_points:', aiSubsectionOutline.main_points.length, 'items');
+      aiSubsectionOutline.main_points.forEach((mainPoint, index) => {
+        console.log(`📝 Main point ${index + 1}:`, mainPoint);
+        const outlineItem = {
+          level: `${pointCounter}`,
+          type: 'number',
+          content: mainPoint,
+          citations: (mainPoint && typeof mainPoint === 'string') ? extractCitationNumbers(mainPoint) : [], // Extract citation numbers from content
+          reference: `AI-generated main point ${pointCounter}`,
+          editable: true,
+          subPoints: []
+        };
+        
+        masterOutline.push(outlineItem);
+        pointCounter++;
+      });
+    } else {
+      console.log('⚠️ No main_points found or not an array');
+    }
+    
+    // Add supporting details as sub-points distributed across main points
+    if (aiSubsectionOutline.supporting_details && Array.isArray(aiSubsectionOutline.supporting_details)) {
+      console.log('✅ Found supporting_details:', aiSubsectionOutline.supporting_details.length, 'items');
+      
+      // Distribute supporting details across main points
+      aiSubsectionOutline.supporting_details.forEach((detail, index) => {
+        console.log(`📝 Supporting detail ${index + 1}:`, detail);
+        
+        // Add to appropriate main point or create new one if no main points exist
+        if (masterOutline.length === 0) {
+          // If no main points, create a main point for the supporting detail
+          masterOutline.push({
+            level: '1',
+            type: 'number', 
+            content: detail,
+            citations: (detail && typeof detail === 'string') ? extractCitationNumbers(detail) : [],
+            reference: `AI-generated point from supporting details`,
+            editable: true,
+            subPoints: []
+          });
+        } else {
+          // Add as sub-point to the most relevant main point (distribute evenly for now)
+          const targetMainPointIndex = index % masterOutline.length;
+          const targetMainPoint = masterOutline[targetMainPointIndex];
+          
+          const subPoint = {
+            level: String.fromCharCode(97 + targetMainPoint.subPoints.length), // a, b, c...
+            type: 'letter',
+            content: detail,
+            citations: (detail && typeof detail === 'string') ? extractCitationNumbers(detail) : [],
+            reference: `AI-generated supporting detail ${targetMainPoint.subPoints.length + 1}`,
+            editable: true
+          };
+          
+          targetMainPoint.subPoints.push(subPoint);
+        }
+      });
+    } else {
+      console.log('⚠️ No supporting_details found or not an array');
+    }
+    
+    // Add transitions as additional content if available
+    if (aiSubsectionOutline.transitions && Array.isArray(aiSubsectionOutline.transitions)) {
+      console.log('✅ Found transitions:', aiSubsectionOutline.transitions.length, 'items');
+      aiSubsectionOutline.transitions.forEach((transition, index) => {
+        console.log(`📝 Transition ${index + 1}:`, transition);
+        
+        // Add transitions as additional main points
+        masterOutline.push({
+          level: `${masterOutline.length + 1}`,
+          type: 'number',
+          content: transition,
+          citations: (transition && typeof transition === 'string') ? extractCitationNumbers(transition) : [],
+          reference: `AI-generated transition point`,
+          editable: true,
+          subPoints: []
+        });
+      });
+    } else {
+      console.log('⚠️ No transitions found or not an array');
+    }
+    
+    // Fallback: If still no content, try to extract from any available text field
+    if (masterOutline.length === 0) {
+      console.log('⚠️ No structured content found, attempting fallback extraction');
+      const fallbackContent = aiSubsectionOutline.subsection_title || 
+                             aiSubsectionOutline.title ||
+                             JSON.stringify(aiSubsectionOutline).substring(0, 200) + '...';
+      
+      masterOutline.push({
+        level: '1',
+        type: 'number',
+        content: fallbackContent,
+        citations: [],
+        reference: 'Fallback content from AI response',
+        editable: true,
+        subPoints: []
+      });
+      
+      console.log('🔄 Created fallback content:', fallbackContent);
+    }
+    
+    console.log('✅ convertAIResponseToMasterOutline complete:', masterOutline.length, 'outline items created');
+    masterOutline.forEach((item, index) => {
+      console.log(`  ${item.level}. ${item.content.substring(0, 100)}... (${item.subPoints?.length || 0} sub-points)`);
+    });
+    
+    return masterOutline;
   };
 
   // Get current master outlines (helper function)
@@ -3285,8 +3451,6 @@ const OutlineDraft2 = ({
 
   // Refresh individual section
   const refreshSection = async (sectionTitle) => {
-    if (refreshingSection) return; // Prevent multiple refresh operations
-    
     setRefreshingSection(sectionTitle);
     try {
       // Find the specific section to refresh
@@ -3321,8 +3485,6 @@ const OutlineDraft2 = ({
 
   // Refresh all logic data
   const refreshAllLogic = async () => {
-    if (refreshingSection) return;
-    
     setRefreshingSection('all');
     try {
       console.log('🔄 Refreshing all outline logic...');
@@ -3370,6 +3532,7 @@ const OutlineDraft2 = ({
       // UI states
       showOutlineLogic,
       showContextMap,
+      expandedStepIntegrations,
       
       // Metadata
       savedAt: new Date().toISOString(),
@@ -3658,7 +3821,7 @@ const OutlineDraft2 = ({
         outline_draft1: Array.isArray(draftOutline) ? draftOutline : [draftOutline],
         thesis: finalThesis,
         methodology: typeof methodology === 'string' ? methodology : JSON.stringify(methodology),
-        paper_type: selectedPaperType?.id || 'analytical',
+        paper_type: typeof selectedPaperType === 'object' ? (selectedPaperType.id || 'analytical') : (selectedPaperType || 'analytical'),
         target_section_indices: indicesToBuild
       });
 
@@ -3808,7 +3971,7 @@ const OutlineDraft2 = ({
                               isAccessible ? '#6c757d' : '#adb5bd'
                       }}>
                         {isComplete ? 'Complete' :
-                         isActive ? (step === 2 && stepProgress ? stepProgress : 'Processing...') :
+                         isActive ? ((step === 2 || step === 3) && stepProgress ? stepProgress : 'Processing...') :
                          isReady ? 'Ready to Start' :
                          isPending ? 'Pending' : 'Waiting'}
                       </small>
@@ -3850,17 +4013,20 @@ const OutlineDraft2 = ({
                   startStep3DataOutlineBuilder(identifiedSections || refinedOutlines, outlineLogicData);
                 }
               }}
-              disabled={stepStatus[currentStep] === 'processing'}
-              title={`Retry Step ${currentStep} - ${stepStatus[currentStep] === 'processing' ? 'Currently processing...' : 'Click to restart this step'}`}
+              title={`Retry Step ${currentStep} - Always available to restart process`}
             >
-              {stepStatus[currentStep] === 'processing' ? (
-                <>
-                  <FaSpinner className="fa-spin me-1" />
-                  Step {currentStep}...
-                </>
-              ) : (
-                <>Retry Step {currentStep}</>
-              )}
+              Retry Step {currentStep}
+            </button>
+          )}
+          {/* Start Step 3 button when Step 3 is ready but not yet started */}
+          {stepStatus[3] === 'ready' && outlineLogicData.length > 0 && (
+            <button
+              className="btn btn-outline-success btn-sm"
+              onClick={() => startStep3DataOutlineBuilder(refinedOutlines, outlineLogicData)}
+              title="Start Step 3 - Data available from Step 2"
+            >
+              <FaPlay className="me-1" />
+              Start Step 3
             </button>
           )}
         </div>
@@ -4037,8 +4203,7 @@ const OutlineDraft2 = ({
                 <button
                   className="btn btn-sm btn-outline-primary"
                   onClick={refreshAllLogic}
-                  disabled={refreshingSection === 'all' || generatingLogic}
-                  title="Refresh all outline logic analysis"
+                  title="Refresh all outline logic analysis - Always available to restart"
                 >
                   {refreshingSection === 'all' ? (
                     <>
@@ -4051,6 +4216,14 @@ const OutlineDraft2 = ({
                       Refresh All
                     </>
                   )}
+                </button>
+
+                {/* Close Button */}
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={toggleOutlineLogic}
+                >
+                  Close
                 </button>
                 
                 {/* Auto-save is handled by project management system */}
@@ -4079,8 +4252,7 @@ const OutlineDraft2 = ({
                       <button
                         className="btn btn-sm btn-outline-secondary"
                         onClick={() => refreshSection(logicItem.section_title)}
-                        disabled={refreshingSection === logicItem.section_title}
-                        title={`Refresh analysis for ${logicItem.section_title}`}
+                        title={`Refresh analysis for ${logicItem.section_title} - Always available to restart`}
                       >
                         {refreshingSection === logicItem.section_title ? (
                           <FaSpinner className="fa-spin" />
@@ -4260,58 +4432,12 @@ const OutlineDraft2 = ({
                   )}
                   {currentStep > 0 && masterOutlines.length === 0 && (
                     <div className="alert alert-warning mb-3">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>⚡ Step {currentStep} Active:</strong> {
-                            currentStep === 1 ? 'Analyzing contextual relationships...' :
-                            currentStep === 2 ? (stepProgress || 'Building logic framework for systematic outline generation...') :
-                            currentStep === 3 ? 'Populating detailed outlines from research data...' :
-                            'Processing...'
-                          }
-                        </div>
-                        {/* Add retry button for Step 2 if it appears stuck */}
-                        {currentStep === 2 && stepStatus[2] === 'processing' && (
-                          <button
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => startStep2LogicFramework(refinedOutlines)}
-                            disabled={generatingLogic}
-                            title="Retry Step 2 if it appears stuck"
-                          >
-                            {generatingLogic ? (
-                              <>
-                                <FaSpinner className="fa-spin me-1" />
-                                Retrying...
-                              </>
-                            ) : (
-                              <>
-                                <FaSyncAlt className="me-1" />
-                                Retry Step 2
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {/* Add retry/start button for Step 3 when ready */}
-                        {currentStep === 3 && (stepStatus[3] === 'ready' || stepStatus[3] === 'processing') && outlineLogicData.length > 0 && (
-                          <button
-                            className="btn btn-sm btn-outline-success"
-                            onClick={() => startStep3DataOutlineBuilder(refinedOutlines, outlineLogicData)}
-                            disabled={stepStatus[3] === 'processing'}
-                            title={stepStatus[3] === 'ready' ? 'Start Step 3 - Data available from Step 2' : 'Retry Step 3 if it appears stuck'}
-                          >
-                            {stepStatus[3] === 'processing' ? (
-                              <>
-                                <FaSpinner className="fa-spin me-1" />
-                                Building...
-                              </>
-                            ) : (
-                              <>
-                                <FaPlay className="me-1" />
-                                {stepStatus[3] === 'ready' ? 'Start Step 3' : 'Retry Step 3'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      <strong>Step {currentStep}:</strong> {
+                        currentStep === 1 ? (stepProgress || 'Analyzing contextual relationships...') :
+                        currentStep === 2 ? (stepProgress || 'Building logic framework for systematic outline generation...') :
+                        currentStep === 3 ? (stepProgress || 'Populating detailed outlines from research data...') :
+                        'Processing...'
+                      }
                     </div>
                   )}
                   {masterOutlines.length > 0 && (
@@ -4374,6 +4500,16 @@ const OutlineDraft2 = ({
                                       {expandedOutlines[`${sectionIndex}-${subIndex}`] ? <FaMinus /> : <FaPlus />}
                                     </button>
                                   )}
+                                  {masterOutlines[sectionIndex]?.master_subsections?.[subIndex]?.step_integrations && (
+                                    <button
+                                      className="btn btn-sm btn-outline-success ms-1"
+                                      onClick={() => toggleStepIntegrationView(sectionIndex, subIndex)}
+                                      title="View 5-Step Integration Process"
+                                      style={{ fontSize: '0.75rem' }}
+                                    >
+                                      5-Step
+                                    </button>
+                                  )}
                                   <button
                                     className="btn btn-outline-info btn-sm ms-2"
                                     onClick={() => showSubsectionTooltip(section, subsection, sectionIndex, subIndex)}
@@ -4393,6 +4529,46 @@ const OutlineDraft2 = ({
                                     placeholder="Subsection context and description"
                                   />
                                   
+                                  {/* 5-Step Integration Process Display */}
+                                  {expandedStepIntegrations[`${sectionIndex}-${subIndex}`] && masterOutlines[sectionIndex]?.master_subsections?.[subIndex]?.step_integrations && (
+                                    <div className="step-integration-panel border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
+                                      <h6 className="fw-bold text-success mb-3">
+                                        <span className="me-2">📋</span>
+                                        5-Step Integration Process
+                                      </h6>
+                                      
+                                      <div className="integration-steps">
+                                        <div className="integration-step mb-2">
+                                          <strong className="text-primary">Step 1 - Context Integration:</strong>
+                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.context_integration}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="integration-step mb-2">
+                                          <strong className="text-primary">Step 2 - Logic Integration:</strong>
+                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.logic_integration}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="integration-step mb-2">
+                                          <strong className="text-primary">Step 3 - Draft Integration:</strong>
+                                          <div className="ms-3 text-muted" style={{ fontSize: '0.9rem' }}>
+                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.draft_integration}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="integration-summary mt-3 pt-2 border-top">
+                                          <strong className="text-success">Integration Summary:</strong>
+                                          <div className="ms-3 text-dark" style={{ fontSize: '0.9rem' }}>
+                                            {masterOutlines[sectionIndex].master_subsections[subIndex].step_integrations.step_integration_notes}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {/* Expanded Master Outline Display */}
                                   {expandedOutlines[`${sectionIndex}-${subIndex}`] && masterOutlines[sectionIndex]?.master_subsections?.[subIndex] && (
                                     <div className="hierarchical-outline">

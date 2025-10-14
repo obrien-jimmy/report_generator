@@ -87,10 +87,14 @@ class BuildDataOutlineRequest(BaseModel):
 
 class SubsectionOutline(BaseModel):
     subsection_title: str = Field(..., description="Title of the subsection")
+    context_integration: Optional[str] = Field(None, description="How Step 1 context shapes this subsection")
+    logic_integration: Optional[str] = Field(None, description="How Step 2 logic focuses this subsection")
+    draft_integration: Optional[str] = Field(None, description="What Step 3 draft content is incorporated")
     main_points: List[str] = Field(..., description="Main points to cover")
     supporting_details: List[str] = Field(..., description="Supporting details and evidence")
     transitions: List[str] = Field(..., description="Transition statements")
     citations_used: List[int] = Field(..., description="Citation numbers referenced")
+    step_integration_notes: Optional[str] = Field(None, description="How all 5 steps contributed to this subsection outline")
 
 class BuildDataOutlineResponse(BaseModel):
     section_title: str = Field(..., description="Title of the section")

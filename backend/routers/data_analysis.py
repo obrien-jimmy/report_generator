@@ -4,7 +4,7 @@ from schemas.data_analysis import (
     BuildDataOutlineRequest, BuildDataOutlineResponse
 )
 from services.bedrock_service import invoke_bedrock
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import json
 import logging
 import re
@@ -529,65 +529,101 @@ def extract_listed_items(text, start_marker, end_marker):
 @router.post("/build-data-outline", response_model=BuildDataOutlineResponse)
 def build_data_outline(request: BuildDataOutlineRequest):
     """
-    Build comprehensive data outline for a section using logic framework, 
-    Draft Outline 1 context, and systematic progression approach.
+    Build comprehensive data outline using the 5-step systematic approach:
+    1. Review context map data
+    2. Review outline logic analysis
+    3. Review Draft Outline 1 notes/responses
+    4. Insert findings into custom research framework
+    5. Incorporate additional citation considerations
     """
     try:
         logger.info(f"Building data outline for section: {request.section_title}")
         logger.info(f"Logic framework items: {len(request.logic_framework)}")
         logger.info(f"Draft context available: {request.draft_outline_context is not None}")
         
-        # Prepare comprehensive prompt for data outline building
+        # Execute the systematic 5-step process
         outline_prompt = f"""
-You are building a comprehensive data outline for an academic paper section. You have access to:
-1. Logic framework analysis from Step 2 (systematic analysis of research questions and citations)
-2. Draft Outline 1 context (initial structural framework)
-3. Section context and positioning within the overall paper
+You are an expert academic writer building a comprehensive outline using a systematic 5-step integration process. Work through each step methodically to create substantive, research-based content.
 
-SECTION INFORMATION:
-Title: {request.section_title}
-Context: {request.section_context}
-Position: Section {request.section_position.current} of {request.section_position.total}
-Paper Type: {request.paper_type}
-Thesis: {request.thesis}
-Methodology: {request.methodology}
+SECTION: {request.section_title}
+CONTEXT: {request.section_context}
+THESIS: {request.thesis}
+METHODOLOGY: {request.methodology}
 
-LOGIC FRAMEWORK ANALYSIS (Step 2 Results):
+## STEP 1: CONTEXT MAP REVIEW
+Analyze the contextual framework established for this section:
+{format_context_analysis(request.logic_framework)}
+
+## STEP 2: OUTLINE LOGIC ANALYSIS  
+Review the logical structure and research focus identified:
 {format_logic_framework(request.logic_framework)}
 
-DRAFT OUTLINE 1 CONTEXT:
-{format_draft_context(request.draft_outline_context) if request.draft_outline_context else "Not available"}
+## STEP 3: DRAFT OUTLINE 1 INTEGRATION
+Extract notes, responses, and content from the initial outline:
+{format_draft_context_detailed(request.draft_outline_context) if request.draft_outline_context else "No Draft Outline 1 data available - proceed with Steps 1-2 only"}
 
-PREVIOUS SECTIONS CONTEXT:
-{format_previous_sections(request.previous_sections)}
+## STEP 4: CUSTOM RESEARCH FRAMEWORK CONSTRUCTION
+Based on Steps 1-3, create a research framework that:
+- Integrates contextual understanding with logical structure
+- Incorporates actual findings/notes from Draft Outline 1  
+- Builds toward specific thesis arguments
+- Follows the identified research methodology
 
-SUBSECTIONS TO BUILD:
-{format_subsections_info(request.subsections)}
+## STEP 5: CITATION-BASED ENHANCEMENTS
+Add substantive details from citation content:
+{format_citation_details(request.subsections)}
 
-BUILD COMPREHENSIVE DATA OUTLINE:
+## SUBSECTION PROCESSING INSTRUCTIONS
 
-Create a detailed, data-driven outline for this section that:
+For EACH subsection, follow this systematic process:
 
-1. **INTEGRATES MULTIPLE SOURCES**: Combine insights from the logic framework analysis, Draft Outline 1 structure, and subsection research data
+**STEP 4 OUTPUT - Custom Framework Points**: Create 4-6 main arguments that synthesize:
+- Context insights from Step 1
+- Logical focus from Step 2  
+- Actual content/notes from Step 3
+- Research methodology alignment
 
-2. **FOLLOWS LOGICAL PROGRESSION**: Build from foundational concepts to complex analysis, ensuring smooth transitions between subsections
+**STEP 5 OUTPUT - Citation Enhancements**: For each framework point, add 3-4 supporting details that:
+- Extract specific facts, statistics, case studies from citation descriptions
+- Reference actual policy names, dates, expert conclusions
+- Provide concrete evidence that supports the framework argument
+- Avoid generic academic language - use actual research content
 
-3. **SUPPORTS THE THESIS**: Every point should clearly advance the thesis argument: "{request.thesis}"
+**INTEGRATION REQUIREMENTS**:
+- Each main point must reference specific content from Steps 1-3
+- Supporting details must come from actual citation descriptions
+- Avoid creating any content not found in the provided research data
+- Connect each point explicitly to thesis advancement
 
-4. **ALIGNS WITH METHODOLOGY**: Structure should support the {request.methodology} research approach
+EXAMPLE STEP-BY-STEP OUTPUT:
 
-5. **USES ACTUAL DATA**: Base all content on the actual research questions, citations, and analysis provided - no generic placeholder content
+Framework Point (Steps 1-3): "Current cyber deterrence policies face attribution challenges that undermine response capabilities"
+Citation Enhancement (Step 5): "The 2016 election interference attribution took 3 months, during which adversaries established persistent network presence [Citation 47]"
 
-For each subsection, provide:
-- **Main Points**: 4-6 substantive points that form the core argument
-- **Supporting Details**: Specific evidence, examples, and analysis points from the research
-- **Transitions**: Clear connections to previous points and upcoming content
-- **Citations**: Reference the specific citation numbers that support each point
+NOT ACCEPTABLE:
+Framework Point: "Analysis of cyber deterrence challenges"  
+Citation Enhancement: "Examination of deterrence effectiveness"
 
-Create a cohesive outline that transforms raw research data into a structured academic argument.
-
-RESPONSE FORMAT: Return structured JSON matching the BuildDataOutlineResponse schema.
-"""
+RESPONSE FORMAT:
+{{
+  "section_title": "{request.section_title}",
+  "section_overview": "How this section advances the thesis using integrated findings from all 5 steps",
+  "subsection_outlines": [
+    {{
+      "subsection_title": "actual subsection name",
+      "context_integration": "How Step 1 context shapes this subsection",
+      "logic_integration": "How Step 2 logic focuses this subsection", 
+      "draft_integration": "What Step 3 draft content is incorporated",
+      "main_points": ["framework point 1 with Steps 1-3 integration", "framework point 2", "framework point 3", "framework point 4"],
+      "supporting_details": ["citation-based evidence 1", "citation-based evidence 2", "citation-based evidence 3", "citation-based evidence 4"],
+      "transitions": ["logical connection referencing integrated framework", "connection building thesis argument"],
+      "citations_used": [1, 2, 3, 4, 5],
+      "step_integration_notes": "How all 5 steps contributed to this subsection outline"
+    }}
+  ],
+  "logical_flow": "How subsections build integrated argument from all steps",
+  "integration_notes": "Overall integration achievement and thesis advancement"
+}}"""
 
         # Generate the outline using AI
         response_text = invoke_bedrock(outline_prompt)
@@ -646,14 +682,22 @@ SUBSECTION: {subsection.get('subsection_title', 'Unknown')}
     
     return formatted
 
-def format_previous_sections(previous_sections: List[Dict]) -> str:
+def format_previous_sections(previous_sections: Union[List[Dict], List[Any]]) -> str:
     """Format information about previous sections"""
     if not previous_sections:
         return "This is the first section"
     
     formatted = []
     for section in previous_sections:
-        formatted.append(f"- {section['title']}: {', '.join(section.get('key_points', []))}")
+        # Handle both dict and Pydantic object formats
+        if hasattr(section, 'title'):  # Pydantic object
+            title = section.title
+            key_points = section.key_points if hasattr(section, 'key_points') else []
+        else:  # Dictionary format
+            title = section.get('title', 'Unknown')
+            key_points = section.get('key_points', [])
+        
+        formatted.append(f"- {title}: {', '.join(key_points)}")
     
     return "\n".join(formatted)
 
@@ -673,6 +717,98 @@ SUBSECTION: {subsection.get('subsection_title', 'Unknown')}
     
     return "\n".join(formatted)
 
+def format_context_analysis(logic_framework: List[Dict]) -> str:
+    """Format contextual analysis data from Step 1 (Context Map)"""
+    if not logic_framework:
+        return "No context analysis data available from Step 1"
+    
+    formatted = []
+    for item in logic_framework:
+        formatted.append(f"""
+SUBSECTION CONTEXT: {item.get('subsection_title', 'Unknown')}
+- Thesis Alignment: {item.get('thesis_connection', 'Not specified')}
+- Methodology Connection: {item.get('methodology_connection', 'Not specified')} 
+- Research Focus Area: {item.get('research_focus', 'Not specified')}
+- Analytical Purpose: {item.get('analytical_purpose', 'Not specified')}
+- Evidence Role: {item.get('evidence_role', 'Not specified')}
+""")
+    
+    return "\n".join(formatted)
+
+def format_draft_context_detailed(draft_context: Dict) -> str:
+    """Format detailed Draft Outline 1 context including notes and responses"""
+    if not draft_context:
+        return "No Draft Outline 1 context available"
+    
+    formatted = f"""
+DRAFT OUTLINE 1 STRUCTURE:
+Section: {draft_context.get('section_title', 'Unknown')}
+Section Context: {draft_context.get('section_context', 'Not provided')}
+"""
+    
+    if 'subsections' in draft_context:
+        formatted += "\nDRAFT SUBSECTION DETAILS:\n"
+        for subsection in draft_context['subsections']:
+            formatted += f"""
+SUBSECTION: {subsection.get('subsection_title', 'Unknown')}
+- Context: {subsection.get('subsection_context', 'Not provided')}
+- Questions: {len(subsection.get('questions', []))}
+"""
+            
+            # Include actual question content and responses
+            questions = subsection.get('questions', [])
+            if questions:
+                formatted += "- Research Questions & Responses:\n"
+                for i, question in enumerate(questions[:3], 1):  # Limit to first 3 questions
+                    q_text = question.get('question', 'No question text')
+                    formatted += f"  Q{i}: {q_text}\n"
+                    
+                    # Include citation descriptions if available
+                    citations = question.get('citations', [])
+                    if citations:
+                        for j, citation in enumerate(citations[:2], 1):  # Limit to first 2 citations per question
+                            desc = citation.get('description', 'No description')[:200]
+                            formatted += f"      Citation {j}: {desc}...\n"
+    
+    return formatted
+
+def format_citation_details(subsections: List[Dict]) -> str:
+    """Format detailed citation content for Step 5 enhancements"""
+    if not subsections:
+        return "No citation details available"
+    
+    formatted = []
+    for subsection in subsections:
+        subsection_name = subsection.get('subsection_title', 'Unknown Subsection')
+        formatted.append(f"\nSUBSECTION CITATIONS: {subsection_name}")
+        
+        questions = subsection.get('questions', [])
+        citation_count = 0
+        
+        for question in questions:
+            citations = question.get('citations', [])
+            for citation in citations:
+                citation_count += 1
+                apa = citation.get('apa', 'No APA available')[:100]
+                description = citation.get('description', 'No description available')
+                url = citation.get('url', 'No URL')
+                
+                formatted.append(f"""
+Citation {citation_count}:
+- APA: {apa}...
+- Description: {description}
+- URL: {url}
+- Question Context: {question.get('question', 'No question')[:100]}...
+""")
+                
+                # Limit citations per subsection to keep prompt manageable
+                if citation_count >= 5:
+                    break
+            if citation_count >= 5:
+                break
+    
+    return "\n".join(formatted)
+
 def create_structured_outline_response(response_text: str, request: BuildDataOutlineRequest) -> BuildDataOutlineResponse:
     """Create a structured response when JSON parsing fails"""
     
@@ -682,6 +818,9 @@ def create_structured_outline_response(response_text: str, request: BuildDataOut
     for subsection in request.subsections:
         outline = {
             "subsection_title": subsection.get('subsection_title', 'Untitled Subsection'),
+            "context_integration": f"Contextual analysis shows this subsection addresses {subsection.get('subsection_context', 'research focus')}",
+            "logic_integration": f"Logic framework indicates focus on {subsection.get('subsection_title', 'analytical approach')}",
+            "draft_integration": "Integration with Draft Outline 1 structure and content" if request.draft_outline_context else "No Draft Outline 1 integration available",
             "main_points": [
                 f"Analysis of {subsection.get('subsection_title', 'research area')}",
                 f"Key findings and evidence",
@@ -699,15 +838,15 @@ def create_structured_outline_response(response_text: str, request: BuildDataOut
                 "This leads to consideration of",
                 "Furthermore, the evidence suggests"
             ],
-            "citations_used": list(range(1, min(6, len(subsection.get('questions', [])) + 1)))
+            "citations_used": list(range(1, min(6, len(subsection.get('questions', [])) + 1))),
+            "step_integration_notes": "Systematic integration of context analysis, logic framework, draft content, custom framework, and citation enhancements"
         }
         subsection_outlines.append(outline)
     
     return BuildDataOutlineResponse(
         section_title=request.section_title,
-        section_overview=f"Comprehensive analysis of {request.section_title} supporting the thesis through systematic examination of research data and evidence.",
+        section_overview=f"Comprehensive analysis of {request.section_title} supporting the thesis through systematic 5-step integration process.",
         subsection_outlines=subsection_outlines,
-        logical_flow="The section progresses from foundational analysis through detailed examination to synthesis and implications.",
-        integration_notes="Integrates findings from logic framework analysis with Draft Outline 1 structure to create comprehensive academic argument.",
-        methodology_alignment=f"Aligns with {request.methodology} approach through systematic data analysis and evidence-based reasoning."
+        logical_flow="The section progresses through systematic integration of contextual analysis, logical structure, draft content, and citation-based enhancements.",
+        integration_notes="Integrates findings from all 5 steps: context map review, logic analysis, Draft Outline 1 integration, custom framework construction, and citation-based enhancements."
     )
