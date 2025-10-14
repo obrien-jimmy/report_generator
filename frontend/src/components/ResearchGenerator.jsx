@@ -7,7 +7,6 @@ import OutlineGenerator from './OutlineGenerator';
 
 const ResearchGenerator = () => {
   const [finalThesis, setFinalThesis] = useState('');
-  const [paperLength, setPaperLength] = useState(5);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [methodology, setMethodology] = useState('');
   const [step, setStep] = useState('thesis');
@@ -28,8 +27,6 @@ const ResearchGenerator = () => {
       {step === 'sources' && (
         <SourceCategories
           finalThesis={finalThesis}
-          paperLength={paperLength}
-          setPaperLength={setPaperLength}
           onCategoriesSelected={(categories) => {
             setSelectedCategories(categories);
             setStep('methodology');
@@ -53,7 +50,6 @@ const ResearchGenerator = () => {
         <OutlineGenerator
           finalThesis={finalThesis}
           methodology={methodology}
-          paperLength={paperLength}
           sourceCategories={selectedCategories}
         />
       )}
@@ -65,7 +61,6 @@ const ResearchGenerator = () => {
         selectedCategories={selectedCategories}
         methodology={methodology}
         selectedPaperType={selectedPaperType}
-        pageCount={paperLength}
         outline={outline}
       />
     </div>

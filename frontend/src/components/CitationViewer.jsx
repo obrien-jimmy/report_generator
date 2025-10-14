@@ -3,7 +3,7 @@ import { FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaSearch, FaTrash, FaTim
 import axios from 'axios';
 import './CitationViewer.css';
 
-const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesis, methodology, paperLength, sourceCategories }) => {
+const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesis, methodology, sourceCategories }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -100,7 +100,7 @@ const CitationViewer = ({ citations, onAddCitation, onRemoveCitation, finalThesi
       const response = await axios.post('http://localhost:8000/generate_citations', {
         final_thesis: finalThesis,
         methodology: methodology,
-        paper_length: paperLength,
+        paper_length: 15,  // Default page length
         source_categories: sourceCategories,
         count: addMoreData.count,
         context: addMoreData.context,

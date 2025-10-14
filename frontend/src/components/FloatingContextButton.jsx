@@ -7,7 +7,6 @@ const FloatingContextButton = ({
   selectedCategories,
   methodology,
   selectedPaperType,
-  pageCount,
   outline
 }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -49,7 +48,6 @@ const FloatingContextButton = ({
         selectedCategories={selectedCategories}
         methodology={methodology}
         selectedPaperType={selectedPaperType}
-        pageCount={pageCount}
         outline={outline}
       />
     </>

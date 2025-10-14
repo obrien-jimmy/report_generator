@@ -3,7 +3,6 @@ from typing import List, Optional
 
 class SourceRecommendationRequest(BaseModel):
     final_thesis: str
-    paper_length_pages: int
 
 class RecommendedSource(BaseModel):
     apa: str

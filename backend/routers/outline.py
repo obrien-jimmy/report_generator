@@ -76,7 +76,7 @@ async def generate_sections(request: SectionGenerationRequest):
             methodology_description = str(request.methodology)
         
         prompt = f"""
-        Generate main sections for a {request.paper_length_pages}-page research paper.
+        Generate main sections for a research paper.
         
         Thesis: "{request.final_thesis}"
         Methodology: {methodology_description}
@@ -156,7 +156,6 @@ async def generate_subsections(request: SubsectionGenerationRequest):
         Section Context: {request.section_context}
         Thesis: "{request.final_thesis}"
         Methodology: {methodology_description}
-        Paper Length: {request.paper_length_pages} pages
         {source_categories_str}
         
         Create subsections with titles and context descriptions that will help address the larger section's purpose.

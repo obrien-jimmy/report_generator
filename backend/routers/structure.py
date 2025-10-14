@@ -31,19 +31,11 @@ async def generate_methodology(request: MethodologyRequest):
 
 @router.post("/generate_outline", response_model=OutlineResponse)
 async def generate_outline(request: OutlineRequest):
-    if request.paper_length_pages == -2:
-        paper_length_pages = "the maximum level of detail possible"
-    elif request.paper_length_pages == -1:
-        paper_length_pages = "a flexible length suitable to the complexity of the thesis"
-    else:
-        paper_length_pages = f"{request.paper_length_pages} pages"
-
     prompt = f"""
     You are an expert professor creating structured thesis outlines.
 
     Final Thesis: "{request.final_thesis}"
     Methodology: "{request.methodology}"
-    Paper Length: {paper_length_pages} single-spaced (excluding citations)
     Source Categories: {", ".join(request.source_categories)}
 
     Explicitly generate a structured JSON outline EXACTLY matching this format:
@@ -87,7 +79,6 @@ async def generate_sections(request: SectionsRequest):
 
     Thesis: "{request.final_thesis}"
     Methodology: "{request.methodology}"
-    Paper length: {request.paper_length_pages if request.paper_length_pages > 0 else 'maximum detail'}
     Source Categories: {', '.join(request.source_categories)}
 
     Provide explicitly in the following JSON format:
@@ -121,7 +112,6 @@ async def generate_subsections(request: SubsectionsRequest):
     Methodology: "{request.methodology}"
     Section Title: "{request.section_title}"
     Section Context: "{request.section_context}"
-    Paper length: {request.paper_length_pages if request.paper_length_pages > 0 else 'maximum detail'}
     Source Categories: {', '.join(request.source_categories)}
 
     Provide explicitly in the following JSON format:

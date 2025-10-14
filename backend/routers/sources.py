@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post("/recommend_sources")
 async def recommend_sources(request: SourceRecommendationRequest):
     prompt = f"""
-    Based on the following thesis and desired paper length ({request.paper_length_pages} pages), explicitly recommend ONLY a numbered list of concise document/source categories suitable for comprehensive research.
+    Based on the following thesis, explicitly recommend ONLY a numbered list of concise document/source categories suitable for comprehensive research.
 
     Thesis: {request.final_thesis}
 

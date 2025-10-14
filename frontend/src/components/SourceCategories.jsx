@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, savedCategories }) => {
+const SourceCategories = ({ finalThesis, onCategoriesSelected, savedCategories }) => {
   const [categories, setCategories] = useState(savedCategories && savedCategories.length > 0
     ? savedCategories.map((name, idx) => ({
         name,
@@ -49,7 +49,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
     try {
       const res = await axios.post('http://localhost:8000/recommend_sources', {
         final_thesis: finalThesis,
-        paper_length_pages: paperLength,
+        paper_length_pages: 15,  // Default to reasonable page count
       });
 
       const cats = res.data.recommended_categories.map((name, index) => {
@@ -101,7 +101,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
       
       const res = await axios.post('http://localhost:8000/recommend_sources', {
         final_thesis: finalThesis,
-        paper_length_pages: paperLength,
+        paper_length_pages: 15,  // Default to reasonable page count
         exclude_categories: existingCategories, // Pass existing categories to avoid duplicates
       });
 
@@ -159,18 +159,17 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
     if (
       (!savedCategories || savedCategories.length === 0) &&
       finalThesis &&
-      paperLength !== null &&
       !hasLoaded &&
       !loading
     ) {
       recommendSources();
     }
     // eslint-disable-next-line
-  }, [savedCategories, finalThesis, paperLength, hasLoaded, loading]);
+  }, [savedCategories, finalThesis, hasLoaded, loading]);
 
   const handleManualLoad = () => {
-    if (!finalThesis || paperLength === null) {
-      alert('Please ensure thesis and paper length are set before generating categories.');
+    if (!finalThesis) {
+      alert('Please ensure thesis is set before generating categories.');
       return;
     }
     // Call directly instead of relying on useEffect
@@ -196,8 +195,8 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
   };
 
   const handleAddMore = () => {
-    if (!finalThesis || paperLength === null) {
-      alert('Please ensure thesis and paper length are set before generating additional categories.');
+    if (!finalThesis) {
+      alert('Please ensure thesis is set before generating additional categories.');
       return;
     }
     
@@ -305,7 +304,7 @@ const SourceCategories = ({ finalThesis, paperLength, onCategoriesSelected, save
               <button
                 className="btn btn-primary"
                 onClick={handleManualLoad}
-                disabled={!finalThesis || paperLength === null}
+                disabled={!finalThesis}
               >
                 Generate Source Categories
               </button>

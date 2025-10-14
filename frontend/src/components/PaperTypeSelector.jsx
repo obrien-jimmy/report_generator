@@ -3,28 +3,24 @@ import { useState, useEffect } from 'react';
 const PaperTypeSelector = ({
   selectedPaperType,
   setSelectedPaperType,
-  paperLength,
-  setPaperLength,
   onPaperTypeSelected
 }) => {
   const [selectedType, setSelectedType] = useState(selectedPaperType ? selectedPaperType.id : '');
-  const [pageCount, setPageCount] = useState(paperLength === null ? '' : paperLength);
   const [finalized, setFinalized] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   // Sync local state with props when they change (e.g., after loading a project)
   useEffect(() => {
     setSelectedType(selectedPaperType ? selectedPaperType.id : '');
-    setPageCount(paperLength === null ? '' : paperLength);
-    // Set finalized if both are present (completed)
-    if (selectedPaperType && paperLength !== null && paperLength !== undefined) {
+    // Set finalized if paper type is present (completed)
+    if (selectedPaperType) {
       setFinalized(true);
       setCollapsed(true);
     } else {
       setFinalized(false);
       setCollapsed(false);
     }
-  }, [selectedPaperType, paperLength]);
+  }, [selectedPaperType]);
 
   const paperTypes = [
     {
@@ -94,10 +90,12 @@ const PaperTypeSelector = ({
     {
       id: 'exploratory',
       name: 'Exploratory Paper (Open-ended)',
-      purpose: 'To investigate emerging security issues or policy questions without predetermined conclusions.',
-      structure: 'Introduction → Background → Exploration of different views → Reflection or tentative conclusion.',
-      tone: 'Inquisitive, balanced, thoughtful.',
-      example: 'What are the strategic implications of artificial intelligence in military operations?'
+      description: 'Investigates a research question without a predetermined thesis. Suitable for exploring complex issues from multiple angles.',
+      purpose: 'To explore a complex issue by examining multiple perspectives and factors without arguing a single conclusion.',
+      structure: 'Introduction → Background → Data & Observations → Analysis → Impact → Conclusion.',
+      tone: 'Analytical, objective, and inquisitive.',
+      example: 'Exploring the Evolving Role of Artificial Intelligence in U.S. National Security Strategy',
+      bestUse: 'When you want to explore a topic thoroughly before forming conclusions.'
     },
     {
       id: 'reflective',
@@ -177,14 +175,6 @@ const PaperTypeSelector = ({
     setSelectedType(e.target.value);
   };
 
-  const handlePageCountChange = (e) => {
-    const value = e.target.value;
-    // Allow only numbers or empty string
-    if (value === '' || /^\d+$/.test(value)) {
-      setPageCount(value);
-    }
-  };
-
   const handleProceedToThesis = () => {
     if (!selectedType) {
       alert("Please select a paper type before proceeding.");
@@ -193,19 +183,15 @@ const PaperTypeSelector = ({
     
     const selectedPaper = paperTypes.find(type => type.id === selectedType);
     
-    // Convert page count to the required format
-    const pageLengthValue = pageCount === '' ? -1 : parseInt(pageCount, 10);
-    
     setFinalized(true);
     setCollapsed(true);
     setSelectedPaperType(selectedPaper);
-    setPaperLength(pageLengthValue);
-    onPaperTypeSelected(selectedPaper, pageLengthValue);
+    onPaperTypeSelected(selectedPaper);
   };
 
   const handleEditPaperType = () => {
     if (finalized) {
-      alert("Warning: Changing the paper type or page length at this point will NOT modify any research outputs already generated unless subsequent sections are rerun.");
+      alert("Warning: Changing the paper type at this point will NOT modify any research outputs already generated unless subsequent sections are rerun.");
     }
     setFinalized(false);
     setCollapsed(false);
@@ -227,10 +213,10 @@ const PaperTypeSelector = ({
       </div>
 
       <h3>
-        Paper Type & Length Selection
+        Paper Type Selection
         {finalized && selectedPaper && (
           <small className="text-muted ms-2">
-            ({selectedPaper.name}{pageCount ? `, ${pageCount} pages` : ', Auto-adjusted'})
+            ({selectedPaper.name})
           </small>
         )}
       </h3>
@@ -250,30 +236,23 @@ const PaperTypeSelector = ({
                   onChange={handlePaperTypeChange}
                 >
                   <option value="">Choose a paper type...</option>
-                  {paperTypes.map(type => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
+                  {paperTypes.map(type => {
+                    const isEnabled = type.id === 'exploratory';
+                    return (
+                      <option 
+                        key={type.id} 
+                        value={type.id}
+                        disabled={!isEnabled}
+                        style={!isEnabled ? { color: '#ccc' } : {}}
+                      >
+                        {type.name}{!isEnabled ? ' (Coming Soon)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
-              <div className="mb-3">
-                <label htmlFor="pageCountInput" className="form-label">
-                  Paper Length (pages):
-                </label>
-                <input
-                  id="pageCountInput"
-                  type="text"
-                  className="form-control"
-                  value={pageCount}
-                  onChange={handlePageCountChange}
-                  placeholder="Leave blank to auto-adjust based on thesis scope"
-                />
-                <div className="form-text">
-                  Enter the desired number of pages, or leave blank to automatically adjust the length based on your thesis scope.
-                </div>
-              </div>
+
 
               {selectedPaper && (
                 <div className="card p-3 mb-3">
@@ -305,10 +284,11 @@ const PaperTypeSelector = ({
             <div className="mt-3">
               <div className="alert alert-success">
                 <strong>Selected Paper Type:</strong> {selectedPaper.name}
-                <br />
-                <strong>Paper Length:</strong> {pageCount ? `${pageCount} pages` : 'Auto-adjusted based on thesis scope'}
                 <div className="mt-2">
                   <small><strong>Purpose:</strong> {selectedPaper.purpose}</small>
+                </div>
+                <div>
+                  <small><strong>Structure:</strong> {selectedPaper.structure}</small>
                 </div>
                 <div>
                   <small><strong>Example:</strong> <em>"{selectedPaper.example}"</em></small>
@@ -318,7 +298,7 @@ const PaperTypeSelector = ({
                 className="btn btn-secondary"
                 onClick={handleEditPaperType}
               >
-                Edit Paper Type & Length
+                Edit Paper Type
               </button>
             </div>
           )}

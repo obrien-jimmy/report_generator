@@ -24,7 +24,10 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
     if (finalThesis && finalThesis.trim() !== '') {
       setFinalized(true);
       setCollapsed(true);
-      setRefinedThesis(finalThesis);
+      // Only set refinedThesis if it's different from initial (meaning it was actually refined)
+      if (refinedThesis && refinedThesis !== finalThesis) {
+        setRefinedThesis(refinedThesis);
+      }
     } else {
       setFinalized(false);
       setCollapsed(false);
@@ -122,14 +125,18 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
 
   // When finalizing, update the app state as well
   const handleFinalize = () => {
-    if (!refinedThesis.trim()) {
-      alert('Please refine your thesis before finalizing.');
+    // Use refined thesis if available, otherwise use initial thesis
+    const thesisToUse = refinedThesis.trim() || initialThesis.trim();
+    
+    if (!thesisToUse) {
+      alert('Please enter a thesis before proceeding.');
       return;
     }
+    
     setFinalized(true);
     setCollapsed(true);
-    setFinalThesis(refinedThesis); // <-- update app state
-    onFinalize(refinedThesis);
+    setFinalThesis(thesisToUse); // <-- update app state
+    onFinalize(thesisToUse);
   };
 
   const handleEdit = () => {
@@ -178,7 +185,7 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
             <>
               <div className="mb-3">
                 <label htmlFor="initialThesis" className="form-label">
-                  Enter your initial thesis or topic:
+                  Enter your thesis or topic:
                 </label>
                 <textarea
                   id="initialThesis"
@@ -188,6 +195,9 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
                   value={initialThesis}
                   onChange={(e) => setInitialThesis(e.target.value)}
                 />
+                <div className="form-text">
+                  You can proceed directly with your thesis, or use the optional refinement tools below.
+                </div>
               </div>
 
               {error && (
@@ -257,31 +267,38 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
                 </div>
               )}
 
-              <div className="mt-3 d-flex gap-2">
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleRefineThesis}
-                  disabled={loading || !initialThesis.trim()}
-                >
-                  {loading ? 'Refining...' : `Auto-Refine for ${selectedPaperType?.name || 'Paper'}`}
-                </button>
+              <div className="mt-3">
+                <div className="mb-2">
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleFinalize}
+                    disabled={!initialThesis.trim()}
+                  >
+                    Proceed to Source Categories
+                  </button>
+                </div>
+                
+                <div className="border-top pt-3">
+                  <h6 className="text-muted mb-2">Optional Thesis Refinement Tools:</h6>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={handleRefineThesis}
+                      disabled={loading || !initialThesis.trim()}
+                    >
+                      {loading ? 'Refining...' : `Auto-Refine for ${selectedPaperType?.name || 'Paper'}`}
+                    </button>
 
-                <button
-                  className="btn btn-outline-secondary"
-                  onClick={handleGenerateProbingQuestions}
-                  disabled={loadingQuestions || !initialThesis.trim() || showProbingQuestions}
-                >
-                  <FaQuestionCircle className="me-1" />
-                  {loadingQuestions ? 'Generating...' : 'Ask Probing Questions'}
-                </button>
-
-                <button
-                  className="btn btn-primary"
-                  onClick={handleFinalize}
-                  disabled={!refinedThesis.trim()}
-                >
-                  Proceed to Source Categories
-                </button>
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={handleGenerateProbingQuestions}
+                      disabled={loadingQuestions || !initialThesis.trim() || showProbingQuestions}
+                    >
+                      <FaQuestionCircle className="me-1" />
+                      {loadingQuestions ? 'Generating...' : 'Ask Probing Questions'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           ) : (
@@ -289,11 +306,11 @@ const ThesisRefinement = ({ finalThesis, setFinalThesis, onFinalize, selectedPap
               <div className="alert alert-success">
                 <strong>Finalized Thesis:</strong>
                 <div className="mt-2">
-                  {refinedThesis}
+                  {refinedThesis || initialThesis}
                 </div>
                 <div className="mt-2">
                   <small className="text-muted">
-                    Optimized for: {selectedPaperType?.name}
+                    {refinedThesis ? `Optimized for: ${selectedPaperType?.name}` : 'Ready for research'}
                   </small>
                 </div>
               </div>

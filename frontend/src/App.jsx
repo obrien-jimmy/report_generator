@@ -22,7 +22,6 @@ function App() {
   const [kbError, setKbError] = useState(null);
 
   const [finalThesis, setFinalThesis] = useState('');
-  const [paperLength, setPaperLength] = useState(null);
   const [sourceCategories, setSourceCategories] = useState([]);
   const [methodology, setMethodology] = useState('');
   const [readyForOutline, setReadyForOutline] = useState(false);
@@ -48,6 +47,11 @@ function App() {
   const [showDebugSections, setShowDebugSections] = useState(false);
 
   const [autoSave, setAutoSave] = useState(true);
+
+  // Structure refresh trigger
+  const [structureRefreshTrigger, setStructureRefreshTrigger] = useState(0);
+
+  // For Outline Draft 1
 
   // Ref for accessing ProjectManager's quickSave function
   const projectManagerRef = useRef(null);
@@ -112,13 +116,11 @@ function App() {
     setKbLoading(false);
   };
 
-  const handlePaperTypeSelected = (paperType, pageLength) => {
+  const handlePaperTypeSelected = (paperType) => {
     setSelectedPaperType(paperType);
-    setPaperLength(pageLength);
-    triggerAutoSave();
-  };
-
-  const handleThesisFinalized = (thesis) => {
+    
+    console.log('Paper type selected:', paperType);
+  };  const handleThesisFinalized = (thesis) => {
     setFinalThesis(thesis);
     setThesisFinalized(true);
     setSourceCategoriesActivated(true);
@@ -133,6 +135,7 @@ function App() {
 
   const proceedToOutline = () => {
     setReadyForOutline(true);
+    setStructureRefreshTrigger(prev => prev + 1); // Force paper structure refresh
     triggerAutoSave();
   };
 
@@ -206,7 +209,6 @@ function App() {
     
     // Restore all state
     setFinalThesis(data.finalThesis || '');
-    setPaperLength(data.paperLength ?? '');
     setSourceCategories(data.sourceCategories || []);
     setMethodology(data.methodology || '');
     setSelectedPaperType(data.selectedPaperType || null);
@@ -234,7 +236,6 @@ function App() {
     if (window.confirm('Create a new project? All unsaved changes will be lost.')) {
       // Reset all state
       setFinalThesis('');
-      setPaperLength(null);
       setSourceCategories([]);
       setMethodology('');
       setSelectedPaperType(null);
@@ -288,7 +289,6 @@ function App() {
             onLoadProject={handleLoadProject}
             onNewProject={handleNewProject}
             finalThesis={finalThesis}
-            paperLength={paperLength}
             sourceCategories={sourceCategories}
             methodology={methodology}
             selectedPaperType={selectedPaperType}
@@ -367,14 +367,12 @@ function App() {
                 <PaperTypeSelector
                   selectedPaperType={selectedPaperType}
                   setSelectedPaperType={setSelectedPaperType}
-                  paperLength={paperLength}
-                  setPaperLength={setPaperLength}
                   onPaperTypeSelected={handlePaperTypeSelected}
                 />
               </div>
 
               {/* Thesis Refinement Section */}
-              {selectedPaperType && paperLength !== null && (
+              {selectedPaperType && (
                 <div className="card p-3 mb-4">
                   <ThesisRefinement 
                     finalThesis={finalThesis}
@@ -390,7 +388,6 @@ function App() {
                 <div className="card p-3 mb-4">
                   <SourceCategories
                     finalThesis={finalThesis}
-                    paperLength={paperLength || 0}
                     onCategoriesSelected={handleCategoriesSelected}
                     savedCategories={sourceCategories} // <-- add this line
                   />
@@ -407,7 +404,6 @@ function App() {
                     setMethodology={handleMethodologySelected}
                     proceedToOutline={proceedToOutline}
                     selectedPaperType={selectedPaperType}
-                    pageCount={paperLength}
                   />
                 </div>
               )}
@@ -419,12 +415,12 @@ function App() {
                     key={outlineVersion}
                     finalThesis={finalThesis}
                     methodology={methodology}
-                    paperLength={paperLength || 0}
                     sourceCategories={sourceCategories}
                     selectedPaperType={selectedPaperType}
                     onFrameworkComplete={handleFrameworkComplete}
                     onTransferToLiteratureReview={handleTransferToLiteratureReview}
                     savedOutlineData={outlineData}
+                    refreshTrigger={structureRefreshTrigger}
                   />
                 </div>
               )}

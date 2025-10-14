@@ -10,7 +10,6 @@ const ContextPanel = ({
   selectedCategories,
   methodology,
   selectedPaperType,
-  pageCount,
   outline
 }) => {
   const [structurePreview, setStructurePreview] = useState(null);
@@ -38,7 +37,7 @@ const ContextPanel = ({
         paper_type: selectedPaperType.id,
         methodology_id: methodology.methodology_type || methodology.id,
         sub_methodology_id: methodology.sub_methodology_id || null,
-        page_count: pageCount || 10
+        page_count: 15  // Default page count
       });
       setStructurePreview(response.data);
     } catch (error) {
@@ -152,21 +151,7 @@ const ContextPanel = ({
               </div>
             )}
 
-            {/* Page Count */}
-            {pageCount && (
-              <div className="card mb-2">
-                <div className="card-body py-2">
-                  <div className="row">
-                    <div className="col-4">
-                      <small className="text-muted">Page Count:</small>
-                    </div>
-                    <div className="col-8">
-                      <small>{pageCount} pages</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Thesis */}
             {finalThesis && (

@@ -7,7 +7,6 @@ const ProjectManager = forwardRef(({
   onLoadProject, 
   onNewProject,
   finalThesis,
-  paperLength,
   sourceCategories,
   methodology,
   selectedPaperType,
@@ -74,7 +73,6 @@ const ProjectManager = forwardRef(({
       data: {
         // User inputs
         finalThesis,
-        paperLength,
         sourceCategories,
         methodology, // <-- should be the full object, not a string
         selectedPaperType,
@@ -153,7 +151,6 @@ const ProjectManager = forwardRef(({
           updatedAt: new Date().toISOString(),
           data: {
             finalThesis,
-            paperLength,
             sourceCategories,
             methodology,
             selectedPaperType,
@@ -187,7 +184,6 @@ const ProjectManager = forwardRef(({
       updatedAt: new Date().toISOString(),
       data: {
         finalThesis,
-        paperLength,
         sourceCategories,
         methodology, // <-- should be the full object, not a string
         selectedPaperType,

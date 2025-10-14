@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from schemas.data_analysis import (
     QuestionAnalysisRequest, DataAnalysisResponse, InclusionExclusionRequest, InclusionExclusionAnalysis,
-    BuildDataOutlineRequest, BuildDataOutlineResponse
+    BuildDataOutlineRequest, BuildDataOutlineResponse, SubsectionOutlineRequest, SubsectionOutlineResponse
 )
 from services.bedrock_service import invoke_bedrock
 from typing import List, Dict, Any, Union
@@ -852,3 +852,148 @@ def create_structured_outline_response(response_text: str, request: BuildDataOut
         integration_notes="Integrates findings from all 5 steps: context map review, logic analysis, Draft Outline 1 integration, custom framework construction, and citation-based enhancements.",
         methodology_alignment=f"This section aligns with the research methodology by providing systematic data analysis for {request.section_title}, supporting the methodological framework through evidence-based examination of cybersecurity elements."
     )
+
+@router.post("/generate-subsection-outline", response_model=SubsectionOutlineResponse)
+def generate_subsection_outline(request: SubsectionOutlineRequest):
+    """
+    Generate detailed 6-level academic outline for individual subsection.
+    Process one subsection at a time with context chain analysis.
+    """
+    try:
+        logger.info(f"Generating outline for: {request.context_chain.position} {request.context_chain.subsection_title}")
+        logger.info(f"Literature responses: {len(request.literature_responses)}")
+        
+        # Build comprehensive prompt for 6-level outline generation
+        outline_prompt = f"""
+You are an expert academic writer generating a detailed 6-level outline for a research subsection. 
+
+CONTEXT CHAIN ANALYSIS:
+Position: {request.context_chain.position}
+Subsection: {request.context_chain.subsection_title}
+Section: {request.context_chain.section_title}
+Context: {request.context_chain.subsection_context}
+Methodology Alignment: {request.context_chain.methodology_alignment}
+Thesis Connection: {request.context_chain.thesis_connection}
+
+RESEARCH FOUNDATION:
+Main Thesis: {request.thesis}
+Methodology: {request.methodology}
+Paper Type: {request.paper_type}
+
+LITERATURE REVIEW RESPONSES:
+{format_literature_responses(request.literature_responses)}
+
+OUTLINE REQUIREMENTS:
+- Generate exactly {request.outline_requirements.levels} levels of detail
+- Start at Level {request.outline_requirements.starting_level} (Arabic numerals: 1., 2., 3.)
+- Level 4: Lowercase letters (a), b), c))
+- Level 5: Lowercase Roman numerals (i), ii), iii))  
+- Level 6: Parenthetical numbers ((1), (2), (3))
+- Maximum {request.outline_requirements.max_points_per_level} points per level
+
+GENERATION TASKS:
+
+1. ANALYZE CONTEXT CHAIN: How do subsection context + methodology alignment + thesis connection create a logical foundation for this subsection?
+
+2. INTEGRATE LITERATURE RESPONSES: How do the literature review findings support and populate this subsection's content?
+
+3. GENERATE 6-LEVEL OUTLINE: Create a detailed academic outline that:
+   - Starts with 2-3 Level 3 points (1., 2., 3.)
+   - Each Level 3 has 2-3 Level 4 sub-points (a), b), c))
+   - Each Level 4 has 1-2 Level 5 deeper points (i), ii))
+   - Each Level 5 has 1-2 Level 6 finest details ((1), (2))
+   - Uses specific evidence from literature responses
+   - Maintains logical flow and academic rigor
+   - Incorporates proper citations
+
+RESPONSE FORMAT:
+Return a structured JSON with:
+- detailed_outline: Array of Level 3 objects with nested sub-levels
+- context_analysis: How context chain shapes this outline
+- literature_integration: How literature responses are integrated
+- outline_rationale: Why this structure serves the subsection purpose
+
+Each outline level should have: level, content, citations, and nested sub-points as applicable.
+Make content specific and evidence-based, not generic.
+"""
+
+        logger.info("Sending request to Bedrock for subsection outline generation")
+        
+        # Generate the outline using Claude
+        bedrock_response = invoke_bedrock(outline_prompt)
+        logger.info("Received response from Bedrock")
+        
+        # Parse and structure the response
+        try:
+            # Try to extract JSON from the response
+            import json
+            response_data = json.loads(bedrock_response)
+        except:
+            # If not JSON, create structured response from text
+            response_data = parse_outline_text_response(bedrock_response, request.context_chain)
+        
+        return SubsectionOutlineResponse(
+            detailed_outline=response_data.get('detailed_outline', []),
+            context_analysis=response_data.get('context_analysis', 'Context chain analysis completed'),
+            literature_integration=response_data.get('literature_integration', 'Literature responses integrated into outline structure'),
+            outline_rationale=response_data.get('outline_rationale', 'Outline structured to support subsection objectives and thesis connection')
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in generate_subsection_outline: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate subsection outline: {str(e)}")
+
+def format_literature_responses(responses: List[Dict]) -> str:
+    """Format literature responses for prompt inclusion"""
+    formatted = []
+    for i, response in enumerate(responses, 1):
+        content = response.get('content', '')
+        question = response.get('question', '')
+        citations = response.get('citations', [])
+        
+        formatted.append(f"""
+Response {i}:
+Question: {question if question else 'General response'}
+Content: {content[:500]}{'...' if len(content) > 500 else ''}
+Citations: {len(citations)} citations available
+""")
+    
+    return '\n'.join(formatted)
+
+def parse_outline_text_response(text_response: str, context_chain) -> Dict:
+    """Parse text response into structured outline format"""
+    # Simple fallback structure if JSON parsing fails
+    return {
+        "detailed_outline": [
+            {
+                "level": "1.",
+                "content": f"Primary analysis of {context_chain.subsection_title}",
+                "citations": [],
+                "reference": "Based on literature review findings",
+                "subPoints": [
+                    {
+                        "level": "a)",
+                        "content": "Supporting evidence from research",
+                        "citations": [],
+                        "deeperPoints": [
+                            {
+                                "level": "i)",
+                                "content": "Detailed analysis point",
+                                "citations": [],
+                                "level6Points": [
+                                    {
+                                        "level": "(1)",
+                                        "content": "Specific supporting detail",
+                                        "citations": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "context_analysis": f"Context chain for {context_chain.subsection_title} establishes clear foundation",
+        "literature_integration": "Literature responses integrated to support outline structure",
+        "outline_rationale": "Structure designed to systematically address subsection objectives"
+    }

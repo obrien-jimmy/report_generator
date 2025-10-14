@@ -88,14 +88,13 @@ class PaperStructureService:
             "References (APA 7th)"
         ],
         "exploratory": [
-            "Title Page",
-            "Abstract",
-            "Introduction (Open‑ended Question)",
-            "Background & Current Knowledge",
-            "Exploration of Perspectives",
-            "Synthesis of Insights",
-            "Tentative Conclusions / Future Questions",
-            "References (APA 7th)"
+            "Introduction",
+            "Background",
+            "Methodology and Approach",
+            "Data & Observations",
+            "Analysis",
+            "Impact",
+            "Conclusion"
         ],
         "reflective": [
             "Title Page",
@@ -409,10 +408,10 @@ class PaperStructureService:
         "mixed_methods": {
             "insert_after": "Introduction",
             "sections": [
-                "Design Rationale (Mixed)",
-                "Data Sources & Collection",
-                "Quantitative Component",
-                "Qualitative Component",
+                "Design Rationale (Mixed Methods)",
+                "Textual Data Sources & Collection",
+                "Quantitative Textual Analysis",
+                "Qualitative Document Analysis",
                 "Integration & Interpretation",
                 "Limitations"
             ]
@@ -441,9 +440,9 @@ class PaperStructureService:
             "insert_after": "Introduction",
             "sections": [
                 "Search & Selection",
-                "Quantitative Synthesis",
-                "Qualitative Synthesis",
-                "Meta‑integration",
+                "Quantitative Textual Synthesis",
+                "Qualitative Document Synthesis",
+                "Mixed-Methods Integration",
                 "Recommendations"
             ]
         }
@@ -582,58 +581,32 @@ class PaperStructureService:
     @staticmethod
     def categorize_section(section_title: str) -> str:
         """
-        Categorize a section based on its title and content type for Data and Observations processing.
+        Categorize a section based on its title - HARDCODED ONLY for exploratory papers.
         
         Categories:
-        - Admin: Administrative sections (Title, Abstract, References)
-        - Intro: Introduction and opening sections
-        - Method: Methodology-related sections (frameworks, models, analytical approaches)
-        - Data: Core analysis and component sections (main research content)
-        - Analysis: Analysis discussion, synthesis, evaluation sections
-        - Summary: Conclusion and closing sections
+        - Intro: Introduction sections
+        - Method: Methodology sections  
+        - Data: Data and background sections
+        - Analysis: Analysis sections
+        - Summary: Conclusion sections
         """
-        section_lower = section_title.lower()
+        section_lower = section_title.lower().strip()
         
-        # Admin sections
-        if any(term in section_lower for term in [
-            'title page', 'abstract', 'references', 'bibliography', 'appendix'
-        ]):
-            return 'Admin'
-        
-        # Intro sections
-        if any(term in section_lower for term in [
-            'introduction', 'background', 'context', 'overview', 'scope'
-        ]):
+        # HARDCODED ONLY mapping - no keyword matching allowed
+        if section_lower == 'introduction':
             return 'Intro'
-        
-        # Method sections (frameworks, models, analytical approaches)
-        if any(term in section_lower for term in [
-            'analytical framework', 'model', 'methodology', 'method', 'approach',
-            'framework', 'theoretical', 'literature context', 'proposed solution'
-        ]):
+        elif section_lower == 'background':
+            return 'Data'
+        elif section_lower == 'methodology and approach':
             return 'Method'
-        
-        # Summary sections
-        if any(term in section_lower for term in [
-            'conclusion', 'summary', 'implications', 'future', 'lessons learned',
-            'reflections', 'tentative conclusions'
-        ]):
+        elif section_lower == 'data & observations':
+            return 'Data'
+        elif section_lower == 'analysis':
+            return 'Analysis'
+        elif section_lower == 'impact':
+            return 'Analysis'
+        elif section_lower == 'conclusion':
             return 'Summary'
         
-        # Analysis sections
-        if any(term in section_lower for term in [
-            'synthesis', 'discussion', 'evaluation', 'assessment', 'analysis',
-            'critique', 'reaction', 'inter-relationships', 'comparison',
-            'counterarguments', 'rebuttals', 'overall assessment'
-        ]):
-            return 'Analysis'
-        
-        # Data sections (core analysis components - explicitly include component)
-        if any(term in section_lower for term in [
-            'component', 'body', 'claim', 'evidence', 'facts', 'timeline',
-            'description', 'cause', 'effect', 'example'
-        ]):
-            return 'Data'
-        
-        # Default to Data for main content sections
+        # For any other sections, return 'Data' as default
         return 'Data'

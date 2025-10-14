@@ -10,7 +10,6 @@ class MethodologySelectionRequest(BaseModel):
     paper_tone: str
     paper_structure: str
     source_categories: List[str]
-    page_count: int
 
 class MethodologyOption(BaseModel):
     id: str

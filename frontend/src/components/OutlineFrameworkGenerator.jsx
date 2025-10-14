@@ -9,12 +9,12 @@ import RetryService from '../services/retryService';
 const OutlineGenerator = ({ 
   finalThesis, 
   methodology, 
-  paperLength, 
   sourceCategories, 
   selectedPaperType, 
   onFrameworkComplete, 
   onTransferToLiteratureReview,
-  savedOutlineData
+  savedOutlineData,
+  refreshTrigger
 }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -77,9 +77,7 @@ const OutlineGenerator = ({
     }
     
     try {
-      const safePaperLength = paperLength === 'Maximum Detail' ? -2 :
-                              paperLength === 'Adjusted Based on Thesis' ? -1 :
-                              parseInt(paperLength, 10);
+      const safePaperLength = 15;  // Default to reasonable page length
 
       const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
       // const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;  // Removed from production, kept for future consideration
@@ -493,11 +491,11 @@ const OutlineGenerator = ({
             paperType={selectedPaperType}
             methodology={methodology?.methodologyType || methodology?.methodology_type}
             // subMethodology={methodology?.subMethodology || methodology?.sub_methodology}  // Removed from production, kept for future consideration
-            paperLength={paperLength}
             onStructureChange={handleStructureChange}
             onGenerateOutline={() => generateOutline(false)}
             loading={false}
             hasGenerated={hasGenerated}
+            refreshTrigger={refreshTrigger}
           />
 
           {customStructure && (
@@ -632,7 +630,6 @@ const OutlineGenerator = ({
                                                 onRemoveCitation={(citationIndex) => handleRemoveCitation(sectionIndex, subIndex, questionIndex, citationIndex)}
                                                 finalThesis={finalThesis}
                                                 methodology={methodology}
-                                                paperLength={paperLength}
                                                 sourceCategories={sourceCategories}
                                               />
                                             </div>

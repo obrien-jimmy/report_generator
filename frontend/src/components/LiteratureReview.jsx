@@ -407,19 +407,39 @@ const LiteratureReview = ({
           const fusedResponse = questionResponses[questionResponses.length - 1];
           const citations = question.citations || [];
           
-          // Create main point from fused response
-          const mainPoint = {
-            level: `${pointCounter}`,
-            type: 'number',
-            content: extractMainContentFromResponse(fusedResponse, question.question),
-            citations: extractCitationNumbers(fusedResponse),
-            reference: `Research Question ${questionIndex + 1}: ${question.question}`,
-            editable: true,
-            subPoints: generateSubPointsFromResponse(fusedResponse, citations)
-          };
+          console.log(`🔍 Processing fused response for Q${questionIndex + 1}:`, fusedResponse.substring(0, 100) + '...');
           
-          masterOutline.push(mainPoint);
-          pointCounter++;
+          // Try to parse as structured outline first
+          const structuredPoints = parseStructuredOutline(fusedResponse);
+          
+          if (structuredPoints.length > 0) {
+            console.log(`✅ Found ${structuredPoints.length} structured points for Q${questionIndex + 1}`);
+            // Use structured outline points directly
+            structuredPoints.forEach((point, index) => {
+              const adjustedPoint = {
+                ...point,
+                level: `${pointCounter}`,
+                reference: `Research Question ${questionIndex + 1}: ${question.question}`
+              };
+              masterOutline.push(adjustedPoint);
+              pointCounter++;
+            });
+          } else {
+            console.log(`📄 No structured outline found for Q${questionIndex + 1}, using fallback approach`);
+            // Fallback to original approach
+            const mainPoint = {
+              level: `${pointCounter}`,
+              type: 'number',
+              content: extractMainContentFromResponse(fusedResponse, question.question),
+              citations: extractCitationNumbers(fusedResponse),
+              reference: `Research Question ${questionIndex + 1}: ${question.question}`,
+              editable: true,
+              subPoints: generateSubPointsFromResponse(fusedResponse, citations)
+            };
+            
+            masterOutline.push(mainPoint);
+            pointCounter++;
+          }
         }
       });
     }
@@ -435,18 +455,7 @@ const LiteratureReview = ({
     };
   };
 
-  // Extract main content from fused response
-  const extractMainContentFromResponse = (response, question) => {
-    if (!response) return `Analysis of: ${question}`;
-    
-    // Extract the first substantial paragraph as main content
-    const paragraphs = response.split('\n\n').filter(p => p.trim().length > 50);
-    if (paragraphs.length > 0) {
-      return paragraphs[0].trim().substring(0, 200) + (paragraphs[0].length > 200 ? '...' : '');
-    }
-    
-    return response.substring(0, 150) + (response.length > 150 ? '...' : '');
-  };
+
 
   // Extract citation numbers from response text
   const extractCitationNumbers = (text) => {
@@ -460,15 +469,237 @@ const LiteratureReview = ({
     return [...new Set(numbers)]; // Remove duplicates
   };
 
-  // Generate sub-points from response content
+  // Parse structured outline from fused response, filtering out non-outline content
+  const parseStructuredOutline = (response) => {
+    if (!response) return [];
+    
+    console.log('🔍 Parsing structured outline from response:', response.substring(0, 200) + '...');
+    
+    // Split response into lines
+    const lines = response.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    const outlinePoints = [];
+    let currentLevel1 = null;
+    let currentLevel2 = null;
+    let currentLevel3 = null;
+    let currentLevel4 = null;
+    let currentLevel5 = null;
+    
+    for (const line of lines) {
+      // Skip introductory text, explanations, and non-outline content
+      if (isNonOutlineContent(line)) {
+        console.log('⏭️ Skipping non-outline content:', line.substring(0, 50) + '...');
+        continue;
+      }
+      
+      // Parse different outline levels
+      const outlineLevel = detectOutlineLevel(line);
+      
+      if (outlineLevel) {
+        const { level, type, number, content, citations } = outlineLevel;
+        
+        switch (type) {
+          case 'level1': // 1., 2., 3.
+            currentLevel1 = {
+              level: number,
+              type: 'number',
+              content: content,
+              citations: citations,
+              reference: 'From fused literature analysis',
+              editable: true,
+              subPoints: []
+            };
+            outlinePoints.push(currentLevel1);
+            currentLevel2 = currentLevel3 = currentLevel4 = currentLevel5 = null;
+            break;
+            
+          case 'level2': // a., b., c.
+            if (currentLevel1) {
+              currentLevel2 = {
+                level: number,
+                type: 'lowercase',
+                content: content,
+                citations: citations,
+                reference: 'Supporting evidence from literature',
+                editable: true,
+                deeperPoints: []
+              };
+              currentLevel1.subPoints.push(currentLevel2);
+              currentLevel3 = currentLevel4 = currentLevel5 = null;
+            }
+            break;
+            
+          case 'level3': // i., ii., iii.
+            if (currentLevel2) {
+              currentLevel3 = {
+                level: number,
+                type: 'roman',
+                content: content,
+                citations: citations,
+                reference: 'Detailed evidence',
+                editable: true,
+                level6Points: []
+              };
+              currentLevel2.deeperPoints.push(currentLevel3);
+              currentLevel4 = currentLevel5 = null;
+            }
+            break;
+            
+          case 'level4': // 1), 2), 3)
+            if (currentLevel3) {
+              currentLevel4 = {
+                level: `${number})`,
+                type: 'number_paren',
+                content: content,
+                citations: citations,
+                reference: 'Specific detail',
+                editable: true,
+                subPoints: []
+              };
+              currentLevel3.level6Points.push(currentLevel4);
+              currentLevel5 = null;
+            }
+            break;
+            
+          case 'level5': // a), b), c)
+            if (currentLevel4) {
+              currentLevel5 = {
+                level: `${number})`,
+                type: 'letter_paren',
+                content: content,
+                citations: citations,
+                reference: 'Supporting detail',
+                editable: true
+              };
+              currentLevel4.subPoints.push(currentLevel5);
+            }
+            break;
+        }
+      }
+    }
+    
+    console.log(`✅ Parsed ${outlinePoints.length} main outline points from structured response`);
+    return outlinePoints;
+  };
+
+  // Detect if content is non-outline (introductory text, explanations, etc.)
+  const isNonOutlineContent = (line) => {
+    const nonOutlinePatterns = [
+      /^Here is.*outline/i,
+      /^Below is.*outline/i,
+      /^This.*outline/i,
+      /^The.*outline/i,
+      /captures.*key points/i,
+      /master outline/i,
+      /combining.*arguments/i,
+      /grouped by/i,
+      /with contradictions/i,
+      /using.*format/i,
+      /^Contradictions?:/i,
+      /^None detected/i,
+      /across.*citations/i,
+      /without.*contradictions/i,
+      /highlighting.*rise/i,
+      /between sources/i,
+      /^Note:/i,
+      /^Summary:/i,
+      /^Conclusion:/i
+    ];
+    
+    return nonOutlinePatterns.some(pattern => pattern.test(line));
+  };
+
+  // Detect outline level and extract content (with indentation support)
+  const detectOutlineLevel = (line) => {
+    // Remove leading whitespace but preserve the pattern
+    const trimmedLine = line.trim();
+    
+    // Level 1: 1., 2., 3., etc.
+    const level1Match = trimmedLine.match(/^(\d+)\.\s+(.+)/);
+    if (level1Match) {
+      return {
+        level: level1Match[1],
+        type: 'level1',
+        number: level1Match[1] + '.',
+        content: level1Match[2],
+        citations: extractCitationNumbers(line)
+      };
+    }
+    
+    // Level 2: a., b., c., etc. (with optional indentation)
+    const level2Match = trimmedLine.match(/^([a-z])\.\s+(.+)/);
+    if (level2Match) {
+      return {
+        level: level2Match[1],
+        type: 'level2', 
+        number: level2Match[1] + ')',
+        content: level2Match[2],
+        citations: extractCitationNumbers(line)
+      };
+    }
+    
+    // Level 3: i., ii., iii., etc. (with optional indentation)
+    const level3Match = trimmedLine.match(/^(i{1,3}v?|iv|v|vi{1,3}|ix|x|xi{1,3})\.\s+(.+)/);
+    if (level3Match) {
+      return {
+        level: level3Match[1],
+        type: 'level3',
+        number: level3Match[1] + ')',
+        content: level3Match[2], 
+        citations: extractCitationNumbers(line)
+      };
+    }
+    
+    // Level 4: 1), 2), 3), etc. (with optional indentation)
+    const level4Match = trimmedLine.match(/^(\d+)\)\s+(.+)/);
+    if (level4Match) {
+      return {
+        level: level4Match[1],
+        type: 'level4',
+        number: level4Match[1],
+        content: level4Match[2],
+        citations: extractCitationNumbers(line)
+      };
+    }
+    
+    // Level 5: a), b), c), etc. (with optional indentation)
+    const level5Match = trimmedLine.match(/^([a-z])\)\s+(.+)/);
+    if (level5Match) {
+      return {
+        level: level5Match[1],
+        type: 'level5',
+        number: level5Match[1],
+        content: level5Match[2],
+        citations: extractCitationNumbers(line)
+      };
+    }
+    
+    return null;
+  };
+
+  // Generate sub-points from response content with full 6-level hierarchy
   const generateSubPointsFromResponse = (response, citations) => {
     if (!response) return [];
     
+    console.log('📝 Processing response for sub-points generation');
+    
+    // First try to parse as structured outline
+    const structuredOutline = parseStructuredOutline(response);
+    if (structuredOutline.length > 0) {
+      console.log('✅ Using structured outline parsing');
+      return structuredOutline;
+    }
+    
+    console.log('📄 Falling back to paragraph-based parsing');
+    
+    // Fallback to original paragraph-based approach if no structured outline found
     const paragraphs = response.split('\n\n').filter(p => p.trim().length > 30);
     const subPoints = [];
     
-    // Create sub-points from subsequent paragraphs (skip first which is main content)
+    // Create Level 4 sub-points (a), b), c)...) from response paragraphs
     paragraphs.slice(1, 4).forEach((paragraph, index) => {
+      const sentences = paragraph.split('.').filter(s => s.trim().length > 20);
+      
       const subPoint = {
         level: String.fromCharCode(97 + index), // a, b, c
         type: 'lowercase',
@@ -476,12 +707,60 @@ const LiteratureReview = ({
         citations: extractCitationNumbers(paragraph),
         reference: `Supporting analysis from literature review`,
         editable: true,
-        deeperPoints: []
+        deeperPoints: generateLevel5Points(sentences, paragraph) // Level 5: i), ii), iii)
       };
       subPoints.push(subPoint);
     });
     
     return subPoints;
+  };
+
+  // Generate Level 5 points (i), ii), iii)...)
+  const generateLevel5Points = (sentences, parentText) => {
+    const level5Points = [];
+    const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi'];
+    
+    // Create up to 3 Level 5 points from sentences
+    sentences.slice(0, 3).forEach((sentence, index) => {
+      if (sentence.trim().length > 15) {
+        const level5Point = {
+          level: romanNumerals[index] || `${index + 1}`,
+          type: 'roman',
+          content: sentence.trim() + (sentence.includes('.') ? '' : '.'),
+          citations: extractCitationNumbers(sentence),
+          reference: 'Supporting evidence from analysis',
+          editable: true,
+          level6Points: generateLevel6Points(sentence) // Level 6: (1), (2), (3)
+        };
+        level5Points.push(level5Point);
+      }
+    });
+    
+    return level5Points;
+  };
+
+  // Generate Level 6 points (1), (2), (3)...)
+  const generateLevel6Points = (sentence) => {
+    const level6Points = [];
+    
+    // Split sentence into clauses for Level 6 details
+    const clauses = sentence.split(/[,;]/).filter(c => c.trim().length > 10);
+    
+    clauses.slice(0, 2).forEach((clause, index) => {
+      if (clause.trim().length > 8) {
+        const level6Point = {
+          level: `(${index + 1})`,
+          type: 'number-paren',
+          content: clause.trim(),
+          citations: extractCitationNumbers(clause),
+          reference: 'Further detail',
+          editable: true
+        };
+        level6Points.push(level6Point);
+      }
+    });
+    
+    return level6Points;
   };
 
   // Toggle context map visibility
@@ -571,6 +850,29 @@ const LiteratureReview = ({
     return completeOutline;
   };
 
+  // Extract main content from response, filtering out introductory text
+  const extractMainContentFromResponse = (response, questionText) => {
+    if (!response) return questionText || 'Analysis point';
+    
+    // Split into sentences and find the first substantial content
+    const sentences = response.split(/[.!?]/).filter(s => s.trim().length > 20);
+    
+    for (const sentence of sentences) {
+      const trimmed = sentence.trim();
+      
+      // Skip introductory phrases
+      if (isNonOutlineContent(trimmed)) continue;
+      
+      // Return first substantial content sentence
+      if (trimmed.length > 30) {
+        return trimmed.length > 150 ? trimmed.substring(0, 150) + '...' : trimmed;
+      }
+    }
+    
+    // Fallback to question text or generic content
+    return questionText || 'Analysis of research findings';
+  };
+
   // Utility functions for numbering
   const toRomanNumeral = (num) => {
     const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
@@ -579,6 +881,19 @@ const LiteratureReview = ({
 
   const toLetter = (num) => {
     return String.fromCharCode(65 + num); // A, B, C, D...
+  };
+
+  const toLowercaseLetter = (num) => {
+    return String.fromCharCode(97 + num); // a, b, c, d...
+  };
+
+  const toLowercaseRoman = (num) => {
+    const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii', 'xiii', 'xiv', 'xv'];
+    return romanNumerals[num - 1] || `${num}`;
+  };
+
+  const toParentheticalNumber = (num) => {
+    return `(${num})`;
   };
 
   // Generate all responses for a question: one per citation, then fused
@@ -1746,11 +2061,11 @@ const LiteratureReview = ({
                                     </div>
                                   </div>
                                   
-                                  {/* Sub Points (a, b, c...) */}
+                                  {/* Level 4: Sub Points (a), b), c)...) */}
                                   {mainPoint.subPoints && mainPoint.subPoints.map((subPoint, subPointIndex) => (
                                     <div key={subPointIndex} className="ms-4 mb-2">
                                       <div className="d-flex align-items-start">
-                                        <span className="me-2 fw-bold text-secondary" style={{ minWidth: '25px' }}>
+                                        <span className="me-2 fw-bold text-secondary" style={{ minWidth: '30px', fontSize: '0.9rem' }}>
                                           {subPoint.level})
                                         </span>
                                         <div className="flex-grow-1">
@@ -1773,25 +2088,61 @@ const LiteratureReview = ({
                                         </div>
                                       </div>
                                       
-                                      {/* Deeper Points (i, ii, iii...) */}
+                                      {/* Level 5: Deeper Points (i), ii), iii)...) */}
                                       {subPoint.deeperPoints && subPoint.deeperPoints.map((deeperPoint, deeperIndex) => (
                                         <div key={deeperIndex} className="ms-4 mb-1">
                                           <div className="d-flex align-items-start">
-                                            <span className="me-2 text-muted" style={{ minWidth: '25px' }}>
+                                            <span className="me-2 text-muted fw-bold" style={{ minWidth: '30px', fontSize: '0.85rem' }}>
                                               {deeperPoint.level})
                                             </span>
-                                            <textarea
-                                              className="form-control form-control-sm"
-                                              rows="1"
-                                              value={deeperPoint.content}
-                                              onChange={(e) => {
-                                                // Handle deeper point editing
-                                                const newOutlines = [...masterOutlines];
-                                                newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].deeperPoints[deeperIndex].content = e.target.value;
-                                                setMasterOutlines(newOutlines);
-                                              }}
-                                            />
+                                            <div className="flex-grow-1">
+                                              <textarea
+                                                className="form-control form-control-sm mb-1"
+                                                rows="1"
+                                                value={deeperPoint.content}
+                                                onChange={(e) => {
+                                                  // Handle deeper point editing
+                                                  const newOutlines = [...masterOutlines];
+                                                  newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].deeperPoints[deeperIndex].content = e.target.value;
+                                                  setMasterOutlines(newOutlines);
+                                                }}
+                                              />
+                                              {deeperPoint.citations && deeperPoint.citations.length > 0 && (
+                                                <div className="small text-muted">
+                                                  Citations: {deeperPoint.citations.map(c => `[${c}]`).join(' ')}
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
+                                          
+                                          {/* Level 6: Finest Details (1), (2), (3)...) */}
+                                          {deeperPoint.level6Points && deeperPoint.level6Points.map((level6Point, level6Index) => (
+                                            <div key={level6Index} className="ms-4 mb-1">
+                                              <div className="d-flex align-items-start">
+                                                <span className="me-2 text-muted" style={{ minWidth: '35px', fontSize: '0.8rem' }}>
+                                                  {level6Point.level}
+                                                </span>
+                                                <div className="flex-grow-1">
+                                                  <textarea
+                                                    className="form-control form-control-sm"
+                                                    rows="1"
+                                                    value={level6Point.content}
+                                                    onChange={(e) => {
+                                                      // Handle level 6 point editing
+                                                      const newOutlines = [...masterOutlines];
+                                                      newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].deeperPoints[deeperIndex].level6Points[level6Index].content = e.target.value;
+                                                      setMasterOutlines(newOutlines);
+                                                    }}
+                                                  />
+                                                  {level6Point.citations && level6Point.citations.length > 0 && (
+                                                    <div className="small text-muted">
+                                                      Citations: {level6Point.citations.map(c => `[${c}]`).join(' ')}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
                                         </div>
                                       ))}
                                     </div>

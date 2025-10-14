@@ -1,32 +1,27 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaList, FaEye, FaEyeSlash, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaArrowUp, FaArrowDown, FaSpinner, FaCheck } from 'react-icons/fa';
+import { FaList, FaEye, FaEyeSlash, FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaArrowUp, FaArrowDown, FaSpinner, FaCheck, FaSync } from 'react-icons/fa';
 
 const PaperStructurePreview = ({ 
   paperType, 
   methodology, 
   // subMethodology,  // Removed from production, kept for future consideration
-  paperLength, 
   onStructureChange,
   onGenerateOutline, // Add this prop
   loading, // Add this prop  
-  hasGenerated // Add this prop
+  hasGenerated, // Add this prop
+  refreshTrigger // Add this prop to force refresh
 }) => {
   const [structureData, setStructureData] = useState(null);
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [editableStructure, setEditableStructure] = useState([]);
   const [editingMode, setEditingMode] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Calculate total pages based on paperLength
+  // Calculate total pages based on default
   const getTotalPages = () => {
-    if (paperLength === 'Maximum Detail') {
-      return 25;
-    } else if (paperLength === 'Adjusted Based on Thesis') {
-      return 15;
-    } else {
-      return parseInt(paperLength, 10) || 10;
-    }
+    return 15;  // Default page count
   };
 
   const totalPages = getTotalPages();
@@ -37,12 +32,19 @@ const PaperStructurePreview = ({
     }
   }, [paperType, methodology]); // Removed subMethodology dependency - kept for future consideration
 
-  // Re-initialize structure when paperLength changes
+  // Force refresh when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger && paperType?.id && methodology) {
+      fetchStructure();
+    }
+  }, [refreshTrigger]);
+
+  // Re-initialize structure when needed
   useEffect(() => {
     if (structureData) {
       initializeEditableStructure(structureData);
     }
-  }, [paperLength]);
+  }, [structureData]);
 
   const fetchStructure = async () => {
     setError(null);
@@ -80,36 +82,44 @@ const PaperStructurePreview = ({
     const sections = data.structure.map((section, index) => {
       const isAdmin = ['Title Page', 'Abstract', 'References (APA 7th)'].includes(section);
       
-      // Determine section type for tagging using proper categorization
-      const sectionLower = section.toLowerCase();
-      const isIntro = sectionLower.includes('introduction') || sectionLower.includes('background') || 
-                      sectionLower.includes('context') || sectionLower.includes('overview') || 
-                      sectionLower.includes('scope');
-      const isSummary = sectionLower.includes('conclusion') || sectionLower.includes('summary') ||
-                        sectionLower.includes('implications') || sectionLower.includes('future') ||
-                        sectionLower.includes('lessons learned') || sectionLower.includes('reflections');
+      // HARDCODED categorization matching backend logic for exploratory papers
+      const sectionLower = section.toLowerCase().trim();
       
-      // Method sections (analytical frameworks, methodology, etc.)
-      const isMethodology = !isAdmin && !isIntro && !isSummary && (
-        sectionLower.includes('analytical framework') || sectionLower.includes('model') ||
-        sectionLower.includes('methodology') || sectionLower.includes('method') ||
-        sectionLower.includes('approach') || sectionLower.includes('framework') ||
-        sectionLower.includes('theoretical') || sectionLower.includes('literature context') ||
-        sectionLower.includes('proposed solution')
-      );
+      // Use exact hardcoded mapping for exploratory sections
+      let category = 'Data'; // Default
+      let isIntro = false;
+      let isSummary = false; 
+      let isMethodology = false;
+      let isAnalysis = false;
+      let isData = true; // Default
       
-      // Analysis sections 
-      const isAnalysis = !isAdmin && !isIntro && !isSummary && !isMethodology && (
-        sectionLower.includes('synthesis') || sectionLower.includes('discussion') ||
-        sectionLower.includes('evaluation') || sectionLower.includes('assessment') ||
-        sectionLower.includes('analysis') || sectionLower.includes('critique') ||
-        sectionLower.includes('reaction') || sectionLower.includes('inter-relationships') ||
-        sectionLower.includes('comparison') || sectionLower.includes('counterarguments') ||
-        sectionLower.includes('rebuttals') || sectionLower.includes('overall assessment')
-      );
-      
-      // Data sections (components, body content, etc.) - everything else that's not categorized above
-      const isData = !isAdmin && !isIntro && !isSummary && !isMethodology && !isAnalysis;
+      if (sectionLower === 'introduction') {
+        category = 'Intro';
+        isIntro = true;
+        isData = false;
+      } else if (sectionLower === 'background') {
+        category = 'Data';
+        isData = true;
+      } else if (sectionLower === 'methodology and approach') {
+        category = 'Method';
+        isMethodology = true;
+        isData = false;
+      } else if (sectionLower === 'data & observations') {
+        category = 'Data';
+        isData = true;
+      } else if (sectionLower === 'analysis') {
+        category = 'Analysis';
+        isAnalysis = true;
+        isData = false;
+      } else if (sectionLower === 'impact') {
+        category = 'Analysis';
+        isAnalysis = true;
+        isData = false;
+      } else if (sectionLower === 'conclusion') {
+        category = 'Summary';
+        isSummary = true;
+        isData = false;
+      }
       console.log('- Final isMethodology:', isMethodology);
       
       // Calculate default percentage allocation
@@ -144,6 +154,7 @@ const PaperStructurePreview = ({
         isSummary,
         isAnalysis,
         isData,
+        category, // Add the hardcoded category
         order: index
       };
     });
@@ -280,6 +291,22 @@ const PaperStructurePreview = ({
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const toggleEditingMode = () => setEditingMode(prev => !prev);
 
+  const handleRefreshStructure = async () => {
+    if (!paperType?.id || !methodology) {
+      return;
+    }
+    
+    setRefreshing(true);
+    try {
+      await fetchStructure();
+    } catch (err) {
+      console.error('Error refreshing structure:', err);
+      setError('Failed to refresh structure. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="alert alert-info">
@@ -316,6 +343,18 @@ const PaperStructurePreview = ({
           </span>
         </div>
         <div className="d-flex gap-2">
+          <button
+            className="btn btn-sm btn-outline-success"
+            onClick={handleRefreshStructure}
+            title="Refresh paper structure"
+            disabled={!paperType?.id || !methodology || refreshing}
+          >
+            {refreshing ? (
+              <FaSpinner className="fa-spin" />
+            ) : (
+              <FaSync />
+            )}
+          </button>
           <button
             className="btn btn-sm btn-outline-primary"
             onClick={addSection}
@@ -468,19 +507,19 @@ const PaperStructurePreview = ({
                           {section.isAdmin && (
                             <span className="badge bg-secondary" style={{ minWidth: '50px' }}>Admin</span>
                           )}
-                          {section.isMethodology && (
+                          {!section.isAdmin && section.category === 'Method' && (
                             <span className="badge bg-primary" style={{ minWidth: '50px' }}>Method</span>
                           )}
-                          {section.isIntro && (
+                          {!section.isAdmin && section.category === 'Intro' && (
                             <span className="badge bg-success" style={{ minWidth: '50px' }}>Intro</span>
                           )}
-                          {section.isSummary && (
+                          {!section.isAdmin && section.category === 'Summary' && (
                             <span className="badge bg-success" style={{ minWidth: '50px' }}>Summary</span>
                           )}
-                          {section.isAnalysis && (
+                          {!section.isAdmin && section.category === 'Analysis' && (
                             <span className="badge bg-warning" style={{ minWidth: '50px' }}>Analysis</span>
                           )}
-                          {section.isData && (
+                          {!section.isAdmin && section.category === 'Data' && (
                             <span className="badge bg-info" style={{ minWidth: '50px' }}>Data</span>
                           )}
                         </div>

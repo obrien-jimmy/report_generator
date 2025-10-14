@@ -19,7 +19,6 @@ class OutlineGenerationResponse(BaseModel):
 class SectionGenerationRequest(BaseModel):
     final_thesis: str
     methodology: Dict[str, Any]  # Can handle both string and object formats
-    paper_length_pages: int
     source_categories: List[str]
 
 class SectionGenerationResponse(BaseModel):
@@ -30,7 +29,6 @@ class SubsectionGenerationRequest(BaseModel):
     section_context: str
     final_thesis: str
     methodology: Dict[str, Any]
-    paper_length_pages: int
     source_categories: Optional[List[str]] = []
 
 class SubsectionGenerationResponse(BaseModel):
@@ -71,7 +69,6 @@ class CitationGenerationResponse(BaseModel):
 class OutlineRequest(BaseModel):
     final_thesis: str
     methodology: str
-    paper_length_pages: int
     source_categories: List[str]
 
 class OutlineResponse(BaseModel):
@@ -80,7 +77,6 @@ class OutlineResponse(BaseModel):
 class SectionsRequest(BaseModel):
     final_thesis: str
     methodology: str
-    paper_length_pages: int
     source_categories: List[str]
 
 class SectionsResponse(BaseModel):
@@ -91,7 +87,6 @@ class SubsectionsRequest(BaseModel):
     methodology: str
     section_title: str
     section_context: str
-    paper_length_pages: int
     source_categories: List[str]
 
 class SubsectionsResponse(BaseModel):

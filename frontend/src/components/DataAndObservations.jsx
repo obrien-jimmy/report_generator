@@ -684,120 +684,279 @@ const DataAndObservations = ({
     }
   };
 
-  // Step 3: Detailed Outline Builder - iteratively build comprehensive outlines using context from Draft Outline 1
+  // Step 3: Simplified Sequential Subsection Builder 
+  const [currentSubsectionIndex, setCurrentSubsectionIndex] = useState(0);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [subsectionOutlines, setSubsectionOutlines] = useState([]);
+  const [processingSubsection, setProcessingSubsection] = useState(false);
+  
   const startStep3DataOutlineBuilder = async (sections, freshLogicData = null) => {
-    console.log('📝 Starting Step 3: Detailed Outline Builder');
+    console.log('📝 Starting Step 3: Simplified Sequential Subsection Builder');
     console.log('Available logic data sections:', outlineLogicData?.length || 0);
     console.log('Fresh logic data passed directly:', freshLogicData?.length || 0);
     console.log('Available data sections:', sections?.length || 0);
-    console.log('Draft Outline 1 data available:', literatureReviewData ? 'Yes' : 'No');
     
     setCurrentStep(3);
     setStepStatus(prev => ({ ...prev, 3: 'processing' }));
-    setStepProgress('Initializing data outline builder with Draft Outline 1 context...');
+    setStepProgress('Ready to process subsections sequentially...');
     
     try {
       // Use fresh logic data if provided, otherwise use state data
       let logicData = freshLogicData || outlineLogicData;
       
       if (!logicData || logicData.length === 0) {
-        console.log('⏳ No logic data found, checking both sources...');
-        console.log('State outlineLogicData:', outlineLogicData?.length || 0);
-        console.log('Fresh logic data:', freshLogicData?.length || 0);
-        
-        // Wait a moment for any pending state updates to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-        logicData = freshLogicData || outlineLogicData; // Re-check after waiting
-        
-        console.log('🔍 After waiting, final logic data:', logicData?.length || 0);
-        if (!logicData || logicData.length === 0) {
-          throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
-        }
-      } else {
-        console.log('✅ Using logic data:', freshLogicData ? 'fresh from Step 2' : 'from state', logicData.length, 'items');
+        throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
       }
       
       if (!sections || sections.length === 0) {
-        throw new Error('No data sections available for data outline building.');
+        throw new Error('No data sections available for outline building.');
       }
       
-      console.log('🔄 Starting iterative data outline building...');
-      const populatedOutlines = [];
+      // Initialize the sequential processing
+      setCurrentSectionIndex(0);
+      setCurrentSubsectionIndex(0);
+      setSubsectionOutlines([]);
       
-      // Process each data section iteratively with full context
-      for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-        const section = sections[sectionIndex];
-        console.log(`📝 Processing section ${sectionIndex + 1}/${sections.length}: "${section.section_title}"`);
-        
-        // Update progress
-        setStepProgress(`Processing section ${sectionIndex + 1}/${sections.length}: "${section.section_title}"`);
-        
-        // Find corresponding logic data for this section using the verified logicData
-        const sectionLogicData = logicData.filter(logic => 
-          logic.section_title === section.section_title
-        );
-        
-        if (sectionLogicData.length === 0) {
-          console.warn(`No logic data found for section "${section.section_title}"`);
-          continue;
-        }
-        
-        // Extract complete context from Draft Outline 1 - preserve ALL responses and citations
-        let draftOutlineContext = null;
-        if (literatureReviewData?.outline) {
-          draftOutlineContext = literatureReviewData.outline.find(draft => 
-            draft.section_title === section.section_title
-          );
-          
-          // Ensure we preserve all response data from Draft 1
-          if (draftOutlineContext) {
-            console.log(`📋 Draft 1 context preserved for "${section.section_title}":`, {
-              subsections: draftOutlineContext.subsections?.length || 0,
-              responses: !!draftOutlineContext.responses,
-              combined_outlines: draftOutlineContext.subsections?.filter(sub => sub.combined_outline?.length > 0).length || 0
-            });
-          }
-        }
-        
-        console.log(`Context from Draft Outline 1: ${draftOutlineContext ? 'Found' : 'Not found'}`);
-        
-        // Build comprehensive outline for this section
-        const populatedSection = await buildDataOutline(
-          section,
-          sectionLogicData,
-          draftOutlineContext,
-          sectionIndex,
-          sections.length
-        );
-        
-        populatedOutlines.push(populatedSection);
-        
-        // Update display incrementally
-        setMasterOutlines([...populatedOutlines]);
-        
-        console.log(`✅ Completed data outline building for "${section.section_title}"`);
-        
-        // Brief pause between sections
-        if (sectionIndex < sections.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      }
-      
-      console.log('🎯 All sections data outline building complete');
-      setStepProgress('✅ Data outline builder complete - All sections processed');
-      setDetailedOutlineBuilderComplete(true);
-      setStepStatus(prev => ({ ...prev, 3: 'complete' }));
-      
-      // Mark as freshly completed (not restored)
-      setJustCompleted(prev => ({ ...prev, detailedOutlineBuilder: true }));
-      
-      console.log('✅ Step 3: Detailed Outline Builder complete with', populatedOutlines.length, 'sections');
+      console.log('🎯 Step 3 initialized - Ready for sequential subsection processing');
       
     } catch (error) {
-      console.error('❌ Error in Step 3:', error);
-      setErrorMessage(`Step 3 failed: ${error.message}`);
+      console.error('❌ Error initializing Step 3:', error);
+      setErrorMessage(`Step 3 initialization failed: ${error.message}`);
       setStepStatus(prev => ({ ...prev, 3: 'error' }));
     }
+  };
+
+  // Process individual subsection with context chain analysis
+  const processIndividualSubsection = async (sectionIndex, subsectionIndex) => {
+    if (processingSubsection) return;
+    
+    setProcessingSubsection(true);
+    setCurrentSectionIndex(sectionIndex);
+    setCurrentSubsectionIndex(subsectionIndex);
+    
+    try {
+      const sections = identifiedSections;
+      const section = sections[sectionIndex];
+      const subsection = section.subsections[subsectionIndex];
+      
+      const romanNumeral = toRomanNumeral(sectionIndex + 1);
+      const capitalLetter = toLetter(subsectionIndex);
+      
+      setStepProgress(`Processing ${romanNumeral}.${capitalLetter}. ${subsection.subsection_title}`);
+      
+      console.log(`🎯 Processing subsection: ${romanNumeral}.${capitalLetter}. ${subsection.subsection_title}`);
+      
+      // Step 1: Establish Context Chain
+      const contextChain = {
+        subsection_context: subsection.subsection_context,
+        methodology_alignment: getMethodologyAlignment(methodology, subsection),
+        thesis_connection: getThesisConnection(subsection, finalThesis),
+        section_title: section.section_title,
+        subsection_title: subsection.subsection_title,
+        position: `${romanNumeral}.${capitalLetter}.`
+      };
+      
+      // Step 2: Gather Literature Review Data
+      const literatureResponses = gatherLiteratureResponsesForSubsection(section.section_title, subsection.subsection_title);
+      
+      // Step 3: Generate 6-Level Detailed Outline
+      const detailedOutline = await generateDetailedSubsectionOutline(contextChain, literatureResponses);
+      
+      // Update the subsection outlines
+      const newSubsectionOutlines = [...subsectionOutlines];
+      if (!newSubsectionOutlines[sectionIndex]) {
+        newSubsectionOutlines[sectionIndex] = { 
+          section_title: section.section_title,
+          subsections: []
+        };
+      }
+      
+      newSubsectionOutlines[sectionIndex].subsections[subsectionIndex] = {
+        ...contextChain,
+        detailed_outline: detailedOutline,
+        processing_complete: true,
+        timestamp: new Date().toISOString()
+      };
+      
+      setSubsectionOutlines(newSubsectionOutlines);
+      
+      console.log(`✅ Completed processing: ${romanNumeral}.${capitalLetter}. ${subsection.subsection_title}`);
+      
+    } catch (error) {
+      console.error('❌ Error processing subsection:', error);
+      setErrorMessage(`Failed to process subsection: ${error.message}`);
+    } finally {
+      setProcessingSubsection(false);
+    }
+  };
+
+  // Gather literature review responses for specific subsection
+  const gatherLiteratureResponsesForSubsection = (sectionTitle, subsectionTitle) => {
+    if (!literatureReviewData?.outline) return [];
+    
+    const section = literatureReviewData.outline.find(s => s.section_title === sectionTitle);
+    if (!section) return [];
+    
+    const subsection = section.subsections?.find(sub => sub.subsection_title === subsectionTitle);
+    if (!subsection) return [];
+    
+    // Collect all responses from this subsection
+    const responses = [];
+    
+    // From combined_outline
+    if (subsection.combined_outline?.length > 0) {
+      responses.push(...subsection.combined_outline);
+    }
+    
+    // From questions with responses
+    if (subsection.questions?.length > 0) {
+      subsection.questions.forEach(q => {
+        if (q.response || q.answer) {
+          responses.push({
+            content: q.response || q.answer,
+            question: q.question,
+            citations: q.citations || [],
+            type: 'question_response'
+          });
+        }
+      });
+    }
+    
+    // From other response formats
+    if (subsection.responses) {
+      Object.entries(subsection.responses).forEach(([key, value]) => {
+        if (value && typeof value === 'string') {
+          responses.push({
+            content: value,
+            source: key,
+            type: 'general_response'
+          });
+        }
+      });
+    }
+    
+    console.log(`📚 Gathered ${responses.length} literature responses for ${subsectionTitle}`);
+    return responses;
+  };
+
+
+
+  // Render subsection outline in 6-level format
+  const renderSubsectionOutline = (outline) => {
+    if (!outline || !Array.isArray(outline)) {
+      return <div className="text-muted">No outline data available</div>;
+    }
+
+    return (
+      <div className="subsection-outline">
+        {outline.map((item, index) => (
+          <div key={index} className="outline-level mb-2">
+            <div className="d-flex align-items-start">
+              <span className="me-2 fw-bold text-primary" style={{ minWidth: '30px' }}>
+                {item.level || `${index + 1}.`}
+              </span>
+              <div className="flex-grow-1">
+                <div className="outline-content">{item.content || item.text}</div>
+                {item.citations && item.citations.length > 0 && (
+                  <div className="citations mt-1">
+                    <small className="text-muted">
+                      Citations: {item.citations.map(c => `[${c}]`).join(' ')}
+                    </small>
+                  </div>
+                )}
+                
+                {/* Render sub-levels recursively */}
+                {item.subPoints && item.subPoints.length > 0 && (
+                  <div className="ms-3 mt-2">
+                    {item.subPoints.map((subItem, subIndex) => (
+                      <div key={subIndex} className="sub-outline mb-1">
+                        <div className="d-flex align-items-start">
+                          <span className="me-2 text-secondary" style={{ minWidth: '25px', fontSize: '0.9rem' }}>
+                            {subItem.level || toLowercaseLetter(subIndex) + ')'}
+                          </span>
+                          <div className="flex-grow-1">
+                            <div className="outline-content" style={{ fontSize: '0.9rem' }}>
+                              {subItem.content || subItem.text}
+                            </div>
+                            
+                            {/* Level 5 and 6 rendering */}
+                            {subItem.deeperPoints && subItem.deeperPoints.length > 0 && (
+                              <div className="ms-3 mt-1">
+                                {subItem.deeperPoints.map((deeperItem, deeperIndex) => (
+                                  <div key={deeperIndex} className="deeper-outline mb-1">
+                                    <div className="d-flex align-items-start">
+                                      <span className="me-2 text-muted" style={{ minWidth: '20px', fontSize: '0.8rem' }}>
+                                        {deeperItem.level || toLowercaseRoman(deeperIndex + 1) + ')'}
+                                      </span>
+                                      <div className="flex-grow-1">
+                                        <div className="outline-content" style={{ fontSize: '0.8rem' }}>
+                                          {deeperItem.content || deeperItem.text}
+                                        </div>
+                                        
+                                        {/* Level 6 */}
+                                        {deeperItem.level6Points && deeperItem.level6Points.length > 0 && (
+                                          <div className="ms-2 mt-1">
+                                            {deeperItem.level6Points.map((level6Item, level6Index) => (
+                                              <div key={level6Index} className="level6-outline mb-1">
+                                                <div className="d-flex align-items-start">
+                                                  <span className="me-2 text-muted" style={{ minWidth: '20px', fontSize: '0.75rem' }}>
+                                                    {level6Item.level || toParentheticalNumber(level6Index + 1)}
+                                                  </span>
+                                                  <div className="flex-grow-1">
+                                                    <div className="outline-content" style={{ fontSize: '0.75rem' }}>
+                                                      {level6Item.content || level6Item.text}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Generate detailed 6-level outline for subsection
+  const generateDetailedSubsectionOutline = async (contextChain, literatureResponses) => {
+    const requestData = {
+      context_chain: contextChain,
+      literature_responses: literatureResponses,
+      thesis: finalThesis,
+      methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
+      paper_type: typeof selectedPaperType === 'object' ? selectedPaperType.id : selectedPaperType,
+      outline_requirements: {
+        levels: 6,
+        format: 'academic',
+        starting_level: 3, // We start at Level 3 (1, 2, 3...) since we're within I.A.
+        max_points_per_level: 4
+      }
+    };
+
+    console.log('🔄 Generating detailed outline for subsection...');
+    
+    const response = await axios.post('http://localhost:8000/data-analysis/generate-subsection-outline', requestData);
+    
+    if (!response.data || !response.data.detailed_outline) {
+      throw new Error('Invalid response from outline generation service');
+    }
+    
+    return response.data.detailed_outline;
   };
 
   // Build data outline for a single section using all available context
@@ -1332,7 +1491,8 @@ const DataAndObservations = ({
                 content: evidence.point,
                 citations: [pointCounter * 10 + evidenceIndex + 10], // Add sample citation number for testing
                 reference: `Supporting detail from fused research`,
-                editable: true
+                editable: true,
+                level6Points: generateLevel6Points(evidence.point) // Level 6: (1), (2), (3)
               });
             }
           });
@@ -2445,7 +2605,8 @@ const DataAndObservations = ({
           content: contentText,
           citations: citationNums, // Store citations separately
           reference: createEvidenceReference(citationNumbers, citationDetails),
-          editable: true
+          editable: true,
+          level6Points: generateLevel6Points(contentText) // Level 6: (1), (2), (3)
         };
         lastSubPoint.deeperPoints.push(deepPoint);
       }
@@ -3056,6 +3217,30 @@ const DataAndObservations = ({
   };
 
   // Helper functions for analysis
+  
+  // Utility functions for 6-level academic numbering
+  const toRomanNumeral = (num) => {
+    const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
+    return romanNumerals[num - 1] || `${num}`;
+  };
+
+  const toLetter = (num) => {
+    return String.fromCharCode(65 + num); // A, B, C, D...
+  };
+
+  const toLowercaseLetter = (num) => {
+    return String.fromCharCode(97 + num); // a, b, c, d...
+  };
+
+  const toLowercaseRoman = (num) => {
+    const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii', 'xiii', 'xiv', 'xv'];
+    return romanNumerals[num - 1] || `${num}`;
+  };
+
+  const toParentheticalNumber = (num) => {
+    return `(${num})`;
+  };
+
   const getMethodologyAlignment = (methodology, subsection) => {
     const title = subsection.subsection_title?.toLowerCase() || '';
     
@@ -3434,16 +3619,44 @@ const DataAndObservations = ({
         const deeperContent = generateDeeperPointContent(citation, question, logic);
         const deeperCitation = [pointNumber * 10 + subPointIndex * 5 + cIdx + 20];
         
-        subPoint.deeperPoints.push({
+        const deeperPoint = {
           level: romanNumerals[cIdx],
           type: 'roman_lower',
           content: deeperContent,
           citations: deeperCitation,
           reference: `Evidence from: ${citation.apa.substring(0, 50)}...`,
-          editable: true
-        });
+          editable: true,
+          level6Points: generateLevel6Points(deeperContent) // Level 6: (1), (2), (3)
+        };
+        
+        subPoint.deeperPoints.push(deeperPoint);
       }
     });
+  };
+
+  // Generate Level 6 points (1), (2), (3)...) from content
+  const generateLevel6Points = (content) => {
+    const level6Points = [];
+    
+    // Split content into clauses for Level 6 details
+    const sentences = content.split(/[.!?]/).filter(s => s.trim().length > 15);
+    const clauses = sentences.length > 0 ? sentences[0].split(/[,;]/).filter(c => c.trim().length > 10) : [];
+    
+    clauses.slice(0, 3).forEach((clause, index) => {
+      if (clause.trim().length > 8) {
+        const level6Point = {
+          level: `(${index + 1})`,
+          type: 'number_paren',
+          content: clause.trim() + (clause.includes('.') ? '' : '.'),
+          citations: [],
+          reference: 'Specific supporting detail',
+          editable: true
+        };
+        level6Points.push(level6Point);
+      }
+    });
+    
+    return level6Points;
   };
 
   const generateClusterContent = (cluster, logic, subsection) => {
@@ -3719,6 +3932,43 @@ const DataAndObservations = ({
                         </small>
                       </div>
                     </div>
+
+                    {/* Level 6: Finest Details (1), (2), (3)...) */}
+                    {deepPoint.level6Points && deepPoint.level6Points.length > 0 && deepPoint.level6Points.map((level6Point, level6Index) => (
+                      <div key={level6Index} className="ms-4 mb-1">
+                        <div className="d-flex align-items-start">
+                          <span className="me-2 text-muted" style={{ minWidth: '35px', fontSize: '0.75rem' }}>
+                            {level6Point.level}
+                          </span>
+                          <div className="flex-grow-1">
+                            <textarea
+                              className="form-control form-control-sm"
+                              rows="1"
+                              value={cleanTextContent(level6Point.content)}
+                              onChange={(e) => {
+                                // Handle level 6 point editing
+                                const newOutlines = [...masterOutlines];
+                                if (newOutlines[sectionIndex] && 
+                                    newOutlines[sectionIndex].master_subsections[subIndex] && 
+                                    newOutlines[sectionIndex].master_subsections[subIndex].master_outline[index] &&
+                                    newOutlines[sectionIndex].master_subsections[subIndex].master_outline[index].subPoints[subIndex] &&
+                                    newOutlines[sectionIndex].master_subsections[subIndex].master_outline[index].subPoints[subIndex].deeperPoints[deepIndex] &&
+                                    newOutlines[sectionIndex].master_subsections[subIndex].master_outline[index].subPoints[subIndex].deeperPoints[deepIndex].level6Points[level6Index]) {
+                                  newOutlines[sectionIndex].master_subsections[subIndex].master_outline[index].subPoints[subIndex].deeperPoints[deepIndex].level6Points[level6Index].content = e.target.value;
+                                  setMasterOutlines(newOutlines);
+                                }
+                              }}
+                              style={{ fontSize: '0.75rem' }}
+                            />
+                            {level6Point.citations && level6Point.citations.length > 0 && (
+                              <div className="small text-muted mt-1">
+                                Citations: {level6Point.citations.map(c => `[${c}]`).join(' ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -3790,6 +4040,7 @@ const DataAndObservations = ({
       case 'number': return '0.9rem';
       case 'lowercase': return '0.85rem';
       case 'roman_lower': return '0.8rem';
+      case 'number_paren': return '0.75rem'; // Level 6
       default: return '0.9rem';
     }
   };
@@ -4450,8 +4701,8 @@ const DataAndObservations = ({
             <p className="small mb-0 text-muted">Determine what content to include vs exclude from Draft Outline 1</p>
           </div>
           <div className="col-md-4">
-            <strong>Step 3:</strong> Detailed Outline Builder
-            <p className="small mb-0 text-muted">Build cohesive outlines using selected content</p>
+            <strong>Step 3:</strong> Sequential Subsection Builder
+            <p className="small mb-0 text-muted">Process each subsection individually with 6-level outlines</p>
           </div>
         </div>
       </div>
@@ -4585,6 +4836,97 @@ const DataAndObservations = ({
                                     placeholder="Subsection context and description"
                                   />
 
+                                  {/* Step 3: Sequential Subsection Processing */}
+                                  {currentStep === 3 && (
+                                    <div className="sequential-processing mb-3">
+                                      <div className="card border-primary">
+                                        <div className="card-header bg-primary text-white">
+                                          <h6 className="mb-0">
+                                            <FaCog className="me-2" />
+                                            Step 3: Sequential Subsection Analysis
+                                          </h6>
+                                        </div>
+                                        <div className="card-body">
+                                          <div className="mb-2">
+                                            <strong>Processing:</strong> {romanNumeral}.{letter}. {subsection.subsection_title}
+                                          </div>
+                                          
+                                          {/* Context Chain Display */}
+                                          <div className="context-chain mb-3">
+                                            <div className="row">
+                                              <div className="col-md-4">
+                                                <small className="text-muted">Subsection Context</small>
+                                                <div className="bg-light p-2 rounded small">
+                                                  {subsection.subsection_context?.substring(0, 100)}...
+                                                </div>
+                                              </div>
+                                              <div className="col-md-4">
+                                                <small className="text-muted">Methodology Alignment</small>
+                                                <div className="bg-light p-2 rounded small">
+                                                  {getMethodologyAlignment(methodology, subsection).substring(0, 100)}...
+                                                </div>
+                                              </div>
+                                              <div className="col-md-4">
+                                                <small className="text-muted">Thesis Connection</small>
+                                                <div className="bg-light p-2 rounded small">
+                                                  {getThesisConnection(subsection, finalThesis).substring(0, 100)}...
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* Processing Button */}
+                                          <div className="text-center">
+                                            <button
+                                              className={`btn ${
+                                                subsectionOutlines[sectionIndex]?.subsections?.[subIndex]?.processing_complete
+                                                  ? 'btn-success'
+                                                  : 'btn-primary'
+                                              }`}
+                                              onClick={() => processIndividualSubsection(sectionIndex, subIndex)}
+                                              disabled={processingSubsection}
+                                            >
+                                              {processingSubsection && currentSectionIndex === sectionIndex && currentSubsectionIndex === subIndex ? (
+                                                <>
+                                                  <FaSpinner className="fa-spin me-2" />
+                                                  Processing Context Chain & Generating 6-Level Outline...
+                                                </>
+                                              ) : subsectionOutlines[sectionIndex]?.subsections?.[subIndex]?.processing_complete ? (
+                                                <>
+                                                  <FaCheckCircle className="me-2" />
+                                                  ✅ Outline Complete - Click to Regenerate
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <FaPlay className="me-2" />
+                                                  Generate Detailed 6-Level Outline
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Generated Outline Display */}
+                                          {subsectionOutlines[sectionIndex]?.subsections?.[subIndex]?.detailed_outline && (
+                                            <div className="generated-outline mt-3">
+                                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                                <h6 className="text-success mb-0">
+                                                  <FaCheckCircle className="me-2" />
+                                                  Generated 6-Level Academic Outline
+                                                </h6>
+                                                <small className="text-muted">
+                                                  {subsectionOutlines[sectionIndex].subsections[subIndex].timestamp && 
+                                                    new Date(subsectionOutlines[sectionIndex].subsections[subIndex].timestamp).toLocaleTimeString()}
+                                                </small>
+                                              </div>
+                                              <div className="outline-preview bg-light p-3 rounded" style={{ maxHeight: '300px', overflow: 'auto' }}>
+                                                {renderSubsectionOutline(subsectionOutlines[sectionIndex].subsections[subIndex].detailed_outline)}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Expanded Master Outline Display */}
                                   {expandedOutlines[`${sectionIndex}-${subIndex}`] && masterOutlines[sectionIndex]?.master_subsections?.[subIndex] && (

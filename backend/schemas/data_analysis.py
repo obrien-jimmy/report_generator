@@ -98,6 +98,65 @@ class SubsectionOutline(BaseModel):
 
 class BuildDataOutlineResponse(BaseModel):
     section_title: str = Field(..., description="Title of the section")
+    
+# Subsection Outline Generation Schemas
+class ContextChain(BaseModel):
+    subsection_context: str = Field(..., description="Context of the subsection")
+    methodology_alignment: str = Field(..., description="How subsection aligns with methodology")
+    thesis_connection: str = Field(..., description="Connection to thesis")
+    section_title: str = Field(..., description="Parent section title")
+    subsection_title: str = Field(..., description="Subsection title")
+    position: str = Field(..., description="Position in outline (e.g., I.A.)")
+
+class LiteratureResponse(BaseModel):
+    content: str = Field(..., description="Response content")
+    question: Optional[str] = Field(None, description="Original question")
+    citations: List[Dict[str, Any]] = Field(default_factory=list, description="Associated citations")
+    type: str = Field(..., description="Type of response")
+
+class OutlineRequirements(BaseModel):
+    levels: int = Field(6, description="Number of outline levels")
+    format: str = Field("academic", description="Outline format")
+    starting_level: int = Field(3, description="Starting level number")
+    max_points_per_level: int = Field(4, description="Maximum points per level")
+
+class SubsectionOutlineRequest(BaseModel):
+    context_chain: ContextChain = Field(..., description="Context chain for subsection")
+    literature_responses: List[LiteratureResponse] = Field(..., description="Literature review responses")
+    thesis: str = Field(..., description="Main thesis statement")
+    methodology: str = Field(..., description="Research methodology")
+    paper_type: str = Field(..., description="Type of academic paper")
+    outline_requirements: OutlineRequirements = Field(..., description="Outline generation requirements")
+
+class OutlineLevel6(BaseModel):
+    level: str = Field(..., description="Level identifier (1), (2), (3)")
+    content: str = Field(..., description="Content text")
+    citations: List[str] = Field(default_factory=list, description="Citation references")
+
+class OutlineLevel5(BaseModel):
+    level: str = Field(..., description="Level identifier i), ii), iii)")
+    content: str = Field(..., description="Content text")
+    citations: List[str] = Field(default_factory=list, description="Citation references")
+    level6Points: List[OutlineLevel6] = Field(default_factory=list, description="Level 6 sub-points")
+
+class OutlineLevel4(BaseModel):
+    level: str = Field(..., description="Level identifier a), b), c)")
+    content: str = Field(..., description="Content text")
+    citations: List[str] = Field(default_factory=list, description="Citation references")
+    deeperPoints: List[OutlineLevel5] = Field(default_factory=list, description="Level 5 sub-points")
+
+class OutlineLevel3(BaseModel):
+    level: str = Field(..., description="Level identifier 1., 2., 3.")
+    content: str = Field(..., description="Content text")
+    citations: List[str] = Field(default_factory=list, description="Citation references")
+    reference: str = Field(..., description="Reference information")
+    subPoints: List[OutlineLevel4] = Field(default_factory=list, description="Level 4 sub-points")
+
+class SubsectionOutlineResponse(BaseModel):
+    detailed_outline: List[OutlineLevel3] = Field(..., description="6-level detailed outline")
+    context_analysis: str = Field(..., description="Analysis of context chain")
+    literature_integration: str = Field(..., description="How literature was integrated")
+    outline_rationale: str = Field(..., description="Rationale for outline structure")
     section_overview: str = Field(..., description="Overview of what this section will cover")
     subsection_outlines: List[SubsectionOutline] = Field(..., description="Detailed outlines for each subsection")
     logical_flow: str = Field(..., description="Description of the logical flow")

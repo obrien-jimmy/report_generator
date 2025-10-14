@@ -9,8 +9,7 @@ const MethodologyGenerator = ({
   methodology, // <-- receive saved methodology as prop
   setMethodology,
   proceedToOutline,
-  selectedPaperType,
-  pageCount
+  selectedPaperType
 }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
   const [selectedMethodology, setSelectedMethodology] = useState('');
@@ -168,7 +167,7 @@ const MethodologyGenerator = ({
         paper_tone: selectedPaperType.tone,
         paper_structure: selectedPaperType.structure,
         source_categories: sourceCategories,
-        page_count: pageCount || 10
+        page_count: 15  // Default reasonable page count
       };
 
       const res = await axios.post('http://localhost:8000/generate_methodology_options', requestData);
@@ -356,12 +355,7 @@ const MethodologyGenerator = ({
     return mainMethodology;
   };
 
-  const getPageCountDisplay = () => {
-    if (pageCount === -1) {
-      return 'Adjusted based on scope';
-    }
-    return pageCount || 'Not set';
-  };
+
 
   return (
     <div className="mb-4 position-relative w-100">
@@ -425,7 +419,7 @@ const MethodologyGenerator = ({
                     <strong>Source Categories:</strong> {sourceCategories?.length || 0} selected<br/>
                     <strong>Selected Paper Type:</strong> {selectedPaperType?.name || 'None'}<br/>
                     <strong>Paper Structure:</strong> {selectedPaperType?.structure || 'Not set'}<br/>
-                    <strong>Page Count:</strong> {getPageCountDisplay()}
+
                   </small>
                 </div>
               </div>
@@ -441,31 +435,42 @@ const MethodologyGenerator = ({
               <div className="mb-3">
                 <label className="form-label">Choose your primary methodology approach:</label>
                 <div className="row">
-                  {methodologyOptions.map((methodology) => (
-                    <div key={methodology.id} className="col-md-6 mb-2">
-                      <div
-                        className={`card h-100 methodology-card ${selectedMethodology === methodology.id ? 'border-primary' : ''}`}
-                        style={{ cursor: 'pointer', minHeight: '120px' }}
-                        onClick={() => handleMethodologySelect(methodology.id)}
-                      >
-                        <div className="card-body">
-                          <div className="d-flex align-items-center mb-2">
-                            <input
-                              type="radio"
-                              name="methodology"
-                              checked={selectedMethodology === methodology.id}
-                              onChange={() => handleMethodologySelect(methodology.id)}
-                              className="me-2"
-                            />
-                            <h6 className="card-title mb-0">{methodology.name}</h6>
-                          </div>
-                          <div className="mt-2">
-                            <small className="text-muted">{methodology.description}</small>
+                  {methodologyOptions.map((methodology) => {
+                    const isDisabled = methodology.id !== 'qualitative';
+                    return (
+                      <div key={methodology.id} className="col-md-6 mb-2">
+                        <div
+                          className={`card h-100 methodology-card ${selectedMethodology === methodology.id ? 'border-primary' : ''} ${isDisabled ? 'opacity-50' : ''}`}
+                          style={{ 
+                            cursor: isDisabled ? 'not-allowed' : 'pointer', 
+                            minHeight: '120px',
+                            backgroundColor: isDisabled ? '#f8f9fa' : ''
+                          }}
+                          onClick={() => !isDisabled && handleMethodologySelect(methodology.id)}
+                        >
+                          <div className="card-body">
+                            <div className="d-flex align-items-center mb-2">
+                              <input
+                                type="radio"
+                                name="methodology"
+                                checked={selectedMethodology === methodology.id}
+                                onChange={() => !isDisabled && handleMethodologySelect(methodology.id)}
+                                className="me-2"
+                                disabled={isDisabled}
+                              />
+                              <h6 className={`card-title mb-0 ${isDisabled ? 'text-muted' : ''}`}>
+                                {methodology.name}
+                                {isDisabled && <small className="ms-2">(Coming Soon)</small>}
+                              </h6>
+                            </div>
+                            <div className="mt-2">
+                              <small className="text-muted">{methodology.description}</small>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

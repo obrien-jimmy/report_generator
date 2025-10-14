@@ -62,12 +62,12 @@ async def get_methodology_options():
         MethodologyOption(
             id="mixed_methods",
             name="Mixed Methods",
-            description="An integrative approach that combines multiple analytical strategies to provide comprehensive analysis through diverse source types and analytical techniques.",
+            description="An integrative approach that combines qualitative and quantitative analysis of textual sources and documents. Optimized for LLM/RAG-based research using only text-accessible data and documentary evidence.",
             rank=4,
             sub_methodologies=[
-                MethodologyOption(id="sequential_concurrent", name="Sequential & Concurrent Analysis", description="Combines literature review with quantitative data analysis in structured phases. Good RAG compatibility.", rank=1),
-                MethodologyOption(id="case_study_mixed", name="Case-Study Mixed Methods", description="Combines qualitative document analysis with available quantitative measures within case studies.", rank=2),
-                MethodologyOption(id="mixed_methods_systematic_review", name="Mixed-Methods Systematic Review", description="Systematic review incorporating both quantitative and qualitative syntheses. Excellent RAG compatibility.", rank=3)
+                MethodologyOption(id="sequential_concurrent", name="Sequential & Concurrent Analysis", description="Combines qualitative document analysis with quantitative textual data analysis from written sources. Full LLM/RAG compatibility.", rank=1),
+                MethodologyOption(id="case_study_mixed", name="Case-Study Mixed Methods", description="Integrates qualitative document analysis with quantitative measures extracted from textual case study materials. Perfect RAG compatibility.", rank=2),
+                MethodologyOption(id="mixed_methods_systematic_review", name="Mixed-Methods Systematic Review", description="Systematic review incorporating both quantitative and qualitative analysis of textual sources and documents. Excellent RAG compatibility.", rank=3)
             ]
         )
     ]
@@ -97,7 +97,7 @@ async def generate_methodology_options(request: MethodologySelectionRequest):
             MethodologyOption(
                 id="mixed_methods",
                 name="Mixed Methods",
-                description="An integrative approach that combines multiple analytical strategies to provide comprehensive analysis through diverse source types and analytical techniques."
+                description="An integrative approach that combines qualitative and quantitative analysis of textual sources and documents. Optimized for LLM/RAG-based research using only text-accessible data and documentary evidence."
             )
         ]
         
@@ -125,7 +125,6 @@ async def generate_methodology_options(request: MethodologySelectionRequest):
         - Paper Purpose: {request.paper_purpose}
         - Paper Tone: {request.paper_tone}
         - Paper Structure: {request.paper_structure}
-        - Page Count: {request.page_count} pages
         - Available Source Categories: {', '.join(request.source_categories)}
 
         METHODOLOGY REQUIREMENTS:
@@ -133,7 +132,6 @@ async def generate_methodology_options(request: MethodologySelectionRequest):
         - Must clearly articulate HOW the thesis will be proven/supported using {methodology_name} methods
         - Must align with {request.paper_type} paper requirements
         - Must strategically utilize the available source categories
-        - Must be appropriate for {request.page_count} page length
 
         Generate exactly 3 methodologies with these DISTINCT characteristics:
         1. **FOCUSED APPROACH**: Targeted {methodology_name} method with narrow, precise focus on specific thesis aspects
@@ -318,26 +316,26 @@ def create_primary_methodology_defaults(selected_methodology_obj, request):
         return [
             {
                 "title": f"Focused Mixed Methods Analysis: Targeted Integration of {thesis_key_concept}",
-                "description": f"Targeted mixed methods methodology that focuses specifically on key quantitative-qualitative integration supporting {request.final_thesis}",
-                "approach": f"Strategic integration of quantitative and qualitative approaches focusing on specific aspects of thesis validation. The methodology combines targeted statistical analysis with focused qualitative investigation to build concentrated mixed-methods evidence for the central argument.",
-                "source_focus": f"Strategic analysis of {', '.join(request.source_categories[:2]) if len(request.source_categories) >= 2 else ', '.join(request.source_categories)} using both quantitative and qualitative lenses focused on sources most relevant to integrated thesis validation.",
-                "structure_alignment": f"Focused mixed methods structure within {request.paper_type} format: targeted integration methodology, concentrated analysis, specific mixed-evidence presentation, precise thesis validation.",
+                "description": f"Targeted mixed methods methodology that focuses specifically on integrating quantitative and qualitative analysis of textual sources to support {request.final_thesis}",
+                "approach": f"Strategic integration of quantitative textual analysis (frequency counts, content metrics, statistical patterns in documents) with qualitative document interpretation focusing on specific thesis validation. This methodology combines targeted numerical analysis of textual data with focused qualitative investigation of document content, using only LLM/RAG-accessible written sources.",
+                "source_focus": f"Strategic analysis of {', '.join(request.source_categories[:2]) if len(request.source_categories) >= 2 else ', '.join(request.source_categories)} using both quantitative textual metrics and qualitative document interpretation, focusing on written sources most relevant to integrated thesis validation through LLM-accessible materials.",
+                "structure_alignment": f"Focused mixed methods structure within {request.paper_type} format: targeted integration methodology combining textual quantitative and qualitative analysis, concentrated document-based analysis, specific text-derived evidence presentation, precise thesis validation through written sources.",
                 "methodology_type": "Focused"
             },
             {
                 "title": f"Comprehensive Mixed Methods Analysis: Multi-Dimensional Integration of {thesis_key_concept}",
-                "description": f"Broad mixed methods methodology that addresses multiple dimensions through systematic quantitative-qualitative integration relevant to {request.final_thesis}",
-                "approach": f"Multi-faceted mixed methods implementation using comprehensive quantitative analysis combined with thorough qualitative investigation to provide complete integrated support for the thesis through systematic mixed-methods examination across multiple dimensions.",
-                "source_focus": f"Comprehensive utilization of all {', '.join(request.source_categories)} using both quantitative and qualitative approaches to ensure complete mixed-methods coverage and build comprehensive thesis support through diverse integrated evidence.",
-                "structure_alignment": f"Comprehensive mixed methods structure within {request.paper_type} format: systematic integration methodology, multi-dimensional analysis, integrated evidence synthesis, thorough thesis validation.",
+                "description": f"Broad mixed methods methodology that addresses multiple dimensions through systematic quantitative-qualitative integration of textual sources relevant to {request.final_thesis}",
+                "approach": f"Multi-faceted mixed methods implementation using comprehensive quantitative analysis of textual data (document frequencies, content patterns, statistical text analysis) combined with thorough qualitative investigation of document content. This approach provides complete integrated support for the thesis through systematic mixed-methods examination of written sources accessible via LLM/RAG systems.",
+                "source_focus": f"Comprehensive utilization of all {', '.join(request.source_categories)} using both quantitative textual analysis and qualitative document interpretation to ensure complete mixed-methods coverage through diverse written evidence accessible by LLM/RAG systems.",
+                "structure_alignment": f"Comprehensive mixed methods structure within {request.paper_type} format: systematic integration methodology combining textual quantitative and qualitative approaches, multi-dimensional document analysis, integrated textual evidence synthesis, thorough thesis validation through written sources.",
                 "methodology_type": "Comprehensive"
             },
             {
                 "title": f"Innovative Mixed Methods Analysis: Creative Integration of {thesis_key_concept}",
-                "description": f"Creative mixed methods methodology offering unique integrated perspective on {request.final_thesis} through innovative analytical combination",
-                "approach": f"Novel application of mixed methods techniques combining quantitative and qualitative approaches in creative ways such as transformative frameworks, participatory methods, or innovative integration strategies to provide fresh insights supporting the thesis.",
-                "source_focus": f"Creative integration of {', '.join(request.source_categories)} using innovative mixed methods techniques to reveal new integrated patterns and insights that strengthen thesis support through novel analytical combinations.",
-                "structure_alignment": f"Innovative mixed methods structure within {request.paper_type} framework: creative integration explanation, novel mixed-methods process, unique integrated insights, innovative thesis validation.",
+                "description": f"Creative mixed methods methodology offering unique integrated perspective on {request.final_thesis} through innovative analytical combination of textual quantitative and qualitative approaches",
+                "approach": f"Novel application of mixed methods techniques combining quantitative textual analysis with qualitative document interpretation in creative ways such as transformative textual frameworks, innovative content analysis methods, or creative integration strategies using only LLM/RAG-accessible written sources to provide fresh insights supporting the thesis.",
+                "source_focus": f"Creative integration of {', '.join(request.source_categories)} using innovative mixed methods techniques applied to textual sources, revealing new integrated patterns and insights from document analysis that strengthen thesis support through novel analytical combinations of written evidence.",
+                "structure_alignment": f"Innovative mixed methods structure within {request.paper_type} framework: creative integration explanation combining textual quantitative and qualitative methods, novel mixed-methods process using document analysis, unique integrated insights from written sources, innovative thesis validation through LLM-accessible materials.",
                 "methodology_type": "Innovative"
             }
         ]
