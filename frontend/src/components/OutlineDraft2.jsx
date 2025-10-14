@@ -146,9 +146,58 @@ const OutlineDraft2 = ({
             startStep2LogicFramework(refinedOutlines || draft2Data.refinedOutlines);
           }, 1000);
         }
+        
+        // Check if Step 3 should be available after restoration
+        checkStep3Availability(draft2Data);
       }, 100);
     }
   }, [draft2Data]);
+
+  // Check if Step 3 (Detailed Outline Builder) should be available
+  const checkStep3Availability = (savedData = null) => {
+    const data = savedData || {
+      logicFrameworkComplete,
+      outlineLogicData,
+      stepStatus,
+      currentStep,
+      detailedOutlineBuilderComplete
+    };
+    
+    // Step 3 should be available if:
+    // 1. Step 2 (Logic Framework) is complete
+    // 2. We have logic data available
+    // 3. Step 3 hasn't been completed yet
+    const step2Complete = data.logicFrameworkComplete || data.stepStatus?.[2] === 'complete';
+    const hasLogicData = (data.outlineLogicData && data.outlineLogicData.length > 0) || 
+                        (outlineLogicData && outlineLogicData.length > 0);
+    const step3NotComplete = !data.detailedOutlineBuilderComplete && data.stepStatus?.[3] !== 'complete';
+    
+    if (step2Complete && hasLogicData && step3NotComplete) {
+      console.log('🎯 Step 3 is ready to start - Step 2 complete with logic data available');
+      console.log('Logic data available:', hasLogicData ? 'Yes' : 'No', 
+                  '| Step 2 complete:', step2Complete ? 'Yes' : 'No',
+                  '| Step 3 complete:', !step3NotComplete ? 'Yes' : 'No');
+      
+      // If we're not currently at Step 3 or beyond, advance to Step 3
+      if (data.currentStep < 3) {
+        console.log('📈 Advancing current step to 3 (Step 3 ready)');
+        setCurrentStep(3);
+      }
+      
+      // Update step status to show Step 3 is ready if it's still pending
+      if (data.stepStatus?.[3] === 'pending') {
+        console.log('🟢 Setting Step 3 status to ready');
+        setStepStatus(prev => ({ ...prev, 3: 'ready' }));
+      }
+    }
+  };
+
+  // Check Step 3 availability when key dependencies change
+  useEffect(() => {
+    if (!isRestoring) {
+      checkStep3Availability();
+    }
+  }, [logicFrameworkComplete, outlineLogicData, stepStatus, isRestoring]);
 
   // Initialize data sections and start with Step 1 (Contextual Analysis)
   useEffect(() => {
@@ -589,20 +638,27 @@ const OutlineDraft2 = ({
         setOutlineLogicData(logicResults);
         
         setLogicFrameworkComplete(true);
-        setStepStatus(prev => ({ ...prev, 2: 'complete' }));
+        setStepStatus(prev => ({ 
+          ...prev, 
+          2: 'complete',
+          3: 'ready'  // Mark Step 3 as ready when Step 2 completes with data
+        }));
         
         // Mark as freshly completed (not restored)
         setJustCompleted(prev => ({ ...prev, logicFramework: true }));
         
         console.log('✅ Step 2: Logic Framework complete with', logicResults.length, 'analysis results');
         console.log('Logic data now available for viewing in Outline Logic section');
+        console.log('🎯 Step 3 is now ready to start with available logic data');
         
         // Only proceed to Step 3 if not in the middle of restoration
         if (!isRestoring) {
+          // Use a shorter delay and pass the fresh logic data directly to avoid timing issues
           setTimeout(() => {
             console.log('🔄 Auto-progressing to Step 3: Detailed Outline Builder');
-            startStep3DataOutlineBuilder(sections);
-          }, 4000); // Longer delay to allow viewing of logic results
+            console.log('🔄 Passing fresh logic data directly to Step 3:', logicResults.length, 'items');
+            startStep3DataOutlineBuilder(sections, logicResults);
+          }, 1000); // Shorter delay to reduce risk of restoration interference
         } else {
           console.log('⏭️ Skipping Step 3 auto-progression - restoration in progress');
         }
@@ -620,9 +676,10 @@ const OutlineDraft2 = ({
   };
 
   // Step 3: Detailed Outline Builder - iteratively build comprehensive outlines using context from Draft Outline 1
-  const startStep3DataOutlineBuilder = async (sections) => {
+  const startStep3DataOutlineBuilder = async (sections, freshLogicData = null) => {
     console.log('📝 Starting Step 3: Detailed Outline Builder');
     console.log('Available logic data sections:', outlineLogicData?.length || 0);
+    console.log('Fresh logic data passed directly:', freshLogicData?.length || 0);
     console.log('Available data sections:', sections?.length || 0);
     console.log('Draft Outline 1 data available:', draftData ? 'Yes' : 'No');
     
@@ -631,18 +688,24 @@ const OutlineDraft2 = ({
     setStepProgress('Initializing data outline builder with Draft Outline 1 context...');
     
     try {
-      // Ensure we have the required data - wait a moment for state to settle if needed
-      let logicData = outlineLogicData;
+      // Use fresh logic data if provided, otherwise use state data
+      let logicData = freshLogicData || outlineLogicData;
+      
       if (!logicData || logicData.length === 0) {
-        console.log('⏳ No logic data found initially, waiting for state to settle...');
+        console.log('⏳ No logic data found, checking both sources...');
+        console.log('State outlineLogicData:', outlineLogicData?.length || 0);
+        console.log('Fresh logic data:', freshLogicData?.length || 0);
+        
         // Wait a moment for any pending state updates to complete
         await new Promise(resolve => setTimeout(resolve, 500));
-        logicData = outlineLogicData; // Re-check after waiting
+        logicData = freshLogicData || outlineLogicData; // Re-check after waiting
         
-        console.log('🔍 After waiting, logic data sections:', logicData?.length || 0);
+        console.log('🔍 After waiting, final logic data:', logicData?.length || 0);
         if (!logicData || logicData.length === 0) {
           throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
         }
+      } else {
+        console.log('✅ Using logic data:', freshLogicData ? 'fresh from Step 2' : 'from state', logicData.length, 'items');
       }
       
       if (!sections || sections.length === 0) {
@@ -3677,8 +3740,9 @@ const OutlineDraft2 = ({
           {[1, 2, 3].map(step => {
             const isActive = stepStatus[step] === 'processing';
             const isComplete = stepStatus[step] === 'complete';
+            const isReady = stepStatus[step] === 'ready';
             const isPending = stepStatus[step] === 'pending' || !stepStatus[step];
-            const isAccessible = step <= currentStep || isComplete;
+            const isAccessible = step <= currentStep || isComplete || isReady;
             
             return (
               <div key={step} className="col-md-4 mb-2">
@@ -3686,17 +3750,20 @@ const OutlineDraft2 = ({
                   className={`card h-100 ${
                     isComplete ? 'border-success' :
                     isActive ? 'border-primary' :
+                    isReady ? 'border-warning' :
                     isAccessible ? 'border-secondary' :
                     'border-light'
                   }`}
                   style={{ 
                     backgroundColor: isComplete ? '#d1e7dd' : 
                                    isActive ? '#cff4fc' : 
+                                   isReady ? '#fff3cd' :
                                    isAccessible ? '#f8f9fa' : '#f1f3f5',
                     opacity: isAccessible ? 1 : 0.5,
                     transition: 'all 0.3s ease',
-                    animation: isActive ? 'gentlePulse 2s ease-in-out infinite' : 'none',
-                    transform: isActive ? 'scale(1.02)' : 'scale(1)'
+                    animation: isActive ? 'gentlePulse 2s ease-in-out infinite' : 
+                              isReady ? 'gentlePulse 3s ease-in-out infinite' : 'none',
+                    transform: (isActive || isReady) ? 'scale(1.02)' : 'scale(1)'
                   }}
                 >
                   <div className="card-body p-3">
@@ -3709,14 +3776,15 @@ const OutlineDraft2 = ({
                           height: '40px',
                           backgroundColor: isComplete ? '#198754' :
                                          isActive ? '#0dcaf0' : 
+                                         isReady ? '#ffc107' :
                                          isAccessible ? '#6c757d' : '#adb5bd',
-                          color: 'white',
+                          color: isReady ? '#000' : 'white',
                           fontSize: '14px',
                           fontWeight: 'bold',
-                          animation: isActive ? 'gentlePulse 2s ease-in-out infinite' : 'none'
+                          animation: (isActive || isReady) ? 'gentlePulse 2s ease-in-out infinite' : 'none'
                         }}
                       >
-                        {isComplete ? '✓' : step}
+                        {isComplete ? '✓' : isReady ? '⚡' : step}
                       </div>
                     </div>
                     {/* Step Content Below Circle */}
@@ -3724,6 +3792,7 @@ const OutlineDraft2 = ({
                       <h6 className="mb-1" style={{ 
                         color: isComplete ? '#198754' :
                               isActive ? '#0dcaf0' :
+                              isReady ? '#b8860b' :
                               isAccessible ? '#495057' : '#adb5bd'
                       }}>
                         Step {step}: {
@@ -3735,10 +3804,12 @@ const OutlineDraft2 = ({
                       <small style={{ 
                         color: isComplete ? '#198754' :
                               isActive ? '#0dcaf0' :
+                              isReady ? '#b8860b' :
                               isAccessible ? '#6c757d' : '#adb5bd'
                       }}>
                         {isComplete ? 'Complete' :
                          isActive ? (step === 2 && stepProgress ? stepProgress : 'Processing...') :
+                         isReady ? 'Ready to Start' :
                          isPending ? 'Pending' : 'Waiting'}
                       </small>
                     </div>
@@ -3765,7 +3836,7 @@ const OutlineDraft2 = ({
           >
             Outline Logic
           </button>
-          {(stepStatus[currentStep] === 'error' || errorMessage) && (
+          {currentStep > 0 && (
             <button
               className="btn btn-outline-warning btn-sm"
               onClick={() => {
@@ -3775,11 +3846,21 @@ const OutlineDraft2 = ({
                 } else if (currentStep === 2) {
                   startStep2LogicFramework(identifiedSections);
                 } else if (currentStep === 3) {
-                  startStep3DataOutlineBuilder(identifiedSections);
+                  // For Step 3, pass both sections and available logic data
+                  startStep3DataOutlineBuilder(identifiedSections || refinedOutlines, outlineLogicData);
                 }
               }}
+              disabled={stepStatus[currentStep] === 'processing'}
+              title={`Retry Step ${currentStep} - ${stepStatus[currentStep] === 'processing' ? 'Currently processing...' : 'Click to restart this step'}`}
             >
-              Retry Step {currentStep}
+              {stepStatus[currentStep] === 'processing' ? (
+                <>
+                  <FaSpinner className="fa-spin me-1" />
+                  Step {currentStep}...
+                </>
+              ) : (
+                <>Retry Step {currentStep}</>
+              )}
             </button>
           )}
         </div>
@@ -4205,6 +4286,27 @@ const OutlineDraft2 = ({
                               <>
                                 <FaSyncAlt className="me-1" />
                                 Retry Step 2
+                              </>
+                            )}
+                          </button>
+                        )}
+                        {/* Add retry/start button for Step 3 when ready */}
+                        {currentStep === 3 && (stepStatus[3] === 'ready' || stepStatus[3] === 'processing') && outlineLogicData.length > 0 && (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => startStep3DataOutlineBuilder(refinedOutlines, outlineLogicData)}
+                            disabled={stepStatus[3] === 'processing'}
+                            title={stepStatus[3] === 'ready' ? 'Start Step 3 - Data available from Step 2' : 'Retry Step 3 if it appears stuck'}
+                          >
+                            {stepStatus[3] === 'processing' ? (
+                              <>
+                                <FaSpinner className="fa-spin me-1" />
+                                Building...
+                              </>
+                            ) : (
+                              <>
+                                <FaPlay className="me-1" />
+                                {stepStatus[3] === 'ready' ? 'Start Step 3' : 'Retry Step 3'}
                               </>
                             )}
                           </button>

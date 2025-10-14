@@ -165,7 +165,6 @@ const ProjectManager = forwardRef(({
             activeTab,
             outlineData,
             draftData,
-            draft2Data,
             draft2Data
           }
         };
