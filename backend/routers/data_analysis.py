@@ -622,7 +622,8 @@ RESPONSE FORMAT:
     }}
   ],
   "logical_flow": "How subsections build integrated argument from all steps",
-  "integration_notes": "Overall integration achievement and thesis advancement"
+  "integration_notes": "Overall integration achievement and thesis advancement",
+  "methodology_alignment": "How this section aligns with and supports the research methodology"
 }}"""
 
         # Generate the outline using AI
@@ -848,5 +849,6 @@ def create_structured_outline_response(response_text: str, request: BuildDataOut
         section_overview=f"Comprehensive analysis of {request.section_title} supporting the thesis through systematic 5-step integration process.",
         subsection_outlines=subsection_outlines,
         logical_flow="The section progresses through systematic integration of contextual analysis, logical structure, draft content, and citation-based enhancements.",
-        integration_notes="Integrates findings from all 5 steps: context map review, logic analysis, Draft Outline 1 integration, custom framework construction, and citation-based enhancements."
+        integration_notes="Integrates findings from all 5 steps: context map review, logic analysis, Draft Outline 1 integration, custom framework construction, and citation-based enhancements.",
+        methodology_alignment=f"This section aligns with the research methodology by providing systematic data analysis for {request.section_title}, supporting the methodological framework through evidence-based examination of cybersecurity elements."
     )
