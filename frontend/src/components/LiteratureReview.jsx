@@ -80,7 +80,7 @@ const LiteratureReview = ({
         console.log('📝 Loading questions from literatureReviewData:', literatureReviewData.questions);
         setQuestions(literatureReviewData.questions);
       }
-      if (literatureReviewData.responses && Object.keys(literatureReviewData.responses).length > 0) {
+      if (literatureReviewData.responses) {
         console.log('📄 Loading responses from literatureReviewData:', literatureReviewData.responses);
         setResponses(literatureReviewData.responses);
       }
