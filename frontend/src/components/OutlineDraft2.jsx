@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaSpinner, FaCheckCircle, FaExpand, FaEye, FaSearch, FaCog, FaEdit, FaArrowRight, FaInfoCircle, FaPlus, FaMinus, FaSyncAlt } from 'react-icons/fa';
 import axios from 'axios';
 import Modal from './Modal';
@@ -76,10 +76,14 @@ const OutlineDraft2 = ({
   const [showDataWarning, setShowDataWarning] = useState(false);
   const [fabricatedMetricsDetected, setFabricatedMetricsDetected] = useState([]);
 
+  // Track restoration state to prevent auto-save during restoration
+  const [isRestoring, setIsRestoring] = useState(false);
+
   // Restore state from saved draft2Data
   useEffect(() => {
     if (draft2Data && typeof draft2Data === 'object') {
       console.log('OutlineDraft2: Restoring saved state from draft2Data:', draft2Data);
+      setIsRestoring(true);
       
       // Restore step progress
       if (draft2Data.currentStep) setCurrentStep(draft2Data.currentStep);
@@ -97,7 +101,32 @@ const OutlineDraft2 = ({
       if (draft2Data.masterOutlines) setMasterOutlines(draft2Data.masterOutlines);
       if (draft2Data.refinedOutlines) setRefinedOutlines(draft2Data.refinedOutlines);
       
+      // Restore UI states
+      if (draft2Data.showOutlineLogic !== undefined) setShowOutlineLogic(draft2Data.showOutlineLogic);
+      if (draft2Data.showContextMap !== undefined) setShowContextMap(draft2Data.showContextMap);
+      
+      // Auto-show sections based on current step and available data
+      if (draft2Data.currentStep >= 1 && draft2Data.contextMapData) {
+        setShowContextMap(true);
+      }
+      if (draft2Data.currentStep >= 2 && draft2Data.outlineLogicData?.length > 0) {
+        setShowOutlineLogic(true);
+      }
+      
       console.log('✅ OutlineDraft2: State restored from saved data');
+      
+      // Set restoration complete after a brief delay to allow all state updates to complete
+      setTimeout(() => {
+        setIsRestoring(false);
+        
+        // Auto-retry Step 2 if it was left in processing state (likely interrupted)
+        if (draft2Data.currentStep === 2 && draft2Data.stepStatus?.[2] === 'processing') {
+          console.log('🔄 Step 2 was in processing state - auto-retrying after restoration');
+          setTimeout(() => {
+            startStep2LogicFramework(refinedOutlines || draft2Data.refinedOutlines);
+          }, 1000);
+        }
+      }, 100);
     }
   }, [draft2Data]);
 
@@ -244,10 +273,14 @@ const OutlineDraft2 = ({
     
     setRefineComplete(true);
     
-    // Automatically start Step 1: Contextual Analysis
-    setTimeout(() => {
-      startStep1ContextualAnalysis(sections);
-    }, 500); // Small delay for UI to update
+    // Only start Step 1 if not restoring from saved state
+    if (!draft2Data || !draft2Data.currentStep) {
+      setTimeout(() => {
+        startStep1ContextualAnalysis(sections);
+      }, 500); // Small delay for UI to update
+    } else {
+      console.log('⏭️ Skipping Step 1 auto-start - restoring from saved state');
+    }
   };
 
   // Step 1: Contextual Analysis - automatically triggered when data sections are identified
@@ -263,10 +296,17 @@ const OutlineDraft2 = ({
       setContextAnalysisComplete(true);
       setStepStatus(prev => ({ ...prev, 1: 'complete' }));
       
-      // Automatically proceed to Step 2: Logic Framework
-      setTimeout(() => {
-        startStep2LogicFramework(sections);
-      }, 1000);
+      // Mark as freshly completed (not restored)
+      setJustCompleted(prev => ({ ...prev, contextAnalysis: true }));
+      
+      // Only proceed to Step 2 if not in the middle of restoration
+      if (!isRestoring) {
+        setTimeout(() => {
+          startStep2LogicFramework(sections);
+        }, 1000);
+      } else {
+        console.log('⏭️ Skipping Step 2 auto-progression - restoration in progress');
+      }
       
       console.log('✅ Step 1: Contextual Analysis complete');
     } catch (error) {
@@ -525,17 +565,27 @@ const OutlineDraft2 = ({
       
       // Only mark as complete if we actually have logic data
       if (logicResults && logicResults.length > 0) {
+        // Set the outline logic data state
+        setOutlineLogicData(logicResults);
+        
         setLogicFrameworkComplete(true);
         setStepStatus(prev => ({ ...prev, 2: 'complete' }));
+        
+        // Mark as freshly completed (not restored)
+        setJustCompleted(prev => ({ ...prev, logicFramework: true }));
         
         console.log('✅ Step 2: Logic Framework complete with', logicResults.length, 'analysis results');
         console.log('Logic data now available for viewing in Outline Logic section');
         
-        // Automatically proceed to Step 3 after a longer delay to allow user to see results
-        setTimeout(() => {
-          console.log('🔄 Auto-progressing to Step 3: Detailed Outline Builder');
-          startStep3DataOutlineBuilder(sections);
-        }, 4000); // Longer delay to allow viewing of logic results
+        // Only proceed to Step 3 if not in the middle of restoration
+        if (!isRestoring) {
+          setTimeout(() => {
+            console.log('🔄 Auto-progressing to Step 3: Detailed Outline Builder');
+            startStep3DataOutlineBuilder(sections);
+          }, 4000); // Longer delay to allow viewing of logic results
+        } else {
+          console.log('⏭️ Skipping Step 3 auto-progression - restoration in progress');
+        }
       } else {
         console.warn('⚠️ Logic generation completed but no data was produced');
         setErrorMessage('Logic framework generation completed but no analysis data was produced. Please check the data sections have research questions and citations.');
@@ -627,6 +677,9 @@ const OutlineDraft2 = ({
       setStepProgress('✅ Data outline builder complete - All sections processed');
       setDetailedOutlineBuilderComplete(true);
       setStepStatus(prev => ({ ...prev, 3: 'complete' }));
+      
+      // Mark as freshly completed (not restored)
+      setJustCompleted(prev => ({ ...prev, detailedOutlineBuilder: true }));
       
       console.log('✅ Step 3: Detailed Outline Builder complete with', populatedOutlines.length, 'sections');
       
@@ -2338,27 +2391,17 @@ const OutlineDraft2 = ({
           
           console.log(`Analyzing subsection: "${subsection.subsection_title}" (${subsection.questions.length} questions, ${citationsCount} citations)`);
           
-          // Prepare the data for outline logic analysis
+          // Prepare the data for outline logic analysis - match backend schema
           const analysisRequest = {
-            questions: subsection.questions,
-            citations: extractAllCitationsFromQuestions(subsection.questions),
-            subsection_title: subsection.subsection_title,
-            subsection_context: subsection.subsection_context,
-            section_title: section.section_title,
-            thesis: finalThesis,
-            methodology: typeof methodology === 'object' ? methodology.methodologyType : methodology,
-            paper_type: selectedPaperType,
-            draft_outline_context: draftData?.outline ? draftData.outline.find(draft => 
-              draft.section_title === section.section_title
-            ) : null,
-            analysis_purpose: "inclusion_exclusion_criteria"
+            draftData: draftData || {},
+            thesis: finalThesis || ""
           };
           
           console.log(`Sending data for outline logic analysis:`, {
             subsection: subsection.subsection_title,
-            questions: analysisRequest.questions.length,
-            citations: analysisRequest.citations.length,
-            has_draft_context: !!analysisRequest.draft_outline_context
+            draftData: !!analysisRequest.draftData,
+            thesis: !!analysisRequest.thesis,
+            request_structure: Object.keys(analysisRequest)
           });
           
           // Call the AI analysis endpoint for outline logic analysis
@@ -2371,7 +2414,9 @@ const OutlineDraft2 = ({
           });
           
           if (!response.ok) {
-            throw new Error(`Analysis failed for "${subsection.subsection_title}": ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            console.error(`Backend error for "${subsection.subsection_title}":`, errorText);
+            throw new Error(`Analysis failed for "${subsection.subsection_title}": ${response.status} ${response.statusText} - ${errorText}`);
           }
           
           const aiAnalysis = await response.json();
@@ -3207,6 +3252,12 @@ const OutlineDraft2 = ({
 
   // Auto-save progress through project management system
   const saveProgress = () => {
+    // Skip saving during restoration to prevent infinite loops
+    if (isRestoring) {
+      console.log('⏭️ Skipping auto-save during restoration');
+      return;
+    }
+
     const progressData = {
       // Step status and current progress
       currentStep,
@@ -3224,6 +3275,10 @@ const OutlineDraft2 = ({
       contextMapData,
       masterOutlines,
       
+      // UI states
+      showOutlineLogic,
+      showContextMap,
+      
       // Metadata
       savedAt: new Date().toISOString(),
       version: '2.0'
@@ -3237,21 +3292,38 @@ const OutlineDraft2 = ({
     console.log('✅ Progress auto-saved through project management');
   };
 
-  // Auto-save progress after each step completion or data change
-  useEffect(() => {
-    if (contextAnalysisComplete || logicFrameworkComplete || detailedOutlineBuilderComplete || 
-        outlineLogicData.length > 0 || contextMapData || masterOutlines.length > 0) {
-      saveProgress();
-    }
-  }, [contextAnalysisComplete, logicFrameworkComplete, detailedOutlineBuilderComplete, 
-      outlineLogicData, contextMapData, masterOutlines]);
+  // Track if we're in the middle of a fresh completion (not restoration)
+  const [justCompleted, setJustCompleted] = useState({
+    contextAnalysis: false,
+    logicFramework: false,
+    detailedOutlineBuilder: false
+  });
 
-  // Auto-save when step progress changes
+  // Auto-save only when sections are freshly completed (not restored)
   useEffect(() => {
-    if (stepProgress) {
-      saveProgress();
+    // Skip saving during restoration or initialization
+    if (isRestoring || !initialized) {
+      console.log('⏭️ Skipping auto-save during restoration or initialization');
+      return;
     }
-  }, [stepProgress]);
+
+    // Only save when a section was just completed (not restored)
+    const shouldSave = (justCompleted.contextAnalysis || justCompleted.logicFramework || justCompleted.detailedOutlineBuilder) && currentStep > 0;
+    
+    if (shouldSave) {
+      console.log('🔄 Auto-saving after fresh section completion');
+      saveProgress();
+      
+      // Reset the justCompleted flags after saving
+      setJustCompleted({
+        contextAnalysis: false,
+        logicFramework: false,
+        detailedOutlineBuilder: false
+      });
+    }
+  }, [justCompleted, isRestoring, initialized, currentStep]);
+
+  // The auto-save logic is now handled by the debounced useEffect above
 
   const renderMasterOutline = (outlineItems, sectionIndex, subIndex) => {
     if (!outlineItems || outlineItems.length === 0) return null;
@@ -3469,13 +3541,7 @@ const OutlineDraft2 = ({
 
 
 
-  const proceedToBuildPhase = () => {
-    if (refinedOutlines.length === 0) {
-      setErrorMessage('Please refine outlines before proceeding to build phase.');
-      return;
-    }
-    setCurrentPhase(2);
-  };
+
 
   // Phase 2: Build selected sections into academic prose
   const buildDataSections = async (sectionIndices = null) => {
@@ -3988,7 +4054,11 @@ const OutlineDraft2 = ({
                         <strong className="text-info">Content Priority Order:</strong>
                         <ul className="small mb-2 ms-3 list-unstyled">
                           {logicItem.content_priorities.map((priority, idx) => (
-                            <li key={idx} className="mb-1">{priority}</li>
+                            <li key={idx} className="mb-1">
+                              {typeof priority === 'string' ? priority : 
+                               typeof priority === 'object' ? (priority.content || priority.title || JSON.stringify(priority)) : 
+                               String(priority)}
+                            </li>
                           ))}
                         </ul>
                       </div>
@@ -4087,12 +4157,37 @@ const OutlineDraft2 = ({
                   )}
                   {currentStep > 0 && masterOutlines.length === 0 && (
                     <div className="alert alert-warning mb-3">
-                      <strong>⚡ Step {currentStep} Active:</strong> {
-                        currentStep === 1 ? 'Analyzing contextual relationships...' :
-                        currentStep === 2 ? (stepProgress || 'Building logic framework for systematic outline generation...') :
-                        currentStep === 3 ? 'Populating detailed outlines from research data...' :
-                        'Processing...'
-                      }
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>⚡ Step {currentStep} Active:</strong> {
+                            currentStep === 1 ? 'Analyzing contextual relationships...' :
+                            currentStep === 2 ? (stepProgress || 'Building logic framework for systematic outline generation...') :
+                            currentStep === 3 ? 'Populating detailed outlines from research data...' :
+                            'Processing...'
+                          }
+                        </div>
+                        {/* Add retry button for Step 2 if it appears stuck */}
+                        {currentStep === 2 && stepStatus[2] === 'processing' && (
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => startStep2LogicFramework(refinedOutlines)}
+                            disabled={generatingLogic}
+                            title="Retry Step 2 if it appears stuck"
+                          >
+                            {generatingLogic ? (
+                              <>
+                                <FaSpinner className="fa-spin me-1" />
+                                Retrying...
+                              </>
+                            ) : (
+                              <>
+                                <FaSyncAlt className="me-1" />
+                                Retry Step 2
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                   {masterOutlines.length > 0 && (
@@ -4101,14 +4196,6 @@ const OutlineDraft2 = ({
                     </p>
                   )}
                 </div>
-                <button 
-                  className="btn btn-success"
-                  onClick={proceedToBuildPhase}
-                  disabled={!refineComplete || masterOutlines.length === 0}
-                >
-                  <FaArrowRight className="me-2" />
-                  Proceed to Build Phase
-                </button>
               </div>
               
               {refinedOutlines.map((section, sectionIndex) => {

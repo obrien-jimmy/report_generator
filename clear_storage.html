@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Browser Storage</title>
+</head>
+<body>
+    <h1>Clear Browser Storage</h1>
+    <p>This will clear all localStorage data for the Report Generator app.</p>
+    
+    <button onclick="clearStorage()">Clear Storage</button>
+    <div id="result"></div>
+    
+    <script>
+        function clearStorage() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                document.getElementById('result').innerHTML = '✅ Storage cleared successfully!';
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:5173';
+                }, 1500);
+            } catch (error) {
+                document.getElementById('result').innerHTML = '❌ Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
