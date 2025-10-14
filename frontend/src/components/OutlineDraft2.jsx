@@ -78,6 +78,13 @@ const OutlineDraft2 = ({
 
   // Track restoration state to prevent auto-save during restoration
   const [isRestoring, setIsRestoring] = useState(false);
+  
+  // Track if we're in the middle of a fresh completion (not restoration)
+  const [justCompleted, setJustCompleted] = useState({
+    contextAnalysis: false,
+    logicFramework: false,
+    detailedOutlineBuilder: false
+  });
 
   // Restore state from saved draft2Data
   useEffect(() => {
@@ -95,10 +102,23 @@ const OutlineDraft2 = ({
       if (draft2Data.logicFrameworkComplete) setLogicFrameworkComplete(draft2Data.logicFrameworkComplete);
       if (draft2Data.detailedOutlineBuilderComplete) setDetailedOutlineBuilderComplete(draft2Data.detailedOutlineBuilderComplete);
       
-      // Restore generated data
-      if (draft2Data.outlineLogicData) setOutlineLogicData(draft2Data.outlineLogicData);
-      if (draft2Data.contextMapData) setContextMapData(draft2Data.contextMapData);
-      if (draft2Data.masterOutlines) setMasterOutlines(draft2Data.masterOutlines);
+      // Restore generated data (but don't override fresh completions)
+      console.log('🔄 Restoration check - justCompleted:', justCompleted);
+      
+      // Only restore outline logic data if we haven't just completed Step 2
+      if (draft2Data.outlineLogicData && !justCompleted.logicFramework) {
+        console.log('✅ Restoring saved outline logic data:', draft2Data.outlineLogicData.length, 'items');
+        setOutlineLogicData(draft2Data.outlineLogicData);
+      } else if (justCompleted.logicFramework) {
+        console.log('⏭️ Skipping outline logic restoration - just completed Step 2');
+      }
+      
+      if (draft2Data.contextMapData && !justCompleted.contextAnalysis) {
+        setContextMapData(draft2Data.contextMapData);
+      }
+      if (draft2Data.masterOutlines && !justCompleted.detailedOutlineBuilder) {
+        setMasterOutlines(draft2Data.masterOutlines);
+      }
       if (draft2Data.refinedOutlines) setRefinedOutlines(draft2Data.refinedOutlines);
       
       // Restore UI states
@@ -611,9 +631,18 @@ const OutlineDraft2 = ({
     setStepProgress('Initializing data outline builder with Draft Outline 1 context...');
     
     try {
-      // Ensure we have the required data
-      if (!outlineLogicData || outlineLogicData.length === 0) {
-        throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
+      // Ensure we have the required data - wait a moment for state to settle if needed
+      let logicData = outlineLogicData;
+      if (!logicData || logicData.length === 0) {
+        console.log('⏳ No logic data found initially, waiting for state to settle...');
+        // Wait a moment for any pending state updates to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        logicData = outlineLogicData; // Re-check after waiting
+        
+        console.log('🔍 After waiting, logic data sections:', logicData?.length || 0);
+        if (!logicData || logicData.length === 0) {
+          throw new Error('No outline logic data available from Step 2. Please complete Step 2 first.');
+        }
       }
       
       if (!sections || sections.length === 0) {
@@ -631,8 +660,8 @@ const OutlineDraft2 = ({
         // Update progress
         setStepProgress(`Processing section ${sectionIndex + 1}/${sections.length}: "${section.section_title}"`);
         
-        // Find corresponding logic data for this section
-        const sectionLogicData = outlineLogicData.filter(logic => 
+        // Find corresponding logic data for this section using the verified logicData
+        const sectionLogicData = logicData.filter(logic => 
           logic.section_title === section.section_title
         );
         
@@ -3291,13 +3320,6 @@ const OutlineDraft2 = ({
     
     console.log('✅ Progress auto-saved through project management');
   };
-
-  // Track if we're in the middle of a fresh completion (not restoration)
-  const [justCompleted, setJustCompleted] = useState({
-    contextAnalysis: false,
-    logicFramework: false,
-    detailedOutlineBuilder: false
-  });
 
   // Auto-save only when sections are freshly completed (not restored)
   useEffect(() => {
