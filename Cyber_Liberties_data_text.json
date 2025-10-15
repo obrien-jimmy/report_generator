@@ -2573,5 +2573,6 @@
       "showStep3Interface": true
     },
     "dataAndObservationsData": null
-  }
+  },
+  "dataObservationData": null
 }
