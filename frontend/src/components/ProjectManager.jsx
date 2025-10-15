@@ -12,7 +12,6 @@ const ProjectManager = forwardRef(({
   selectedPaperType,
   outlineData,
   literatureReviewData,
-  dataAndObservationsData,
   thesisFinalized,
   categoriesFinalized,
   sourceCategoriesActivated,
@@ -87,8 +86,7 @@ const ProjectManager = forwardRef(({
         
         // Generated outputs - this should include full outline with contexts
         outlineData, // This already contains section_context and subsection_context
-        literatureReviewData,
-        dataAndObservationsData
+        literatureReviewData
       }
     };
 
@@ -133,8 +131,7 @@ const ProjectManager = forwardRef(({
                        methodology || 
                        selectedPaperType || 
                        (outlineData && outlineData.length > 0) || 
-                       literatureReviewData ||
-                       dataAndObservationsData;
+                       literatureReviewData;
         
         if (!hasData) {
           // No meaningful data to save yet
@@ -161,8 +158,7 @@ const ProjectManager = forwardRef(({
             frameworkComplete,
             activeTab,
             outlineData,
-            literatureReviewData,
-            dataAndObservationsData
+            literatureReviewData
           }
         };
 
@@ -194,8 +190,7 @@ const ProjectManager = forwardRef(({
         frameworkComplete,
         activeTab,
         outlineData,
-        literatureReviewData,
-        dataAndObservationsData
+        literatureReviewData
       }
     };
 

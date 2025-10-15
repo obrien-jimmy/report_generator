@@ -8,8 +8,6 @@ import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
 import LiteratureReview from './components/LiteratureReview';
-import DataAndObservations from './components/DataAndObservations';
-import FinalOutline from './components/FinalOutline';
 import ProjectManager from './components/ProjectManager';
 
 function App() {
@@ -35,10 +33,8 @@ function App() {
   // Tab management
   const [activeTab, setActiveTab] = useState('framework');
   const [frameworkComplete, setFrameworkComplete] = useState(false);
-  const [literatureReviewComplete, setLiteratureReviewComplete] = useState(false);
   const [outlineData, setOutlineData] = useState(null);
   const [literatureReviewData, setLiteratureReviewData] = useState(null);
-  const [dataAndObservationsData, setDataAndObservationsData] = useState(null);
 
   // Project management
   const [currentProject, setCurrentProject] = useState(null);
@@ -168,28 +164,11 @@ function App() {
 
   const handleLiteratureReviewComplete = (literatureReviewData) => {
     setLiteratureReviewData(literatureReviewData);
-    setLiteratureReviewComplete(true);
     triggerAutoSave();
   };
 
   const handleAutoSaveLiteratureReview = (literatureReview) => {
     setLiteratureReviewData(literatureReview);
-    triggerAutoSave(); // Debounced save for frequent draft updates
-  };
-
-  const handleTransferToDataAndObservations = () => {
-    console.log('App.jsx: Transferring to data and observations');
-    setActiveTab('dataobs');
-    triggerAutoSave();
-  };
-
-  const handleDataAndObservationsComplete = (dataAndObservationsData) => {
-    setDataAndObservationsData(dataAndObservationsData);
-    triggerAutoSave();
-  };
-
-  const handleAutoSaveDataAndObservations = (dataAndObservations) => {
-    setDataAndObservationsData(dataAndObservations);
     triggerAutoSave(); // Debounced save for frequent draft updates
   };
 
@@ -215,7 +194,6 @@ function App() {
     setOutlineData(data.outlineData || null);
     console.log('🔍 Loading literatureReviewData:', data.literatureReviewData);
     setLiteratureReviewData(data.literatureReviewData || null);
-    setDataAndObservationsData(data.dataAndObservationsData || null);
     
     // Restore state flags
     setThesisFinalized(data.thesisFinalized || false);
@@ -223,7 +201,6 @@ function App() {
     setSourceCategoriesActivated(data.sourceCategoriesActivated || false);
     setReadyForOutline(data.readyForOutline || false);
     setFrameworkComplete(data.frameworkComplete || false);
-    setLiteratureReviewComplete(data.literatureReviewComplete || false);
     setActiveTab(data.activeTab || 'framework');
     
     setCurrentProject(project);
@@ -240,14 +217,12 @@ function App() {
       setMethodology('');
       setSelectedPaperType(null);
       setOutlineData(null);
-      setDraftData(null);
       
       setThesisFinalized(false);
       setCategoriesFinalized(false);
       setSourceCategoriesActivated(false);
       setReadyForOutline(false);
       setFrameworkComplete(false);
-      setLiteratureReviewComplete(false);
       setActiveTab('framework');
       
       setCurrentProject(null);
@@ -294,13 +269,11 @@ function App() {
             selectedPaperType={selectedPaperType}
             outlineData={outlineData}
             literatureReviewData={literatureReviewData}
-            dataAndObservationsData={dataAndObservationsData}
             thesisFinalized={thesisFinalized}
             categoriesFinalized={categoriesFinalized}
             sourceCategoriesActivated={sourceCategoriesActivated}
             readyForOutline={readyForOutline}
             frameworkComplete={frameworkComplete}
-            literatureReviewComplete={literatureReviewComplete}
             activeTab={activeTab}
             showDebugSections={showDebugSections}
             setShowDebugSections={setShowDebugSections}
@@ -331,28 +304,6 @@ function App() {
                 disabled={!frameworkComplete}
               >
                 Literature Review
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeTab === 'dataobs' ? 'active' : ''} ${!literatureReviewData ? 'disabled' : ''}`}
-                onClick={() => literatureReviewData && handleTabChange('dataobs')}
-                type="button"
-                role="tab"
-                disabled={!literatureReviewData}
-              >
-                Data & Observations
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeTab === 'initial' ? 'active' : ''} ${!dataAndObservationsData ? 'disabled' : ''}`}
-                onClick={() => dataAndObservationsData && handleTabChange('initial')}
-                type="button"
-                role="tab"
-                disabled={!dataAndObservationsData}
-              >
-                Final Outline
               </button>
             </li>
           </ul>
@@ -435,7 +386,6 @@ function App() {
                 finalThesis={finalThesis}
                 methodology={methodology}
                 onLiteratureReviewComplete={handleLiteratureReviewComplete}
-                onTransferToDataAndObservations={handleTransferToDataAndObservations}
                 autoSave={autoSave}
                 onAutoSaveDraft={handleAutoSaveLiteratureReview}
                 literatureReviewData={literatureReviewData}
@@ -443,32 +393,6 @@ function App() {
             </div>
           )}
 
-          {/* Data & Observations Tab */}
-          {activeTab === 'dataobs' && (
-            <div className="tab-pane fade show active">
-              <DataAndObservations
-                outlineData={outlineData}
-                finalThesis={finalThesis}
-                methodology={methodology}
-                selectedPaperType={selectedPaperType}
-                literatureReviewData={literatureReviewData}
-                dataAndObservationsData={dataAndObservationsData}
-                onDataAndObservationsComplete={handleDataAndObservationsComplete}
-                onDataAndObservationsUpdate={handleAutoSaveDataAndObservations}
-              />
-            </div>
-          )}
-
-          {/* Final Outline Tab */}
-          {activeTab === 'initial' && (
-            <div className="tab-pane fade show active">
-              <FinalOutline
-                literatureReviewData={literatureReviewData}
-                dataAndObservationsData={dataAndObservationsData}
-                finalThesis={finalThesis}
-              />
-            </div>
-          )}
         </div>
       </div>
 

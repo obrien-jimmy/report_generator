@@ -8,7 +8,6 @@ const LiteratureReview = ({
   finalThesis,
   methodology,
   onLiteratureReviewComplete,
-  onTransferToDataAndObservations,
   autoSave,
   onAutoSaveDraft,
   literatureReviewData // receives: { questions, responses, contextMapData, etc. }
@@ -25,8 +24,16 @@ const LiteratureReview = ({
   const [contextAnalysisComplete, setContextAnalysisComplete] = useState(false);
   const [contextMapData, setContextMapData] = useState(null);
   const [showContextMap, setShowContextMap] = useState(false);
-  const [showStep2Interface, setShowStep2Interface] = useState(false);
-  const [showStep3Interface, setShowStep3Interface] = useState(false);
+  const [showStep2Interface, setShowStep2Interface] = useState(() => {
+    return literatureReviewData?.showStep2Interface || 
+           (literatureReviewData?.currentStep >= 2) || 
+           false;
+  });
+  const [showStep3Interface, setShowStep3Interface] = useState(() => {
+    return literatureReviewData?.showStep3Interface || 
+           (literatureReviewData?.masterOutlines?.length > 0) || 
+           false;
+  });
   
   // Step 2: Answer Questions (existing functionality)
   const [questions, setQuestions] = useState({}); // { questionKey: "question text" }
@@ -81,30 +88,7 @@ const LiteratureReview = ({
       // Restore generated data - only if we have actual data
       if (literatureReviewData.contextMapData) setContextMapData(literatureReviewData.contextMapData);
       
-      // Load questions - first try from saved questions, then extract from saved outline if needed
-      if (literatureReviewData.questions && Object.keys(literatureReviewData.questions).length > 0) {
-        console.log('📝 Loading questions from literatureReviewData.questions:', literatureReviewData.questions);
-        setQuestions(literatureReviewData.questions);
-      } else if (literatureReviewData.outline && literatureReviewData.outline.length > 0) {
-        console.log('📝 Extracting questions from saved outline in literatureReviewData:', literatureReviewData.outline);
-        const extractedQuestions = {};
-        
-        literatureReviewData.outline.forEach((section, sectionIndex) => {
-          if (section.subsections) {
-            section.subsections.forEach((subsection, subsectionIndex) => {
-              if (subsection.questions) {
-                subsection.questions.forEach((question, questionIndex) => {
-                  const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-                  extractedQuestions[questionKey] = question.question;
-                });
-              }
-            });
-          }
-        });
-        
-        console.log('📝 Extracted questions from saved outline:', extractedQuestions);
-        setQuestions(extractedQuestions);
-      }
+      // Questions will be loaded separately via outlineData useEffect if needed
       
       if (literatureReviewData.responses) {
         console.log('📄 Loading responses from literatureReviewData:', literatureReviewData.responses);
@@ -125,35 +109,33 @@ const LiteratureReview = ({
       if (literatureReviewData.currentStep >= 1 && literatureReviewData.contextMapData) {
         setShowContextMap(true);
       }
-      if (literatureReviewData.currentStep >= 2) {
-        setShowStep2Interface(true);
-      }
       if (literatureReviewData.masterOutlines && literatureReviewData.masterOutlines.length > 0) {
         setShowStep3Interface(true);
+      } else if (literatureReviewData.currentStep >= 2 || (literatureReviewData.responses && Object.keys(literatureReviewData.responses).length > 0)) {
+        setShowStep2Interface(true);
       }
       
       console.log('✅ LiteratureReview: State restored from saved data');
       
-      // Check question completion status after loading data
-      setTimeout(() => {
-        console.log('🔍 Checking question completion after data load...');
-        checkQuestionAnsweringComplete();
-      }, 100);
+      // Completion checking is now handled by the questions initialization useEffect
     } else if (literatureReviewData === null || literatureReviewData === undefined || Object.keys(literatureReviewData || {}).length === 0) {
       console.log('⚠️ LiteratureReview: Received null/empty literatureReviewData, keeping existing state');
     }
   }, [literatureReviewData]);
 
-  // Initialize questions from outlineData when it loads (only if we don't already have questions)
+  // Initialize questions from literatureReviewData or outlineData
   useEffect(() => {
-    console.log('🔍 Questions extraction useEffect triggered');
+    console.log('🔍 Questions initialization useEffect triggered');
+    console.log('🔍 literatureReviewData:', literatureReviewData);
     console.log('🔍 outlineData:', outlineData);
     console.log('🔍 questions:', questions);
-    console.log('🔍 Object.keys(questions).length:', Object.keys(questions || {}).length);
     
-    // Only extract questions if we have outline data but no questions yet
-    if (outlineData && outlineData.length > 0 && (!questions || Object.keys(questions).length === 0)) {
-      console.log('🔍 Initializing questions from outlineData...');
+    // Priority: saved questions > extract from outline
+    if (literatureReviewData?.questions && Object.keys(literatureReviewData.questions).length > 0) {
+      console.log('📝 Loading saved questions from literatureReviewData:', literatureReviewData.questions);
+      setQuestions(literatureReviewData.questions);
+    } else if (outlineData && outlineData.length > 0 && (!questions || Object.keys(questions).length === 0)) {
+      console.log('� Extracting questions from outlineData...');
       const extractedQuestions = {};
       
       outlineData.forEach((section, sectionIndex) => {
@@ -174,19 +156,18 @@ const LiteratureReview = ({
       
       console.log('📝 Extracted questions from outline:', extractedQuestions);
       setQuestions(extractedQuestions);
-      
-      // After setting questions, check completion
+    } else {
+      console.log('🔍 Skipping question initialization - conditions not met');
+    }
+    
+    // After setting questions, check completion if we have responses
+    if ((literatureReviewData?.questions || (outlineData && outlineData.length > 0)) && literatureReviewData?.responses) {
       setTimeout(() => {
-        console.log('🔍 Checking completion after question extraction...');
+        console.log('🔍 Checking completion after question initialization...');
         checkQuestionAnsweringComplete();
       }, 200);
-    } else {
-      console.log('🔍 Skipping question extraction - conditions not met');
-      console.log('🔍 outlineData exists:', !!outlineData);
-      console.log('🔍 outlineData length:', outlineData?.length);
-      console.log('🔍 questions is empty:', !questions || Object.keys(questions).length === 0);
     }
-  }, [outlineData]); // Removed questions dependency to prevent resetting
+  }, [literatureReviewData, outlineData]);
 
   // Check question completion when questions or responses change
   useEffect(() => {
@@ -2455,17 +2436,6 @@ const LiteratureReview = ({
                 >
                   <FaCheckCircle className="me-2" />
                   Complete Literature Review
-                </button>
-                <button
-                  className="btn btn-outline-success"
-                  onClick={() => {
-                    if (onTransferToDataAndObservations) {
-                      onTransferToDataAndObservations();
-                    }
-                  }}
-                >
-                  <FaChevronRight className="me-2" />
-                  Transfer to Data & Observations
                 </button>
               </div>
             </div>
