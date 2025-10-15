@@ -10,6 +10,8 @@ import PaperTypeSelector from './components/PaperTypeSelector';
 import DataObservationBuilder from './components/DataObservationBuilder';
 import ProjectManager from './components/ProjectManager';
 import PaperStructurePreview from './components/PaperStructurePreview';
+import FloatingCitationsButton from './components/FloatingCitationsButton';
+import FloatingContextButton from './components/FloatingContextButton';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -47,6 +49,10 @@ function App() {
 
   // Structure refresh trigger
   const [structureRefreshTrigger, setStructureRefreshTrigger] = useState(0);
+  const [triggerOutlineGeneration, setTriggerOutlineGeneration] = useState(false);
+  
+  // Centralized citation management (ground truth)
+  const [masterCitations, setMasterCitations] = useState([]);
 
   // For Outline Draft 1
 
@@ -132,6 +138,7 @@ function App() {
 
   const proceedToOutline = () => {
     setReadyForOutline(true);
+    setTriggerOutlineGeneration(true); // Trigger outline generation
     setStructureRefreshTrigger(prev => prev + 1); // Force paper structure refresh
     triggerAutoSave();
   };
@@ -166,6 +173,9 @@ function App() {
       console.log('App.jsx: Setting outline data...');
       setOutlineData(outlineData);
       
+      // Update master citations from outline
+      updateMasterCitations(outlineData);
+      
       console.log('App.jsx: Setting framework complete to true...');
       setFrameworkComplete(true);
       
@@ -175,6 +185,57 @@ function App() {
       console.error('App.jsx: Invalid outline data received:', outlineData);
     }
   };
+  
+  // Update master citations whenever outline changes
+  const updateMasterCitations = (outline) => {
+    const allCitations = [];
+    let citationNumber = 1;
+
+    outline.forEach((section, sectionIndex) => {
+      if (section.subsections) {
+        section.subsections.forEach((subsection, subsectionIndex) => {
+          if (subsection.questions) {
+            subsection.questions.forEach((questionObj, questionIndex) => {
+              if (questionObj.citations) {
+                questionObj.citations.forEach((citation, citationIndex) => {
+                  // Preserve existing citation number if it exists
+                  const existingCitation = masterCitations.find(
+                    c => c.apa === citation.apa && 
+                    c.sectionIndex === sectionIndex && 
+                    c.subsectionIndex === subsectionIndex
+                  );
+                  
+                  allCitations.push({
+                    id: existingCitation?.id || `cit-${Date.now()}-${citationNumber}`,
+                    number: existingCitation?.number || citationNumber++,
+                    ...citation,
+                    sectionTitle: section.section_title,
+                    sectionContext: section.section_context,
+                    subsectionTitle: subsection.subsection_title,
+                    subsectionContext: subsection.subsection_context,
+                    question: questionObj.question,
+                    sectionIndex,
+                    subsectionIndex,
+                    questionIndex,
+                    citationIndex
+                  });
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    setMasterCitations(allCitations);
+  };
+  
+  // Update outline data whenever it changes to sync citations
+  useEffect(() => {
+    if (outlineData && Array.isArray(outlineData) && outlineData.length > 0) {
+      updateMasterCitations(outlineData);
+    }
+  }, [outlineData]);
 
   const handleTransferToDataObservation = () => {
     console.log('App.jsx: Transferring to data observation');
@@ -215,6 +276,7 @@ function App() {
     setOutlineData(data.outlineData || null);
   console.log('🔍 Loading dataObservationData (from project):', data.dataObservationData || data.literatureReviewData);
   setDataObservationData(data.dataObservationData || data.literatureReviewData || null);
+    setMasterCitations(data.masterCitations || []);
     
     // Restore state flags
     setThesisFinalized(data.thesisFinalized || false);
@@ -238,6 +300,7 @@ function App() {
       setMethodology('');
       setSelectedPaperType(null);
       setOutlineData(null);
+      setMasterCitations([]);
       
       setThesisFinalized(false);
       setCategoriesFinalized(false);
@@ -290,6 +353,7 @@ function App() {
             selectedPaperType={selectedPaperType}
             outlineData={outlineData}
             dataObservationData={dataObservationData}
+            masterCitations={masterCitations}
             thesisFinalized={thesisFinalized}
             categoriesFinalized={categoriesFinalized}
             sourceCategoriesActivated={sourceCategoriesActivated}
@@ -418,6 +482,7 @@ function App() {
                     refreshTrigger={structureRefreshTrigger}
                     methodologyComplete={readyForOutline}
                     savedCustomStructure={paperStructure}
+                    triggerGeneration={triggerOutlineGeneration}
                   />
                 </div>
               )}
@@ -441,6 +506,22 @@ function App() {
 
         </div>
       </div>
+
+      {/* Floating Buttons */}
+      <FloatingCitationsButton
+        outline={outlineData}
+        finalThesis={finalThesis}
+        methodology={methodology}
+        masterCitations={masterCitations}
+      />
+      <FloatingContextButton
+        currentStep={activeTab}
+        finalThesis={finalThesis}
+        selectedCategories={sourceCategories}
+        methodology={methodology}
+        selectedPaperType={selectedPaperType}
+        outline={outlineData}
+      />
 
       {/* Hidden Debug Sections */}
       {showDebugSections && (

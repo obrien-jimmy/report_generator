@@ -485,6 +485,110 @@ async def generate_structured_outline(request: StructuredOutlineRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating structured outline: {str(e)}")
 
+@router.post("/generate_section_context")
+async def generate_section_context(request: dict):
+    """
+    Generate thorough context for a section that relates it back to the thesis.
+    """
+    try:
+        final_thesis = request.get('final_thesis')
+        section_title = request.get('section_title')
+        section_description = request.get('section_description', '')
+        methodology = request.get('methodology')
+        source_categories = request.get('source_categories', [])
+        
+        # Extract methodology information
+        methodology_description = ""
+        if isinstance(methodology, dict):
+            methodology_description = methodology.get('description', str(methodology))
+        else:
+            methodology_description = str(methodology)
+        
+        prompt = f"""
+Generate a thorough context statement for the section "{section_title}" in a research paper.
+
+Thesis: "{final_thesis}"
+Methodology: {methodology_description}
+Source Categories: {', '.join(source_categories)}
+Section Description: {section_description}
+
+Write 2-3 sentences that:
+1. Explain the purpose of this section
+2. MUST include the exact phrase: "This supports the thesis by..."
+3. Explicitly connect it to the thesis and methodology
+
+Be direct, academic, and specific about how this section contributes to proving the thesis.
+
+Return only the context statement, no additional text.
+"""
+        
+        response = invoke_bedrock(prompt)
+        context = response.strip()
+        
+        # Ensure it includes the required phrase
+        if "This supports the thesis by" not in context:
+            context += f" This supports the thesis by providing essential evidence and analysis for {section_title.lower()}."
+        
+        return {"context": context}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating section context: {str(e)}")
+
+@router.post("/generate_subsection_context")
+async def generate_subsection_context(request: dict):
+    """
+    Generate thorough context for a subsection that relates it to its parent section and thesis.
+    """
+    try:
+        final_thesis = request.get('final_thesis')
+        section_title = request.get('section_title')
+        section_context = request.get('section_context')
+        subsection_title = request.get('subsection_title')
+        subsection_description = request.get('subsection_description', '')
+        methodology = request.get('methodology')
+        source_categories = request.get('source_categories', [])
+        
+        # Extract methodology information
+        methodology_description = ""
+        if isinstance(methodology, dict):
+            methodology_description = methodology.get('description', str(methodology))
+        else:
+            methodology_description = str(methodology)
+        
+        prompt = f"""
+Generate a thorough context statement for the subsection "{subsection_title}" within the section "{section_title}".
+
+Thesis: "{final_thesis}"
+Section Context: {section_context}
+Methodology: {methodology_description}
+Source Categories: {', '.join(source_categories)}
+Subsection Description: {subsection_description}
+
+Write 2-3 sentences that:
+1. Explain the specific focus of this subsection
+2. MUST include the exact phrase: "This supports the larger section by..."
+3. MUST also include: "and therefore supports the thesis by..."
+4. Explicitly connect it to both the parent section and the thesis
+
+Be direct, academic, and specific about how this subsection contributes to the section and thesis.
+
+Return only the context statement, no additional text.
+"""
+        
+        response = invoke_bedrock(prompt)
+        context = response.strip()
+        
+        # Ensure it includes the required phrases
+        if "This supports the larger section by" not in context:
+            context += f" This supports the larger section by providing detailed analysis of {subsection_title.lower()}, and therefore supports the thesis by contributing essential evidence."
+        elif "and therefore supports the thesis by" not in context and "therefore supports the thesis by" not in context:
+            context += f" and therefore supports the thesis by contributing essential evidence."
+        
+        return {"context": context}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating subsection context: {str(e)}")
+
 @router.post("/generate_sections_subsections")
 async def generate_sections_subsections(request: dict):
     """

@@ -6,7 +6,8 @@ const CitationsPanel = ({
   onClose, 
   outline,
   finalThesis,
-  methodology
+  methodology,
+  masterCitations
 }) => {
   const [citations, setCitations] = useState([]);
   const [viewType, setViewType] = useState('individual'); // 'individual', 'categories'
@@ -17,12 +18,15 @@ const CitationsPanel = ({
   const [checkingCitation, setCheckingCitation] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Extract all citations from outline when it changes
+  // Use masterCitations as ground truth
   useEffect(() => {
-    if (outline && outline.length > 0) {
+    if (masterCitations && masterCitations.length > 0) {
+      setCitations(masterCitations);
+    } else if (outline && outline.length > 0) {
+      // Fallback to extracting from outline if masterCitations not available
       extractCitationsFromOutline();
     }
-  }, [outline]);
+  }, [masterCitations, outline]);
 
   const extractCitationsFromOutline = () => {
     const allCitations = [];
@@ -36,6 +40,7 @@ const CitationsPanel = ({
               if (questionObj.citations) {
                 questionObj.citations.forEach((citation, citationIndex) => {
                   allCitations.push({
+                    id: `cit-${Date.now()}-${citationNumber}`,
                     number: citationNumber++,
                     ...citation,
                     sectionTitle: section.section_title,
@@ -228,7 +233,7 @@ const CitationsPanel = ({
         <div className="border-bottom p-3 d-flex justify-content-between align-items-center">
           <div>
             <h5 className="mb-0">Citations ({citations.length})</h5>
-            <small className="text-muted">All citations from the paper outline</small>
+            <small className="text-muted">Master citation registry - All citations maintain persistent numbers</small>
           </div>
           <button 
             className="btn-close" 

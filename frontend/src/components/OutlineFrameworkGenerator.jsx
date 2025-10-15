@@ -15,8 +15,9 @@ const OutlineGenerator = ({
   onTransferToLiteratureReview,
   savedOutlineData,
   refreshTrigger,
-  methodologyComplete
-  , savedCustomStructure
+  methodologyComplete,
+  savedCustomStructure,
+  triggerGeneration
 }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,6 @@ const OutlineGenerator = ({
   const [collapsedSections, setCollapsedSections] = useState({});
   const [collapsed, setCollapsed] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
-  const [frameworkCompleteCalled, setFrameworkCompleteCalled] = useState(false);
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
@@ -35,14 +35,20 @@ const OutlineGenerator = ({
     if (savedCustomStructure && Array.isArray(savedCustomStructure)) {
       console.log('OutlineGenerator: Initializing customStructure from App provided preview structure');
       setCustomStructure(savedCustomStructure);
-      // If outline was already generated, regenerate it with the new structure
-      if (hasGenerated) {
-        console.log('OutlineGenerator: Regenerating outline with updated structure');
-        setHasGenerated(false);
-        setFrameworkCompleteCalled(false);
-      }
     }
   }, [savedCustomStructure]);
+
+  // Trigger generation when explicitly requested
+  useEffect(() => {
+    if (triggerGeneration && customStructure && !loading) {
+      console.log('OutlineGenerator: Generating outline on explicit trigger');
+      console.log('Current customStructure:', customStructure);
+      // Reset and regenerate
+      setHasGenerated(false);
+      setOutline([]);
+      generateOutline();
+    }
+  }, [triggerGeneration]);
 
   // Question and Citation States
   const [loadingQuestions, setLoadingQuestions] = useState({});
@@ -59,22 +65,15 @@ const OutlineGenerator = ({
     }
   }, [savedOutlineData]);
 
-  // Auto-call framework complete when outline is generated
+  // Auto-call framework complete when outline changes (to sync any manual edits)
   useEffect(() => {
-    if (hasGenerated && outline.length > 0 && onFrameworkComplete && !frameworkCompleteCalled) {
-      console.log('OutlineGenerator: Auto-calling framework complete with outline:', outline);
-      setFrameworkCompleteCalled(true);
+    if (hasGenerated && outline.length > 0 && onFrameworkComplete) {
+      console.log('OutlineGenerator: Syncing outline changes to parent:', outline);
       onFrameworkComplete(outline);
     }
-  }, [hasGenerated, outline, onFrameworkComplete, frameworkCompleteCalled]);
+  }, [outline]);
 
-  // Auto-generate outline when component first appears with required props
-  useEffect(() => {
-    if (methodologyComplete && finalThesis && sourceCategories && selectedPaperType?.id && customStructure && !hasGenerated && !loading) {
-      console.log('OutlineGenerator: Auto-generating outline on component mount');
-      generateOutline();
-    }
-  }, [methodologyComplete, finalThesis, sourceCategories, selectedPaperType?.id, customStructure]);
+
 
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const [outlineFrameworkCollapsed, setOutlineFrameworkCollapsed] = useState(false);
@@ -88,13 +87,12 @@ const OutlineGenerator = ({
     setOutline([]);
     setHasGenerated(false);
     setError(null);
-    setFrameworkCompleteCalled(false);
   };
 
   const generateOutline = async (isRegeneration = false) => {
     setLoading(true);
     setError(null);
-    setGenerationProgress('Converting data structure to outline...');
+    setGenerationProgress('Generating contextual outline...');
 
     if (isRegeneration) {
       setOutline([]);
@@ -107,28 +105,59 @@ const OutlineGenerator = ({
         throw new Error('No data structure available. Please generate sections first.');
       }
 
-      // Convert custom structure directly to outline format
-      const sections = customStructure
-        .filter(s => !s.isAdmin) // Exclude administrative sections
-        .map(section => ({
+      setGenerationProgress('Generating section contexts...');
+
+      // Generate context for each section using AI
+      const sectionsWithContext = [];
+      for (const section of customStructure.filter(s => !s.isAdmin)) {
+        const sectionContextResponse = await axios.post('http://localhost:8000/generate_section_context', {
+          final_thesis: finalThesis,
           section_title: section.title,
-          section_context: section.context || `Analysis and discussion of ${section.title} to support the thesis`,
-          subsections: (section.subsections || []).map(sub => ({
+          section_description: section.context || '',
+          methodology: methodology,
+          source_categories: sourceCategories
+        });
+
+        const subsectionsWithContext = [];
+        for (const sub of section.subsections || []) {
+          const subsectionContextResponse = await axios.post('http://localhost:8000/generate_subsection_context', {
+            final_thesis: finalThesis,
+            section_title: section.title,
+            section_context: sectionContextResponse.data.context,
             subsection_title: sub.subsection_title,
-            subsection_context: sub.subsection_context || `Detailed examination of ${sub.subsection_title}`,
+            subsection_description: sub.subsection_context || '',
+            methodology: methodology,
+            source_categories: sourceCategories
+          });
+
+          subsectionsWithContext.push({
+            subsection_title: sub.subsection_title,
+            subsection_context: subsectionContextResponse.data.context,
             questions: []
-          })),
+          });
+        }
+
+        sectionsWithContext.push({
+          section_title: section.title,
+          section_context: sectionContextResponse.data.context,
+          subsections: subsectionsWithContext,
           is_administrative: false,
-          pages_allocated: 2, // Default allocation
+          pages_allocated: 2,
           is_data_section: section.isData || false,
           section_type: section.isData ? 'data' : (section.isMethodology ? 'methodology' : (section.isAnalysis ? 'analysis' : 'content')),
           category: section.category || (section.isData ? 'data_section' : 'content_section')
-        }));
+        });
+      }
 
-      console.log('OutlineGenerator: Converted custom structure to outline:', sections);
-      setOutline(sections);
+      console.log('OutlineGenerator: Generated outline with contexts:', sectionsWithContext);
+      setOutline(sectionsWithContext);
       setHasGenerated(true);
       setGenerationProgress('Outline generated successfully');
+      
+      // Immediately update parent with new outline containing generated contexts
+      if (onFrameworkComplete) {
+        onFrameworkComplete(sectionsWithContext);
+      }
 
     } catch (err) {
       console.error('Outline generation error:', err);
@@ -181,16 +210,18 @@ const OutlineGenerator = ({
         // If source is already an object with citation text
         if (typeof source === 'object') {
           return {
-            citation: source.citation || source.source || source.title || JSON.stringify(source),
-            source: source.source || '',
-            relevance: source.relevance || ''
+            apa: source.citation || source.apa || source.source || source.title || JSON.stringify(source),
+            categories: source.categories || [],
+            methodologyPoints: source.methodologyPoints || source.methodology_points || [],
+            description: source.relevance || source.description || ''
           };
         }
         // If source is just a string
         return {
-          citation: source,
-          source: '',
-          relevance: ''
+          apa: source,
+          categories: [],
+          methodologyPoints: [],
+          description: ''
         };
       });
 
@@ -599,22 +630,24 @@ const OutlineGenerator = ({
                         </small>
                       </div>
 
-                      <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
-                        <h6 className="text-success mb-3">Complete Outline Framework Ready</h6>
-                        <p className="mb-3">
-                          Your complete outline framework with detailed sections, subsections, questions, and citations is ready. 
-                          Transfer it to the Literature Review to begin generating responses.
-                        </p>
-                        <button 
-                          className="btn btn-success"
-                          onClick={() => {
-                            handleFrameworkComplete();
-                            onTransferToLiteratureReview();
-                          }}
-                        >
-                          Transfer to Literature Review
-                        </button>
-                      </div>
+                      {!hasCitationsToGenerate() && (
+                        <div className="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
+                          <h6 className="text-success mb-3">Complete Outline Framework Ready</h6>
+                          <p className="mb-3">
+                            Your complete outline framework with detailed sections, subsections, questions, and citations is ready. 
+                            Transfer it to Data & Observations to begin generating responses.
+                          </p>
+                          <button 
+                            className="btn btn-success"
+                            onClick={() => {
+                              handleFrameworkComplete();
+                              onTransferToLiteratureReview();
+                            }}
+                          >
+                            Transfer to Data & Observations
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

@@ -18,7 +18,8 @@ const ContextPanel = ({
     sourceCategories: false,
     methodology: false,
     outlineContext: false,
-    processFlow: false
+    processFlow: false,
+    outlineDetails: false
   });
 
   // Load structure preview when methodology changes
@@ -300,6 +301,116 @@ const ContextPanel = ({
                     <small className="text-muted">
                       {ContextService.generateProcessFlowSummary(finalThesis, methodology, selectedCategories, outline)}
                     </small>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Ground Truth Context - All API Context */}
+          <div className="mb-4">
+            <h6 className="text-danger">
+              <i className="bi bi-shield-check me-2"></i>
+              Ground Truth Context
+            </h6>
+            <div className="alert alert-warning small">
+              <p className="mb-2"><strong>This is the authoritative context passed to all AI generation calls:</strong></p>
+            </div>
+            
+            {/* Final Thesis Context */}
+            {finalThesis && (
+              <div className="card mb-2 border-danger">
+                <div className="card-header py-2 bg-danger bg-opacity-10">
+                  <small><strong>Final Thesis (final_thesis)</strong></small>
+                </div>
+                <div className="card-body py-2">
+                  <small className="font-monospace">{finalThesis}</small>
+                </div>
+              </div>
+            )}
+
+            {/* Methodology Context */}
+            {methodology && (
+              <div className="card mb-2 border-danger">
+                <div className="card-header py-2 bg-danger bg-opacity-10">
+                  <small><strong>Methodology (methodology)</strong></small>
+                </div>
+                <div className="card-body py-2">
+                  <small className="font-monospace">
+                    <strong>Type:</strong> {methodology.methodologyType || methodology.methodology_type || 'N/A'}<br/>
+                    <strong>ID:</strong> {methodology.methodologyId || methodology.id || 'N/A'}<br/>
+                    {methodology.description && (
+                      <><strong>Description:</strong> {methodology.description}<br/></>
+                    )}
+                    {methodology.approach && (
+                      <><strong>Approach:</strong> {methodology.approach}<br/></>
+                    )}
+                  </small>
+                </div>
+              </div>
+            )}
+
+            {/* Source Categories Context */}
+            {selectedCategories?.length > 0 && (
+              <div className="card mb-2 border-danger">
+                <div className="card-header py-2 bg-danger bg-opacity-10">
+                  <small><strong>Source Categories (source_categories)</strong></small>
+                </div>
+                <div className="card-body py-2">
+                  <small className="font-monospace">
+                    {selectedCategories.map((cat, idx) => (
+                      <div key={idx}>• {cat}</div>
+                    ))}
+                  </small>
+                </div>
+              </div>
+            )}
+
+            {/* Paper Type Context */}
+            {selectedPaperType && (
+              <div className="card mb-2 border-danger">
+                <div className="card-header py-2 bg-danger bg-opacity-10">
+                  <small><strong>Paper Type (paper_type)</strong></small>
+                </div>
+                <div className="card-body py-2">
+                  <small className="font-monospace">
+                    <strong>ID:</strong> {selectedPaperType.id}<br/>
+                    <strong>Name:</strong> {selectedPaperType.name}<br/>
+                    <strong>Description:</strong> {selectedPaperType.description}
+                  </small>
+                </div>
+              </div>
+            )}
+
+            {/* Outline Context (Section & Subsection Context) */}
+            {outline?.length > 0 && (
+              <div className="card mb-2 border-danger">
+                <div className="card-header py-2 bg-danger bg-opacity-10 d-flex justify-content-between align-items-center"
+                     style={{cursor: 'pointer'}}
+                     onClick={() => toggleSection('outlineDetails')}>
+                  <small><strong>Outline Context (section_context, subsection_context)</strong></small>
+                  <small>{expandedSections.outlineDetails ? '▼' : '►'}</small>
+                </div>
+                {expandedSections.outlineDetails && (
+                  <div className="card-body py-2">
+                    {outline.map((section, idx) => (
+                      <div key={idx} className="mb-3">
+                        <small className="font-monospace">
+                          <strong>Section {idx + 1}:</strong> {section.section_title}<br/>
+                          <strong>Context:</strong> {section.section_context || 'N/A'}<br/>
+                          {section.subsections?.length > 0 && (
+                            <div className="ms-3 mt-1">
+                              {section.subsections.map((sub, subIdx) => (
+                                <div key={subIdx} className="mb-2">
+                                  <strong>Subsection {subIdx + 1}:</strong> {sub.subsection_title}<br/>
+                                  <strong>Context:</strong> {sub.subsection_context || 'N/A'}<br/>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </small>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

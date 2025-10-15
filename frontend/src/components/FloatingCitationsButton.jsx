@@ -4,7 +4,8 @@ import CitationsPanel from './CitationsPanel';
 const FloatingCitationsButton = ({ 
   outline,
   finalThesis,
-  methodology
+  methodology,
+  masterCitations
 }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
@@ -94,6 +95,7 @@ const FloatingCitationsButton = ({
         outline={outline}
         finalThesis={finalThesis}
         methodology={methodology}
+        masterCitations={masterCitations}
       />
     </>
   );

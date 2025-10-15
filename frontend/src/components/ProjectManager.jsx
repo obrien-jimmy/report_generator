@@ -13,6 +13,7 @@ const ProjectManager = forwardRef(({
   outlineData,
   dataObservationData,
   literatureReviewData,
+  masterCitations,
   thesisFinalized,
   categoriesFinalized,
   sourceCategoriesActivated,
@@ -159,7 +160,8 @@ const ProjectManager = forwardRef(({
             frameworkComplete,
             activeTab,
     outlineData,
-    dataObservationData: literatureReviewData || null
+    dataObservationData: literatureReviewData || null,
+    masterCitations: masterCitations || []
           }
         };
 
@@ -191,7 +193,8 @@ const ProjectManager = forwardRef(({
         frameworkComplete,
         activeTab,
     outlineData,
-    dataObservationData: literatureReviewData || null
+    dataObservationData: literatureReviewData || null,
+    masterCitations: masterCitations || []
       }
     };
 
