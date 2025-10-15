@@ -922,8 +922,8 @@ End of Prompt`;
               </div>
               <div className="col-md-3">
                 <small className="text-muted">
-                  <strong>Auto-Save:</strong><br/>
-                  <label className="form-check-label d-flex align-items-center">
+                  <strong>Auto-Save:</strong>
+                  <label className="form-check-label d-flex align-items-center ms-2">
                     <input
                       type="checkbox"
                       className="form-check-input me-1"
