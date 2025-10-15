@@ -69,120 +69,90 @@ const DataObservationBuilder = ({
   const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
   const safeThesis = typeof finalThesis === "string" ? finalThesis : JSON.stringify(finalThesis);
 
-  // Restore state from saved dataObservationData / literatureReviewData
+  // SINGLE consolidated useEffect for ALL state restoration
   useEffect(() => {
-    console.log('🔍 DataObservationBuilder useEffect - literatureData:', literatureData);
-    console.log('🔍 Questions check:', literatureData?.questions);
-    console.log('🔍 Responses check:', literatureData?.responses);
-    
-    // Only restore if we have valid data - don't clear existing state if literatureData becomes null/empty
-    if (literatureData && typeof literatureData === 'object' && Object.keys(literatureData).length > 0) {
-      console.log('DataObservationBuilder: Restoring saved state from literatureData:', literatureData);
-      
-      // Restore step progress
-      if (literatureData.currentStep) setCurrentStep(literatureData.currentStep);
-      if (literatureData.stepStatus) setStepStatus(literatureData.stepStatus);
-      if (literatureData.stepProgress) setStepProgress(literatureData.stepProgress);
-      
-      // Restore completion flags
-      if (literatureData.contextAnalysisComplete) setContextAnalysisComplete(literatureData.contextAnalysisComplete);
-      if (literatureData.questionAnsweringComplete) setQuestionAnsweringComplete(literatureData.questionAnsweringComplete);
-      if (literatureData.detailedOutlineComplete) setDetailedOutlineComplete(literatureData.detailedOutlineComplete);
-      
-      // Restore generated data - only if we have actual data
-      if (literatureData.contextMapData) setContextMapData(literatureData.contextMapData);
-      
-      // Questions will be loaded separately via outlineData useEffect if needed
-      
-      if (literatureData.responses) {
-        console.log('📄 Loading responses from literatureData:', literatureData.responses);
-        setResponses(literatureData.responses);
-      }
-      if (literatureData.masterOutlines) {
-        console.log('📚 Loading masterOutlines from saved data:', literatureData.masterOutlines);
-        setMasterOutlines(literatureData.masterOutlines);
-      }
-      
-      // Restore UI states
-      if (literatureData.showContextMap !== undefined) setShowContextMap(literatureData.showContextMap);
-      if (literatureData.showStep2Interface !== undefined) setShowStep2Interface(literatureData.showStep2Interface);
-      if (literatureData.showStep3Interface !== undefined) setShowStep3Interface(literatureData.showStep3Interface);
-      if (literatureData.expandedOutlines) setExpandedOutlines(literatureData.expandedOutlines);
-      
-      // Auto-show sections based on current step and available data
-      if (literatureData.currentStep >= 1 && literatureData.contextMapData) {
-        setShowContextMap(true);
-      }
-      if (literatureData.masterOutlines && literatureData.masterOutlines.length > 0) {
-        setShowStep3Interface(true);
-      } else if (literatureData.currentStep >= 2 || (literatureData.responses && Object.keys(literatureData.responses).length > 0)) {
-        setShowStep2Interface(true);
-      }
-      
-      console.log('✅ DataObservationBuilder: State restored from saved data');
-    } else if (literatureData === null || literatureData === undefined || Object.keys(literatureData || {}).length === 0) {
-      console.log('⚠️ DataObservationBuilder: Received null/empty literatureData, keeping existing state');
+    if (!literatureData || typeof literatureData !== 'object' || Object.keys(literatureData).length === 0) {
+      console.log('⚠️ No literatureData to restore');
+      return;
     }
+
+    console.log('🔄 RESTORING STATE from literatureData');
+    console.log('📦 Questions:', Object.keys(literatureData.questions || {}).length);
+    console.log('📦 Responses:', Object.keys(literatureData.responses || {}).length);
+    
+    // Restore step progress
+    if (literatureData.currentStep) setCurrentStep(literatureData.currentStep);
+    if (literatureData.stepStatus) setStepStatus(literatureData.stepStatus);
+    if (literatureData.stepProgress) setStepProgress(literatureData.stepProgress);
+    
+    // Restore completion flags
+    if (literatureData.contextAnalysisComplete) setContextAnalysisComplete(literatureData.contextAnalysisComplete);
+    if (literatureData.questionAnsweringComplete) setQuestionAnsweringComplete(literatureData.questionAnsweringComplete);
+    if (literatureData.detailedOutlineComplete) setDetailedOutlineComplete(literatureData.detailedOutlineComplete);
+    
+    // Restore generated data
+    if (literatureData.contextMapData) setContextMapData(literatureData.contextMapData);
+    if (literatureData.masterOutlines) setMasterOutlines(literatureData.masterOutlines);
+    
+    // Restore questions and responses
+    if (literatureData.questions && Object.keys(literatureData.questions).length > 0) {
+      console.log('Loading questions:', Object.keys(literatureData.questions).length);
+      setQuestions(literatureData.questions);
+    }
+    
+    if (literatureData.responses && Object.keys(literatureData.responses).length > 0) {
+      console.log('Loading responses:', Object.keys(literatureData.responses).length);
+      setResponses(literatureData.responses);
+    }
+    
+    // Restore UI states
+    if (literatureData.showContextMap !== undefined) setShowContextMap(literatureData.showContextMap);
+    if (literatureData.showStep2Interface !== undefined) setShowStep2Interface(literatureData.showStep2Interface);
+    if (literatureData.showStep3Interface !== undefined) setShowStep3Interface(literatureData.showStep3Interface);
+    if (literatureData.expandedOutlines) setExpandedOutlines(literatureData.expandedOutlines);
+    
+    console.log('State restored');
   }, [literatureData]);
 
-  // Initialize questions from literatureData or outlineData
+  // Extract questions from outlineData if not loaded from saved data
   useEffect(() => {
-    console.log('🔍 Questions initialization useEffect triggered');
-    console.log('🔍 literatureData:', literatureData);
-    console.log('🔍 outlineData:', outlineData);
-    console.log('🔍 questions:', questions);
+    if (!outlineData || outlineData.length === 0) return;
+    if (questions && Object.keys(questions).length > 0) return;
     
-    // Priority: saved questions > extract from outline
-    if (literatureData?.questions && Object.keys(literatureData.questions).length > 0) {
-      console.log('📝 Loading saved questions from literatureData:', literatureData.questions);
-      setQuestions(literatureData.questions);
-    } else if (outlineData && outlineData.length > 0 && (!questions || Object.keys(questions).length === 0)) {
-      console.log('� Extracting questions from outlineData...');
-      const extractedQuestions = {};
-      
-      outlineData.forEach((section, sectionIndex) => {
-        console.log(`🔍 Processing section ${sectionIndex}:`, section.section_title);
-        if (section.subsections) {
-          section.subsections.forEach((subsection, subsectionIndex) => {
-            console.log(`🔍 Processing subsection ${sectionIndex}-${subsectionIndex}:`, subsection.subsection_title);
-            if (subsection.questions) {
-              subsection.questions.forEach((question, questionIndex) => {
-                const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-                extractedQuestions[questionKey] = question.question;
-                console.log(`🔍 Extracted question ${questionKey}:`, question.question);
-              });
-            }
-          });
-        }
-      });
-      
-      console.log('📝 Extracted questions from outline:', extractedQuestions);
+    const extractedQuestions = {};
+    outlineData.forEach((section, sectionIndex) => {
+      if (section.subsections) {
+        section.subsections.forEach((subsection, subsectionIndex) => {
+          if (subsection.questions) {
+            subsection.questions.forEach((question, questionIndex) => {
+              const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+              extractedQuestions[questionKey] = question.question;
+            });
+          }
+        });
+      }
+    });
+    
+    if (Object.keys(extractedQuestions).length > 0) {
+      console.log('Extracted', Object.keys(extractedQuestions).length, 'questions');
       setQuestions(extractedQuestions);
-    } else {
-      console.log('🔍 Skipping question initialization - conditions not met');
     }
-    
-    // After setting questions, check completion if we have responses
-    if ((literatureData?.questions || (outlineData && outlineData.length > 0)) && literatureData?.responses) {
-      setTimeout(() => {
-        console.log('🔍 Checking completion after question initialization...');
-        checkQuestionAnsweringComplete();
-      }, 200);
-    }
-  }, [literatureData, outlineData]);
+  }, [outlineData, questions]);
 
-  // Check question completion when questions or responses change
+  // Check completion when both questions and responses are loaded
   useEffect(() => {
-    if (questions && Object.keys(questions).length > 0 && responses && Object.keys(responses).length > 0) {
-      console.log('🔍 Questions or responses changed, checking completion...');
-      setTimeout(() => checkQuestionAnsweringComplete(), 200);
+    const hasQuestions = questions && Object.keys(questions).length > 0;
+    const hasResponses = responses && Object.keys(responses).length > 0;
+    
+    if (hasQuestions && hasResponses) {
+      setTimeout(() => checkQuestionAnsweringComplete(), 100);
     }
   }, [questions, responses]);
 
   // Build citation reference map using simple running numbers
   const buildCitationReferenceMap = () => {
     const referenceMap = {};
-    const globalCitationMap = {}; // Maps citation content to reference number
+    const globalCitationMap = {};
     let globalRefNumber = 1;
     
     outlineData.forEach((section, sectionIndex) => {
@@ -195,16 +165,12 @@ const DataObservationBuilder = ({
               
               citations.forEach((citation, citationIndex) => {
                 const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-                
-                // Create a unique key for the citation to avoid duplicates
                 const citationKey = `${citation.apa || citation.title || citation.source || citation.author}`;
                 
                 let referenceNumber;
                 if (globalCitationMap[citationKey]) {
-                  // Reuse existing reference number for the same citation
                   referenceNumber = globalCitationMap[citationKey];
                 } else {
-                  // Assign new reference number
                   referenceNumber = globalRefNumber;
                   globalCitationMap[citationKey] = globalRefNumber;
                   globalRefNumber++;
@@ -237,7 +203,6 @@ const DataObservationBuilder = ({
       buildCitationReferenceMap();
       // Auto-start Step 1 if we haven't started the workflow yet
       if (currentStep === 0) {
-        console.log('📚 Auto-starting Step 1: Contextual Analysis');
         startStep1ContextualAnalysis();
       }
     }
@@ -522,6 +487,39 @@ const DataObservationBuilder = ({
           );
           sectionProse.prose_subsections.push(proseParagraphs);
           console.log(`    ✅ Added subsection prose for: ${subsection.subsection_title}`);
+          
+          // Incremental save and UI update after each subsection
+          const currentProgress = [...proseResults];
+          const currentSectionIndex = currentProgress.findIndex(s => s.section_title === section.section_title);
+          if (currentSectionIndex >= 0) {
+            currentProgress[currentSectionIndex] = { ...sectionProse };
+          } else {
+            currentProgress.push({ ...sectionProse });
+          }
+          
+          setMasterOutlines([...currentProgress]);
+          setShowStep3Interface(true);
+          
+          if (autoSave && onAutoSaveDraft) {
+            const saveData = {
+              currentStep: 3,
+              stepStatus: { 1: 'complete', 2: 'complete', 3: 'processing' },
+              contextAnalysisComplete: true,
+              questionAnsweringComplete: true,
+              detailedOutlineComplete: false,
+              questions: questions,
+              responses: responses,
+              masterOutlines: currentProgress,
+              contextMapData: contextMapData,
+              showContextMap: showContextMap,
+              showStep2Interface: showStep2Interface,
+              showStep3Interface: true
+            };
+            console.log(`💾 Incremental save after subsection: ${subsection.subsection_title}`);
+            onAutoSaveDraft(saveData);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
@@ -531,6 +529,27 @@ const DataObservationBuilder = ({
     
     setStepProgress(`Completed prose generation for all ${dataSections.length} data sections`);
     console.log('🔍 Final proseResults:', proseResults);
+    
+    // Final save with complete status
+    if (autoSave && onAutoSaveDraft) {
+      const finalSaveData = {
+        currentStep: 3,
+        stepStatus: { 1: 'complete', 2: 'complete', 3: 'complete' },
+        contextAnalysisComplete: true,
+        questionAnsweringComplete: true,
+        detailedOutlineComplete: true,
+        questions: questions,
+        responses: responses,
+        masterOutlines: proseResults,
+        contextMapData: contextMapData,
+        showContextMap: showContextMap,
+        showStep2Interface: showStep2Interface,
+        showStep3Interface: true
+      };
+      console.log('💾 Final save with complete status');
+      onAutoSaveDraft(finalSaveData);
+    }
+    
     return proseResults;
   };
 
@@ -1422,25 +1441,7 @@ const DataObservationBuilder = ({
       {/* Step-based Progress Header */}
       <div className="mb-4">
         <div className="d-flex align-items-center gap-3 mb-3">
-          <h3 className="mb-0">Enhanced Literature Review Builder</h3>
-          <span className="badge bg-info">
-            {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
-          </span>
-          <div className="ms-auto d-flex gap-2">
-            <button
-              className="btn btn-outline-primary btn-sm"
-              onClick={handleManualSave}
-              disabled={saving || !onAutoSaveDraft}
-              title="Save current progress manually"
-            >
-              {saving ? 'Saving...' : 'Save Progress'}
-            </button>
-            {lastSaved && (
-              <small className="text-muted align-self-center">
-                Last saved: {lastSaved}
-              </small>
-            )}
-          </div>
+          <h3 className="mb-0">Data & Observations Report</h3>
         </div>
         
         {/* Step Progress Indicators */}
@@ -1506,7 +1507,7 @@ const DataObservationBuilder = ({
                         Step {step}: {
                           step === 1 ? 'Contextual Analysis' :
                           step === 2 ? 'Answer Questions' :
-                          'Detailed Outline Builder'
+                          'Write Sections'
                         }
                       </h6>
                       <small style={{ 
@@ -1537,127 +1538,122 @@ const DataObservationBuilder = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="d-flex gap-2 mt-3">
-          <button
-            className="btn btn-outline-secondary btn-sm"
-            onClick={toggleContextMap}
-            disabled={!contextAnalysisComplete}
-          >
-            Context Map
-          </button>
-          <button
-            className="btn btn-outline-secondary btn-sm ms-2"
-            onClick={toggleStep2Interface}
-            disabled={currentStep < 2}
-          >
-            Step 2 Questions
-          </button>
-          <button
-            className="btn btn-outline-secondary btn-sm ms-2"
-            onClick={toggleStep3Interface}
-            disabled={currentStep < 1 || !outlineData || outlineData.length === 0}
-          >
-            Step 3 Prose
-          </button>
-          {detailedOutlineComplete && (
+        <div className="d-flex justify-content-between gap-2 mt-3">
+          <div className="d-flex gap-2">
             <button
-              className="btn btn-success btn-sm"
-              onClick={() => {
-                if (onLiteratureReviewComplete) {
-                  onLiteratureReviewComplete({
-                    responses: responses,
-                    masterOutlines: masterOutlines,
-                    contextMapData: contextMapData,
-                    completionStatus: 'complete'
-                  });
-                }
-              }}
+              className={`btn btn-sm ${showContextMap ? 'btn-secondary' : 'btn-outline-secondary'}`}
+              onClick={toggleContextMap}
+              disabled={!contextAnalysisComplete}
             >
-              Complete Literature Review
+              Context Map
             </button>
-          )}
-          {/* Continue Step 2 button - only when questions started but not all completed */}
-          {currentStep >= 1 && currentStep <= 2 && getCompletedQuestions() > 0 && !questionAnsweringComplete && (
             <button
-              className={`btn ${currentStep === 2 && !batchProcessing ? 'btn-warning' : 'btn-primary'} btn-sm border-warning`}
-              onClick={batchProcessing ? pauseProcessing : startOrResumeProcessing}
-              title={batchProcessing ? "Pause response generation" : "Continue answering questions from where you left off"}
-              style={{
-                backgroundColor: '#fff3cd',
-                borderColor: '#ffc107',
-                color: '#b8860b',
-                animation: currentStep === 2 && !batchProcessing ? 'gentlePulse 2s ease-in-out infinite' : 'none'
-              }}
+              className={`btn btn-sm ${showStep2Interface ? 'btn-secondary' : 'btn-outline-secondary'}`}
+              onClick={toggleStep2Interface}
+              disabled={currentStep < 2}
             >
-              {batchProcessing ? (
-                <>
-                  <FaPause className="me-1" />
-                  Pause Step 2
-                </>
-              ) : (
-                <>
-                  <FaPlay className="me-1" />
-                  Continue Step 2
-                </>
-              )}
+              Step 2 Questions
             </button>
-          )}
+            <button
+              className={`btn btn-sm ${showStep3Interface ? 'btn-secondary' : 'btn-outline-secondary'}`}
+              onClick={toggleStep3Interface}
+              disabled={currentStep < 1 || !outlineData || outlineData.length === 0}
+            >
+              Step 3 Prose
+            </button>
+          </div>
+          
+          <div className="d-flex gap-2">
+            {detailedOutlineComplete && (
+              <button
+                className="btn btn-success btn-sm"
+                onClick={() => {
+                  if (onLiteratureReviewComplete) {
+                    onLiteratureReviewComplete({
+                      responses: responses,
+                      masterOutlines: masterOutlines,
+                      contextMapData: contextMapData,
+                      completionStatus: 'complete'
+                    });
+                  }
+                }}
+              >
+                Complete Literature Review
+              </button>
+            )}
+            {/* Continue Step 2 button - only when questions started but not all completed */}
+            {currentStep >= 1 && currentStep <= 2 && getCompletedQuestions() > 0 && !questionAnsweringComplete && (
+              <button
+                className={`btn ${currentStep === 2 && !batchProcessing ? 'btn-warning' : 'btn-primary'} btn-sm border-warning`}
+                onClick={batchProcessing ? pauseProcessing : startOrResumeProcessing}
+                title={batchProcessing ? "Pause response generation" : "Continue answering questions from where you left off"}
+                style={{
+                  backgroundColor: '#fff3cd',
+                  borderColor: '#ffc107',
+                  color: '#b8860b',
+                  animation: currentStep === 2 && !batchProcessing ? 'gentlePulse 2s ease-in-out infinite' : 'none'
+                }}
+              >
+                {batchProcessing ? (
+                  <>
+                    <FaPause className="me-1" />
+                    Pause Step 2
+                  </>
+                ) : (
+                  <>
+                    <FaPlay className="me-1" />
+                    Continue Step 2
+                  </>
+                )}
+              </button>
+            )}
 
-          {/* Step 2 Ready button - only when Step 2 is ready but no questions started yet */}
-          {stepStatus[2] === 'ready' && getCompletedQuestions() === 0 && (
-            <button
-              className="btn btn-sm border-warning"
-              onClick={batchProcessing ? pauseProcessing : startOrResumeProcessing}
-              title={batchProcessing ? "Pause response generation" : "Step 2 Ready - Start answering questions"}
-              style={{
-                backgroundColor: '#fff3cd',
-                borderColor: '#ffc107',
-                color: '#b8860b',
-                animation: !batchProcessing ? 'gentlePulse 2s ease-in-out infinite' : 'none'
-              }}
-            >
-              {batchProcessing ? (
-                <>
-                  <FaPause className="me-1" />
-                  Pause Step 2
-                </>
-              ) : (
-                <>
-                  <FaPlay className="me-1" />
-                  Step 2 Ready
-                </>
-              )}
-            </button>
-          )}
-          {stepStatus[3] === 'ready' && (
-            <button
-              className="btn btn-outline-success btn-sm"
-              onClick={startStep3ProseBuilder}
-              title="Start Step 3 - Convert outlines to academic prose"
-            >
-              <FaPlay className="me-1" />
-              Start Step 3
-            </button>
-          )}
+            {/* Step 2 Ready button - only when Step 2 is ready but no questions started yet */}
+            {stepStatus[2] === 'ready' && getCompletedQuestions() === 0 && (
+              <button
+                className="btn btn-sm border-warning"
+                onClick={batchProcessing ? pauseProcessing : startOrResumeProcessing}
+                title={batchProcessing ? "Pause response generation" : "Step 2 Ready - Start answering questions"}
+                style={{
+                  backgroundColor: '#fff3cd',
+                  borderColor: '#ffc107',
+                  color: '#b8860b',
+                  animation: !batchProcessing ? 'gentlePulse 2s ease-in-out infinite' : 'none'
+                }}
+              >
+                {batchProcessing ? (
+                  <>
+                    <FaPause className="me-1" />
+                    Pause Step 2
+                  </>
+                ) : (
+                  <>
+                    <FaPlay className="me-1" />
+                    Step 2 Ready
+                  </>
+                )}
+              </button>
+            )}
+            {stepStatus[3] === 'ready' && (
+              <button
+                className="btn btn-sm border-warning"
+                onClick={startStep3ProseBuilder}
+                title="Start Step 3 - Convert outlines to academic prose"
+                style={{
+                  backgroundColor: '#fff3cd',
+                  borderColor: '#ffc107',
+                  color: '#b8860b',
+                  animation: 'gentlePulse 2s ease-in-out infinite'
+                }}
+              >
+                <FaPlay className="me-1" />
+                Start Step 3
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Test row - Skip to Step 3 button */}
-        <div className="d-flex gap-2 mt-2">
-          {(currentStep >= 1 && currentStep <= 2 && !questionAnsweringComplete) && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={skipToStep3}
-              title="Skip Step 2 and proceed directly to Step 3 (for testing)"
-              style={{
-                backgroundColor: '#0d6efd',
-                borderColor: '#0d6efd',
-                color: 'white'
-              }}
-            >
-              Test: Skip to Step 3 Now
-            </button>
-          )}
-        </div>
+
       </div>
 
       {/* CSS for gentle pulsing animation */}
@@ -1817,7 +1813,160 @@ const DataObservationBuilder = ({
         </div>
       )}
 
-      {/* The remainder of the UI and handlers remain the same as LiteratureReview.jsx - omitted for brevity here but included in the full implementation above. */}
+      {/* Step 2: Questions & Responses Interface */}
+      {showStep2Interface && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Step 2: Questions & Responses</h5>
+              <button className="btn btn-sm btn-outline-secondary" onClick={toggleStep2Interface}>
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="card-body">
+            {outlineData.map((section, sectionIndex) => (
+              <div key={sectionIndex} className="mb-4">
+                <h5 className="text-primary">{section.section_title}</h5>
+                {section.subsections?.map((subsection, subsectionIndex) => (
+                  <div key={subsectionIndex} className="mb-3 ps-3">
+                    <h6 className="text-secondary">{subsection.subsection_title}</h6>
+                    {subsection.questions?.map((questionObj, questionIndex) => {
+                      const key = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+                      const responseArray = responses[key] || [];
+                      const currentIdx = currentResponseIdx[key] || 0;
+                      const isLoading = loading[key];
+                      const citations = questionObj.citations || [];
+                      
+                      return (
+                        <div key={questionIndex} className="card mb-3">
+                          <div className="card-body">
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <p className="mb-0"><strong>Q{questionIndex + 1}:</strong> {questionObj.question}</p>
+                              <div className="d-flex gap-1">
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => generateAllQuestionResponses(sectionIndex, subsectionIndex, questionIndex, questionObj)}
+                                  disabled={isLoading}
+                                  title="Generate/Refresh responses"
+                                >
+                                  {isLoading ? <FaSpinner className="fa-spin" /> : <FaSyncAlt />}
+                                </button>
+                                {responseArray.length > 0 && (
+                                  <button 
+                                    className="btn btn-sm btn-outline-primary" 
+                                    onClick={() => openModal(responseArray[currentIdx], questionObj.question)}
+                                    title="Expand response"
+                                  >
+                                    <FaExpand />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {responseArray.length > 0 && (
+                              <div className="mt-3">
+                                
+                                {/* Citation selector buttons */}
+                                {citations.length > 0 && (
+                                  <div className="mb-2 d-flex gap-1 flex-wrap">
+                                    {citations.map((citation, citIdx) => {
+                                      const author = citation.author || citation.apa?.split('(')[0]?.trim() || 'Unknown';
+                                      const refNum = citationReferenceMap[key]?.[citIdx]?.referenceNumber || (citIdx + 1);
+                                      return (
+                                        <button
+                                          key={citIdx}
+                                          className={`btn btn-sm ${currentIdx === citIdx ? 'btn-primary' : 'btn-outline-primary'}`}
+                                          onClick={() => handleJumpToResponse(key, citIdx)}
+                                          title={citation.apa || citation.title || citation.source}
+                                        >
+                                          {author} [{refNum}]
+                                        </button>
+                                      );
+                                    })}
+                                    <button
+                                      className={`btn btn-sm ${currentIdx === responseArray.length - 1 ? 'btn-success' : 'btn-outline-success'}`}
+                                      onClick={() => handleJumpToResponse(key, responseArray.length - 1)}
+                                    >
+                                      Fused Response
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                <div className="p-3 bg-light rounded" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                  <div dangerouslySetInnerHTML={{ __html: responseArray[currentIdx] }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Generated Prose Display */}
+      {showStep3Interface && masterOutlines && masterOutlines.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Step 3: Generated Prose</h5>
+              <button className="btn btn-sm btn-outline-secondary" onClick={toggleStep3Interface}>
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="card-body">
+            {masterOutlines.map((section, sectionIndex) => (
+              <div key={sectionIndex} className="mb-4">
+                <h4 className="text-primary mb-3">{section.section_title}</h4>
+                <div className="mb-3 p-3 bg-light rounded">
+                  <p className="text-muted small mb-0">
+                    <strong>Section Context:</strong> {section.section_context}
+                  </p>
+                </div>
+                
+                {section.prose_subsections && section.prose_subsections.map((subsection, subIndex) => (
+                  <div key={subIndex} className="mb-4">
+                    <h5 className="text-secondary mb-2">{subsection.subsection_title}</h5>
+                    <div className="mb-2 p-2 bg-light rounded">
+                      <p className="text-muted small mb-0">
+                        <strong>Subsection Context:</strong> {subsection.subsection_context}
+                      </p>
+                    </div>
+                    
+                    <div className="prose-content p-3 border rounded" style={{ backgroundColor: '#fff' }}>
+                      {subsection.prose_content ? (
+                        <div dangerouslySetInnerHTML={{ __html: subsection.prose_content }} />
+                      ) : (
+                        <p className="text-muted"><em>No prose generated yet...</em></p>
+                      )}
+                    </div>
+                    
+                    <div className="mt-2 text-muted small">
+                      <span className="me-3">📊 {subsection.question_count} questions</span>
+                      <span>📚 {subsection.citation_count} citations</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal for expanded view */}
+      {showModal && selectedResponse && (
+        <Modal onClose={closeModal}>
+          <h5 className="mb-3">{selectedResponse.question}</h5>
+          <div dangerouslySetInnerHTML={{ __html: selectedResponse.response }} />
+        </Modal>
+      )}
     </div>
   );
 };
