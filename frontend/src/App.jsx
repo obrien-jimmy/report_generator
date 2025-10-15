@@ -174,6 +174,7 @@ function App() {
 
   const handleMethodologySelected = (methodologyData) => {
     setMethodology(methodologyData);
+    setReadyForOutline(true); // Show outline section when methodology is selected
     triggerAutoSave(true); // Immediate save for important milestone
   };
 
