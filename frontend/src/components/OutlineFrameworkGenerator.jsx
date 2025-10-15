@@ -14,7 +14,8 @@ const OutlineGenerator = ({
   onFrameworkComplete, 
   onTransferToLiteratureReview,
   savedOutlineData,
-  refreshTrigger
+  refreshTrigger,
+  methodologyComplete
 }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -501,6 +502,7 @@ const OutlineGenerator = ({
             refreshTrigger={refreshTrigger}
             finalThesis={finalThesis}
             sourceCategories={sourceCategories}
+            methodologyComplete={methodologyComplete}
           />
 
           {customStructure && (

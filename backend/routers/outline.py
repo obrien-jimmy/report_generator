@@ -24,8 +24,10 @@ from services.bedrock_service import invoke_bedrock
 from services.paper_structure_service import PaperStructureService
 import json
 import re
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/generate_outline", response_model=OutlineGenerationResponse)
 async def generate_outline(request: OutlineGenerationRequest):
@@ -493,9 +495,10 @@ async def generate_sections_subsections(request: dict):
         paper_type = request.get('paper_type')
         methodology = request.get('methodology')
         structure = request.get('structure', [])
+        custom_prompt = request.get('prompt')
         
-        if not paper_type or not methodology:
-            raise HTTPException(status_code=400, detail="Paper type and methodology are required")
+        if not paper_type:
+            raise HTTPException(status_code=400, detail="Paper type is required")
         
         # Extract methodology information
         methodology_description = ""
@@ -504,76 +507,160 @@ async def generate_sections_subsections(request: dict):
         else:
             methodology_description = str(methodology)
         
-        # Generate sections with context and subsections
-        generated_sections = []
-        
-        for section_title in structure:
-            # Skip administrative sections
-            if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)', 'references']:
-                continue
-                
-            # Generate context for this section
-            section_context_prompt = f"""
-            Generate a brief context description for the section "{section_title}" in a {paper_type} research paper.
-            
-            Paper Type: {paper_type}
-            Methodology: {methodology_description}
-            Section: {section_title}
-            
-            Provide a 1-2 sentence description of what this section should cover and how it relates to the overall paper structure.
-            Return only the context description, no additional formatting.
-            """
-            
-            section_context = invoke_bedrock(section_context_prompt).strip()
-            
-            # Generate subsections for content sections (skip intro/conclusion)
-            subsections = []
-            if section_title.lower() not in ['introduction', 'conclusion', 'abstract']:
-                subsection_prompt = f"""
-                Generate 3-4 subsection titles for the section "{section_title}" in a {paper_type} research paper.
-                
+        # Use custom prompt if provided, otherwise use the enhanced generation prompt
+        if custom_prompt:
+            prompt = custom_prompt
+        else:
+            # Enhanced generation: ask the model for strict JSON output that uses the thesis, source categories, methodology
+            # to produce focused sections and subsections. We expect the model to return an array of section objects with
+            # fields: title, category, focus, subsections: [{title, focus, required_data_examples}], flags: {isData,isAnalysis,isMethod}
+            prompt = f"""
+You are an expert academic structure generator. Given the paper's thesis, source categories (topics of available evidence), the methodology, and a baseline structure list, produce a focused, actionable set of sections and subsections suitable to drive an outline generator.
+
+Inputs:
+- Paper type: {paper_type}
+- Methodology (summary): {methodology_description}
+- Thesis: {request.get('final_thesis', '')}
+- Source categories: {json.dumps(request.get('source_categories', []))}
+- Baseline structure titles: {json.dumps(structure)}
+You are an expert academic structure generator. Given the paper's thesis, source categories (topics of available evidence), the methodology, and a baseline structure list, produce a focused, actionable set of sections and subsections suitable to drive an outline generator.
+
+Inputs:
+- Paper type: {paper_type}
+- Methodology (summary): {methodology_description}
+- Thesis: {request.get('final_thesis', '')}
+- Source categories: {json.dumps(request.get('source_categories', []))}
+- Baseline structure titles: {json.dumps(structure)}
+
+Task:
+1) For each baseline section, decide whether to (a) keep it as administrative, (b) expand it into focused sections (e.g., Data sections should be specific kinds of evidence such as 'Operational Logs', 'Survey Responses', 'Case Studies'), or (c) mark it as Analysis/Method/Other.
+2) For each Data-type section, produce 3-6 concrete subsection topics. Each subsection must be a focused research topic or data element that can be directly analyzed (not a generic meta-heading). Example: 'Network Intrusion Timeline (Event-level logs: timestamps, source IPs, attack vectors)'.
+3) For each Analysis-type section, specify which Data sections it analyzes (use exact titles returned in the Data sections), and list focused analysis subtopics (e.g., 'Temporal attack patterns - anomaly detection on event timestamps').
+4) For each section, include a short 'focus' sentence (1-2 sentences) that links the section to the thesis and methodology.
+
+Output format (STRICT JSON):
+Return only valid JSON: an array of sections. Each section object must have the following keys:
+[
+  {
+    "title": "Section Title",
+    "category": "Admin|Intro|Data|Method|Analysis|Impact|Summary|Other",
+    "focus": "One or two sentences linking this section to the thesis and methodology",
+    "flags": {"isData": true|false, "isAnalysis": true|false, "isMethod": true|false},
+    "subsections": [
+      {"title": "Subsection title (focused)", "focus": "1-line description of topic and data needed", "required_data_examples": ["example1", "example2"]}
+    ],
+    // optional for analysis sections
+    "analysis_targets": ["Exact Data Section title(s) this analysis will use"]
+  }
+]
+
+Constraints:
+- Use the thesis and source categories to produce subsection topics that directly map to available evidence and testable claims.
+- Do not return generic headings like 'Existing Literature' or 'Key Observations' as subsection titles; instead produce concrete topics and data elements.
+- Ensure Data sections are specific (e.g., 'Survey: public sentiment about X' not just 'Data Collection Process').
+- Ensure Analysis sections include explicit analysis_targets referencing data section titles.
+
+Produce the JSON now.
+"""
+
+        try:
+            raw = invoke_bedrock(prompt)
+            if not raw:
+                raise ValueError('Empty response from model')
+
+            # For custom prompts, return the raw text directly
+            if custom_prompt:
+                return {"sections": raw.strip()}
+
+            # For the default prompt, parse JSON as before
+            # Try to extract JSON from the response robustly
+            text = raw.strip()
+            if '```json' in text:
+                text = text[text.find('```json') + 7:]
+                if '```' in text:
+                    text = text[:text.find('```')]
+
+            # Fallback: find first '[' and last ']' to get JSON array
+            if not text.startswith('['):
+                start = text.find('[')
+                end = text.rfind(']')
+                if start != -1 and end != -1:
+                    text = text[start:end+1]
+
+            sections_data = json.loads(text)
+
+            # Validate and normalize
+            normalized = []
+            for sec in sections_data:
+                title = sec.get('title') or sec.get('section_title') or ''
+                category = sec.get('category') or 'Other'
+                focus = sec.get('focus') or sec.get('section_context') or ''
+                flags = sec.get('flags') or {}
+                isData = flags.get('isData', False) or sec.get('is_data') or sec.get('is_data_section', False)
+                isAnalysis = flags.get('isAnalysis', False) or sec.get('is_analysis', False)
+                isMethod = flags.get('isMethod', False) or sec.get('is_method', False)
+
+                subs = []
+                for s in sec.get('subsections', []) or []:
+                    st = s.get('title') or s.get('subsection_title') or s.get('subsection') or ''
+                    sf = s.get('focus') or s.get('subsection_context') or ''
+                    req = s.get('required_data_examples') or s.get('examples') or []
+                    subs.append({"title": st, "focus": sf, "required_data_examples": req})
+
+                analysis_targets = sec.get('analysis_targets') or sec.get('targets') or []
+
+                normalized.append({
+                    "title": title,
+                    "category": category,
+                    "focus": focus,
+                    "flags": {"isData": bool(isData), "isAnalysis": bool(isAnalysis), "isMethod": bool(isMethod)},
+                    "subsections": subs,
+                    "analysis_targets": analysis_targets
+                })
+
+            # As a final step, ensure Data sections precede Analysis sections and admin sections are first
+            admin = [s for s in normalized if s['category'].lower() in ('admin', 'intro', 'title page', 'abstract')]
+            data_secs = [s for s in normalized if s['flags']['isData']]
+            analysis_secs = [s for s in normalized if s['flags']['isAnalysis']]
+            others = [s for s in normalized if s not in admin + data_secs + analysis_secs]
+
+            final_sections = admin + data_secs + analysis_secs + others
+
+            return {"sections": final_sections}
+
+        except Exception as e:
+            # Fallback to previous simpler behavior if parsing or model fails
+            logger.error(f"generate_sections_subsections failed to parse model output: {str(e)}")
+            generated_sections = []
+            for section_title in structure:
+                if section_title.lower() in ['title page', 'abstract', 'references (apa 7th)', 'references']:
+                    continue
+                section_context_prompt = f"""
+                Generate a brief context description for the section "{section_title}" in a {paper_type} research paper.
                 Paper Type: {paper_type}
                 Methodology: {methodology_description}
-                Section Title: {section_title}
-                Section Context: {section_context}
-                
-                Return as a JSON array of objects with "subsection_title" and "subsection_context":
-                [
-                  {{
-                    "subsection_title": "Subsection Title",
-                    "subsection_context": "Brief description of subsection focus"
-                  }}
-                ]
-                
-                Return only the JSON array.
+                Section: {section_title}
+                Return a short context sentence.
                 """
-                
                 try:
-                    subsections_response = invoke_bedrock(subsection_prompt).strip()
-                    # Clean the response to ensure it's valid JSON
-                    subsections_response = subsections_response.replace('```json', '').replace('```', '').strip()
-                    subsections_data = json.loads(subsections_response)
-                    
-                    for sub_data in subsections_data:
-                        subsections.append({
-                            "subsection_title": sub_data.get("subsection_title", ""),
-                            "subsection_context": sub_data.get("subsection_context", "")
-                        })
-                except (json.JSONDecodeError, KeyError) as e:
-                    print(f"Error parsing subsections for {section_title}: {e}")
-                    # Fallback to basic subsections
+                    section_context = invoke_bedrock(section_context_prompt).strip()
+                except:
+                    section_context = f"Analysis and discussion relevant to {section_title.lower()}"
+
+                subsections = []
+                if section_title.lower() not in ['introduction', 'conclusion', 'abstract']:
                     subsections = [
                         {"subsection_title": f"{section_title} Overview", "subsection_context": "Overview and introduction"},
                         {"subsection_title": f"{section_title} Analysis", "subsection_context": "Detailed analysis and discussion"}
                     ]
-            
-            generated_sections.append({
-                "title": section_title,
-                "context": section_context,
-                "subsections": subsections
-            })
-        
-        return {"sections": generated_sections}
+
+                generated_sections.append({
+                    "title": section_title,
+                    "context": section_context,
+                    "subsections": subsections
+                })
+
+            return {"sections": generated_sections}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating sections and subsections: {str(e)}")

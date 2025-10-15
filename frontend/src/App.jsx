@@ -372,6 +372,7 @@ function App() {
                     onTransferToLiteratureReview={handleTransferToDataObservation}
                     savedOutlineData={outlineData}
                     refreshTrigger={structureRefreshTrigger}
+                    methodologyComplete={readyForOutline}
                   />
                 </div>
               )}

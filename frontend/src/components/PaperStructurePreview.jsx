@@ -12,7 +12,8 @@ const PaperStructurePreview = ({
   hasGenerated, // Add this prop
   refreshTrigger, // Add this prop to force refresh
   finalThesis,
-  sourceCategories
+  sourceCategories,
+  methodologyComplete // Add this prop to trigger generation
 }) => {
   const [structureData, setStructureData] = useState(null);
   const [error, setError] = useState(null);
@@ -30,17 +31,36 @@ const PaperStructurePreview = ({
 
 
   useEffect(() => {
-    if (paperType?.id && methodology) {
-      fetchStructure();
+    if (paperType?.id) {
+      // Initialize with just background section
+      const initialStructure = [
+        {
+          id: 'background-section',
+          title: 'Background',
+          context: 'Factual background needed to understand the thesis',
+          isAdmin: false,
+          isMethodology: false,
+          isIntro: false,
+          isSummary: false,
+          isAnalysis: false,
+          isData: true,
+          category: 'Data',
+          order: 0
+        }
+      ];
+      setEditableStructure(initialStructure);
+      if (onStructureChange) {
+        onStructureChange(initialStructure);
+      }
     }
-  }, [paperType, methodology]); // Removed subMethodology dependency - kept for future consideration
+  }, [paperType?.id]);
 
-  // Force refresh when refreshTrigger changes
+  // Trigger generation when methodology is completed
   useEffect(() => {
-    if (refreshTrigger && paperType?.id && methodology) {
-      fetchStructure();
+    if (methodologyComplete && finalThesis && sourceCategories && paperType?.id) {
+      generateSections();
     }
-  }, [refreshTrigger]);
+  }, [methodologyComplete, finalThesis, sourceCategories, paperType?.id]);
 
   // Re-initialize structure when needed
   useEffect(() => {
@@ -363,25 +383,34 @@ const PaperStructurePreview = ({
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const toggleEditingMode = () => setEditingMode(prev => !prev);
 
-  const handleRefreshStructure = async () => {
-    if (!paperType?.id || !methodology) {
-      return;
+  const parseGeneratedText = (text) => {
+    const sections = [];
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+    let currentSection = null;
+    for (const line of lines) {
+      if (line.startsWith('I. Background') || line.match(/^Section I:/)) {
+        currentSection = { title: 'Background', description: '', subcategories: [] };
+        sections.push(currentSection);
+      } else if (line.match(/^Section [IVXLCDM]+:/) || line.match(/^[IVXLCDM]+\./)) {
+        const titleMatch = line.match(/^Section [IVXLCDM]+: (.+)|^([IVXLCDM]+)\. (.+)/);
+        if (titleMatch) {
+          const title = titleMatch[1] || titleMatch[3];
+          currentSection = { title, description: '', subcategories: [] };
+          sections.push(currentSection);
+        }
+      } else if (line.startsWith('- ') && currentSection) {
+        currentSection.subcategories.push(line.substring(2));
+      } else if (currentSection && !currentSection.description && line) {
+        currentSection.description = line;
+      }
     }
-    
-    setRefreshing(true);
-    try {
-      await fetchStructure();
-    } catch (err) {
-      console.error('Error refreshing structure:', err);
-      setError('Failed to refresh structure. Please try again.');
-    } finally {
-      setRefreshing(false);
-    }
+    return sections;
   };
 
   const generateSections = async () => {
-    if (!paperType?.id || !methodology) {
-      setError('Paper type and methodology are required to generate sections.');
+    if (!paperType?.id || !finalThesis || !sourceCategories) {
+      setError('Paper type, thesis, and source categories are required to generate sections.');
       return;
     }
 
@@ -389,95 +418,125 @@ const PaperStructurePreview = ({
     setError(null);
 
     try {
+      // New prompt for data-only generation
+      const prompt = `Paper Structure Preview (Data-Only Generation)
+
+Instruction to the Model:
+
+You are generating a Paper Structure Preview.
+This is not the paper's outline or thesis structure — it is a data framework that identifies what must be researched or extracted from source material to fully understand and address the thesis.
+
+Rules:
+
+Do not include non-data or administrative sections.
+
+Exclude: Methodology, Analysis, Discussion, Summary, or Administrative content.
+
+Focus only on observable, data-based topics.
+
+These should be facts, systems, historical background, case studies, technical parameters, organizational structures, key actors, frameworks, or data patterns that inform the thesis.
+
+Start with a "Background" section.
+
+This section provides factual, descriptive context to orient the reader to the problem space.
+
+After the Background section, list all other categories and subcategories of topics that someone would need to research to fully understand the thesis.
+
+Each category should represent a major thematic area of evidence or observation.
+
+Each subcategory should represent a specific dimension, dataset, variable, or concept relevant to that category.
+
+No argumentation or interpretation.
+
+These items are strictly informational elements that a researcher would collect.
+
+Thesis: "${finalThesis}"
+
+Source Categories: ${JSON.stringify(sourceCategories)}
+
+Output Format:
+
+Title: Paper Structure Preview
+
+Section I: Background
+
+Describe what factual background is needed to understand the thesis.
+
+Section II–X: Major Categories
+
+For each category:
+
+Heading (Category Name)
+
+Subheadings (Subcategories) – each identifying a specific topic or dataset to explore.
+
+Example (Illustrative Only):
+
+Paper Structure Preview
+
+I. Background
+   - Evolution of cyber deterrence strategy since 2000
+   - Key actors and institutional frameworks (DoD, NSA, USCYBERCOM)
+
+II. Threat Landscape
+   - Types of cyber adversaries (state, proxy, criminal)
+   - Trends in offensive capabilities
+   - Notable cyber incidents (2010–present)
+
+III. Defensive Infrastructure
+   - National cyber defense architecture
+   - Public-private sector coordination
+   - International partnerships (NATO, AUKUS)
+
+IV. Legal and Policy Framework
+   - U.S. statutory authorities for cyber operations
+   - International norms and law of armed conflict
+
+End of Prompt`;
+
       // Call the backend to generate sections and subsections
       const response = await axios.post('http://localhost:8000/generate_sections_subsections', {
+        prompt: prompt,
         paper_type: paperType.id,
         methodology: methodology,
-        structure: structureData?.structure || [],
         final_thesis: finalThesis,
         source_categories: sourceCategories
       });
 
       if (response.data && response.data.sections) {
-        // Convert the generated sections into the editable structure format
-        const generatedSections = response.data.sections.map((section, index) => {
-          const originalSection = editableStructure.find(s => s.title.toLowerCase() === section.title.toLowerCase());
-          
-          return {
-            ...originalSection, // Keep original properties like category, flags, etc.
-            id: originalSection?.id || `generated-section-${index}`,
-            title: section.title,
-            context: section.context || '',
-            subsections: section.subsections || [],
-            generated: true // Mark as generated
-          };
-        });
+        // Parse the generated text into sections
+        const generatedText = response.data.sections; // Assuming it's the text output
+        const sections = parseGeneratedText(generatedText);
 
-        // Update the editable structure with generated content and persist it immediately
-        // Merge generated sections, prefer generated metadata where available
-        const newStructure = editableStructure.map(section => {
-          const generatedSection = generatedSections.find(gs => gs.title.toLowerCase() === section.title.toLowerCase());
-          if (generatedSection) {
-            return {
-              ...section,
-              context: generatedSection.context || section.context,
-              subsections: generatedSection.subsections || section.subsections,
-              generated: true,
-              // Ensure flags are set according to generated metadata
-              isData: generatedSection.isData !== undefined ? generatedSection.isData : section.isData,
-              isAnalysis: generatedSection.isAnalysis !== undefined ? generatedSection.isAnalysis : section.isAnalysis,
-              isMethodology: generatedSection.isMethodology !== undefined ? generatedSection.isMethodology : section.isMethodology
-            };
-          }
-          return section;
-        });
+        // Convert to editable structure format
+        const generatedSections = sections.map((section, index) => ({
+          id: `generated-section-${index}`,
+          title: section.title,
+          context: section.description || '',
+          subsections: section.subcategories.map(sub => ({
+            subsection_title: sub,
+            subsection_context: ''
+          })),
+          isAdmin: false,
+          isMethodology: false,
+          isIntro: false,
+          isSummary: false,
+          isAnalysis: false,
+          isData: true,
+          category: 'Data',
+          order: index,
+          generated: true
+        }));
 
-        // Reorder using a canonical ordering so Intro appears early and Data sections precede Analysis
-        const adminSections = newStructure.filter(s => s.isAdmin);
+        setEditableStructure(generatedSections);
 
-        // canonical order of section keywords (lowercased)
-        const canonicalOrder = [
-          'title page',
-          'abstract',
-          'introduction',
-          'background',
-          'data & observations',
-          'data',
-          'methodology and approach',
-          'methodology',
-          'analysis',
-          'impact',
-          'conclusion',
-          'references'
-        ];
-
-        const scored = newStructure
-          .filter(s => !s.isAdmin)
-          .map(s => {
-            const title = (s.title || '').toLowerCase();
-            let index = canonicalOrder.findIndex(k => title.includes(k) || (s.category && s.category.toLowerCase() === k));
-            if (index === -1) {
-              // give Data/Analysis flags priority
-              if (s.isData) index = canonicalOrder.indexOf('data & observations');
-              else if (s.isAnalysis) index = canonicalOrder.indexOf('analysis');
-              else index = canonicalOrder.length + 10; // place at end
-            }
-            return { section: s, index };
-          })
-          .sort((a, b) => a.index - b.index)
-          .map(x => x.section);
-
-        const reordered = [...adminSections, ...scored];
-
-        setEditableStructure(reordered);
-
-        // Notify parent of the updated structure so it can be used as customStructure
+        // Notify parent
         if (onStructureChange) {
-          try { onStructureChange(reordered); } catch (e) { console.warn('onStructureChange failed', e); }
+          onStructureChange(generatedSections);
         }
 
-        // Immediately save the generated structure so UI changes or remounts restore it
-  try { saveStructure(reordered, true); } catch (e) { console.warn('saveStructure failed', e); }
+        // Save immediately
+        saveStructure(generatedSections, true);
 
         setSectionsGenerated(true);
         console.log('Sections generated successfully:', generatedSections);
@@ -561,7 +620,7 @@ const PaperStructurePreview = ({
     <div className="card mb-4">
       <div className="card-header d-flex justify-content-between align-items-center">
         <div className="d-flex align-items-center">
-          <h5 className="mb-0">Paper Structure Preview</h5>
+          <h5 className="mb-0">Data Structure Preview</h5>
           <span className="badge bg-info ms-2">
             {editableStructure.length} sections
           </span>
@@ -577,18 +636,6 @@ const PaperStructurePreview = ({
           )}
         </div>
         <div className="d-flex gap-2">
-          <button
-            className="btn btn-sm btn-outline-success"
-            onClick={handleRefreshStructure}
-            title="Refresh paper structure"
-            disabled={!paperType?.id || !methodology || refreshing}
-          >
-            {refreshing ? (
-              <FaSpinner className="fa-spin" />
-            ) : (
-              <FaSync />
-            )}
-          </button>
           <button
             className="btn btn-sm btn-outline-primary"
             onClick={addSection}
