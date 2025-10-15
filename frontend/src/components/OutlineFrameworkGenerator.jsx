@@ -60,6 +60,7 @@ const OutlineGenerator = ({
   };
 
   const editStructure = () => {
+    // Preserve customStructure so the refined/generated preview persists
     setOutline([]);
     setHasGenerated(false);
     setError(null);

@@ -288,9 +288,14 @@ const PaperStructurePreview = ({
   };
 
   // Save/Load functionality
+  const getMethodologyIdForKey = () => {
+    return methodology?.methodologyType || methodology?.methodology_type || methodology;
+  };
+
   const getSaveKey = () => {
-    if (!paperType?.id || !methodology) return null;
-    return `paper_structure_${paperType.id}_${methodology}`;
+    const methodologyId = getMethodologyIdForKey();
+    if (!paperType?.id || !methodologyId) return null;
+    return `paper_structure_${paperType.id}_${methodologyId}`;
   };
 
   const saveStructure = async (structure = editableStructure, manual = false) => {
@@ -404,13 +409,12 @@ const PaperStructurePreview = ({
           };
         });
 
-        // Update the editable structure with generated content
-        setEditableStructure(prevStructure => {
-          return prevStructure.map(section => {
+        // Update the editable structure with generated content and persist it immediately
+        const newStructure = (prev => {
+          return prev.map(section => {
             const generatedSection = generatedSections.find(gs => 
               gs.title.toLowerCase() === section.title.toLowerCase()
             );
-            
             if (generatedSection) {
               return {
                 ...section,
@@ -419,10 +423,19 @@ const PaperStructurePreview = ({
                 generated: true
               };
             }
-            
             return section;
           });
-        });
+        })(editableStructure || []);
+
+        setEditableStructure(newStructure);
+
+        // Notify parent of the updated structure so it can be used as customStructure
+        if (onStructureChange) {
+          try { onStructureChange(newStructure); } catch (e) { console.warn('onStructureChange failed', e); }
+        }
+
+        // Immediately save the generated structure so UI changes or remounts restore it
+        try { saveStructure(newStructure, true); } catch (e) { console.warn('saveStructure failed', e); }
 
         setSectionsGenerated(true);
         console.log('Sections generated successfully:', generatedSections);
