@@ -499,6 +499,8 @@ const OutlineGenerator = ({
             loading={false}
             hasGenerated={hasGenerated}
             refreshTrigger={refreshTrigger}
+            finalThesis={finalThesis}
+            sourceCategories={sourceCategories}
           />
 
           {customStructure && (

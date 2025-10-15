@@ -10,7 +10,9 @@ const PaperStructurePreview = ({
   onGenerateOutline, // Add this prop
   loading, // Add this prop  
   hasGenerated, // Add this prop
-  refreshTrigger // Add this prop to force refresh
+  refreshTrigger, // Add this prop to force refresh
+  finalThesis,
+  sourceCategories
 }) => {
   const [structureData, setStructureData] = useState(null);
   const [error, setError] = useState(null);
@@ -391,7 +393,9 @@ const PaperStructurePreview = ({
       const response = await axios.post('http://localhost:8000/generate_sections_subsections', {
         paper_type: paperType.id,
         methodology: methodology,
-        structure: structureData?.structure || []
+        structure: structureData?.structure || [],
+        final_thesis: finalThesis,
+        source_categories: sourceCategories
       });
 
       if (response.data && response.data.sections) {
@@ -410,32 +414,41 @@ const PaperStructurePreview = ({
         });
 
         // Update the editable structure with generated content and persist it immediately
-        const newStructure = (prev => {
-          return prev.map(section => {
-            const generatedSection = generatedSections.find(gs => 
-              gs.title.toLowerCase() === section.title.toLowerCase()
-            );
-            if (generatedSection) {
-              return {
-                ...section,
-                context: generatedSection.context,
-                subsections: generatedSection.subsections,
-                generated: true
-              };
-            }
-            return section;
-          });
-        })(editableStructure || []);
+        // Merge generated sections, prefer generated metadata where available
+        const newStructure = editableStructure.map(section => {
+          const generatedSection = generatedSections.find(gs => gs.title.toLowerCase() === section.title.toLowerCase());
+          if (generatedSection) {
+            return {
+              ...section,
+              context: generatedSection.context || section.context,
+              subsections: generatedSection.subsections || section.subsections,
+              generated: true,
+              // Ensure flags are set according to generated metadata
+              isData: generatedSection.isData !== undefined ? generatedSection.isData : section.isData,
+              isAnalysis: generatedSection.isAnalysis !== undefined ? generatedSection.isAnalysis : section.isAnalysis,
+              isMethodology: generatedSection.isMethodology !== undefined ? generatedSection.isMethodology : section.isMethodology
+            };
+          }
+          return section;
+        });
 
-        setEditableStructure(newStructure);
+        // Reorder: ensure Data sections come before Analysis sections
+        const dataSections = newStructure.filter(s => s.isData && !s.isAdmin);
+        const analysisSections = newStructure.filter(s => s.isAnalysis && !s.isAdmin);
+        const adminSections = newStructure.filter(s => s.isAdmin);
+        const otherSections = newStructure.filter(s => !s.isData && !s.isAnalysis && !s.isAdmin);
+
+        const reordered = [...adminSections, ...dataSections, ...analysisSections, ...otherSections];
+
+        setEditableStructure(reordered);
 
         // Notify parent of the updated structure so it can be used as customStructure
         if (onStructureChange) {
-          try { onStructureChange(newStructure); } catch (e) { console.warn('onStructureChange failed', e); }
+          try { onStructureChange(reordered); } catch (e) { console.warn('onStructureChange failed', e); }
         }
 
         // Immediately save the generated structure so UI changes or remounts restore it
-        try { saveStructure(newStructure, true); } catch (e) { console.warn('saveStructure failed', e); }
+  try { saveStructure(reordered, true); } catch (e) { console.warn('saveStructure failed', e); }
 
         setSectionsGenerated(true);
         console.log('Sections generated successfully:', generatedSections);
