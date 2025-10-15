@@ -9,6 +9,7 @@ import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
 import DataObservationBuilder from './components/DataObservationBuilder';
 import ProjectManager from './components/ProjectManager';
+import PaperStructurePreview from './components/PaperStructurePreview';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -133,6 +134,25 @@ function App() {
     setReadyForOutline(true);
     setStructureRefreshTrigger(prev => prev + 1); // Force paper structure refresh
     triggerAutoSave();
+  };
+
+  // Paper structure state (moved here so preview is shown under Methodology)
+  const [paperStructure, setPaperStructure] = useState(null);
+  const handleStructureChange = (structure) => {
+    setPaperStructure(structure);
+    // Persist to auto-save
+    triggerAutoSave();
+  };
+
+  // Control whether the PaperStructurePreview is visible (opened by Methodology)
+  const [showStructurePreview, setShowStructurePreview] = useState(false);
+  const handleOpenStructurePreview = () => {
+    setShowStructurePreview(true);
+    // bump refresh trigger so preview will load fresh saved structure when opened
+    setStructureRefreshTrigger(prev => prev + 1);
+  };
+  const handleCloseStructurePreview = () => {
+    setShowStructurePreview(false);
   };
 
   const handleFrameworkComplete = (outlineData) => {
@@ -355,7 +375,30 @@ function App() {
                     methodology={methodology} // <-- should be the full object
                     setMethodology={handleMethodologySelected}
                     proceedToOutline={proceedToOutline}
+                    onOpenStructurePreview={handleOpenStructurePreview}
                     selectedPaperType={selectedPaperType}
+                  />
+                </div>
+              )}
+
+              {/* Paper Structure Preview: moved here to appear directly under Methodology */}
+              {finalThesis && categoriesFinalized && selectedPaperType && showStructurePreview && (
+                <div className="card p-3 mb-4">
+                  <PaperStructurePreview
+                    paperType={selectedPaperType}
+                    methodology={methodology?.methodologyType || methodology?.methodology_type || methodology}
+                    onStructureChange={handleStructureChange}
+                    onGenerateOutline={() => {
+                      // Trigger outline generation by setting readyForOutline
+                      proceedToOutline();
+                    }}
+                    loading={false}
+                    hasGenerated={Boolean(paperStructure && paperStructure.length)}
+                    refreshTrigger={structureRefreshTrigger}
+                    finalThesis={finalThesis}
+                    sourceCategories={sourceCategories}
+                    methodologyComplete={readyForOutline}
+                    onClosePreview={handleCloseStructurePreview}
                   />
                 </div>
               )}
@@ -374,6 +417,7 @@ function App() {
                     savedOutlineData={outlineData}
                     refreshTrigger={structureRefreshTrigger}
                     methodologyComplete={readyForOutline}
+                    savedCustomStructure={paperStructure}
                   />
                 </div>
               )}

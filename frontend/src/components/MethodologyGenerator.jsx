@@ -8,7 +8,8 @@ const MethodologyGenerator = ({
   sourceCategories,
   methodology, // <-- receive saved methodology as prop
   setMethodology,
-  proceedToOutline,
+    proceedToOutline,
+    onOpenStructurePreview,
   selectedPaperType
 }) => {
   const [methodologyOptions, setMethodologyOptions] = useState([]);
@@ -355,6 +356,35 @@ const MethodologyGenerator = ({
     return mainMethodology;
   };
 
+  // Handle clicking the "Generate Research Structure" button
+  const handleGenerateResearchStructure = () => {
+    if (!selectedMethodology) return;
+
+    const selected = selectedMethodology;
+    const picked = methodologyOptions.find(m => m.id === selected) || { id: selected, name: selected };
+    const meth = {
+      methodologyType: picked.id || picked.name || selected,
+      description: picked.name || selected,
+      isCustom: false
+    };
+
+    if (typeof setMethodology === 'function') setMethodology(meth);
+    // Prefer to open the preview if parent provided a handler; otherwise fall back to proceedToOutline
+    if (typeof onOpenStructurePreview === 'function') {
+      try {
+        onOpenStructurePreview();
+      } catch (e) {
+        console.error('Error calling onOpenStructurePreview:', e);
+      }
+    } else if (typeof proceedToOutline === 'function') {
+      try {
+        proceedToOutline();
+      } catch (e) {
+        console.error('Error calling proceedToOutline:', e);
+      }
+    }
+  };
+
 
 
   return (
@@ -478,298 +508,15 @@ const MethodologyGenerator = ({
               <div className="mt-3">
                 <button
                   className="btn btn-primary"
-                  onClick={generateMethodologyOptions}
-                  disabled={!selectedMethodology || loading}
+                  onClick={() => handleGenerateResearchStructure()}
+                  disabled={!selectedMethodology}
                 >
-                  {loading ? 'Generating Options...' : 'Generate Methodology Options'}
+                  Generate Research Structure
                 </button>
               </div>
             </div>
           )}
-
-          {/* Generated Methodology Options */}
-          {methodologySets.length > 0 && !finalized && (
-            <div className="mb-4">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5>Select Your Methodology Approach</h5>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={handleBackToSelection}
-                >
-                  Back to Selection
-                </button>
-              </div>
-
-              {getSelectedMethodologyInfo() && (
-                <div className="alert alert-info mb-3">
-                  <strong>Selected:</strong> {getSelectedMethodologyInfo().name}
-                  <br />
-                  <small>{getSelectedMethodologyInfo().description}</small>
-                </div>
-              )}
-
-              {/* Set Navigation and Controls */}
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <div className="d-flex align-items-center">
-                  <button
-                    className="btn btn-sm btn-outline-secondary me-2"
-                    onClick={() => handleSetNavigation('prev')}
-                    disabled={currentSetIndex === 0}
-                  >
-                    <FaChevronLeft />
-                  </button>
-                  <span className="me-2">
-                    Set {currentSetIndex + 1} of {methodologySets.length}
-                  </span>
-                  <button
-                    className="btn btn-sm btn-outline-secondary me-3"
-                    onClick={() => handleSetNavigation('next')}
-                    disabled={currentSetIndex === methodologySets.length - 1}
-                  >
-                    <FaChevronRight />
-                  </button>
-                </div>
-                
-                <div className="d-flex gap-2">
-                  <button
-                    className="btn btn-sm btn-outline-primary"
-                    onClick={generateMethodologyOptions}
-                    disabled={loading}
-                  >
-                    <FaPlus className="me-1" />
-                    {loading ? 'Generating...' : 'Generate New Set'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Methodology Options Grid */}
-              <div className="row">
-                {generatedMethodologies.map((methodology, index) => (
-                  <div key={index} className="col-12 mb-3">
-                    <div 
-                      className={`card h-100 ${selectedMethodologyIndex === index && selectedSetIndex === currentSetIndex ? 'border-primary' : ''}`}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleMethodologyChoice(index)}
-                    >
-                      <div className="card-body">
-                        <div className="d-flex align-items-start">
-                          <input
-                            type="radio"
-                            name="generatedMethodology"
-                            checked={selectedMethodologyIndex === index && selectedSetIndex === currentSetIndex}
-                            onChange={() => handleMethodologyChoice(index)}
-                            className="me-2 mt-1"
-                          />
-                          <div className="flex-grow-1">
-                            <h6 className="card-title">{methodology.title}</h6>
-                            <p className="card-text">{methodology.description}</p>
-                            <div className="mt-2">
-                              <small className="text-muted">
-                                <strong>Approach:</strong> {methodology.approach}
-                              </small>
-                            </div>
-                            <div className="mt-1">
-                              <small className="text-muted">
-                                <strong>Source Focus:</strong> {methodology.source_focus}
-                              </small>
-                            </div>
-                            <div className="mt-1">
-                              <small className="text-muted">
-                                <strong>Structure Alignment:</strong> {methodology.structure_alignment}
-                              </small>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Custom Methodology Option */}
-                <div className="col-12 mb-3">
-                  <div 
-                    className={`card h-100 ${isCustomMethodology ? 'border-primary' : 'border-secondary'}`}
-                    style={{ cursor: 'pointer', borderStyle: 'dashed' }}
-                    onClick={handleCustomMethodologyChoice}
-                  >
-                    <div className="card-body">
-                      <div className="d-flex align-items-start">
-                        <input
-                          type="radio"
-                          name="generatedMethodology"
-                          checked={isCustomMethodology}
-                          onChange={handleCustomMethodologyChoice}
-                          className="me-2 mt-1"
-                        />
-                        <div className="flex-grow-1">
-                          <h6 className="card-title">Create Custom Methodology</h6>
-                          <p className="card-text text-muted">
-                            Design your own methodology with custom approach, source focus, and structure alignment
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Custom Methodology Fields */}
-              {(selectedMethodologyIndex !== null || isCustomMethodology) && (
-                <div className="mb-3">
-                  <h6 className="form-label">
-                    {isCustomMethodology ? 'Create Custom Methodology' : 'Customize Your Methodology'} 
-                    <span className="text-danger">*</span>
-                  </h6>
-                  <p className="text-muted small">All fields are required. Edit the methodology to match your research needs.</p>
-                  
-                  {/* Description */}
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Description <span className="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={customMethodology}
-                      onChange={(e) => setCustomMethodology(e.target.value)}
-                      placeholder="Describe your methodology approach..."
-                      required
-                    />
-                  </div>
-
-                  {/* Approach */}
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Approach <span className="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      value={customApproach}
-                      onChange={(e) => setCustomApproach(e.target.value)}
-                      placeholder="Describe your approach..."
-                      required
-                    />
-                  </div>
-
-                  {/* Source Focus */}
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Source Focus <span className="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      value={customSourceFocus}
-                      onChange={(e) => setCustomSourceFocus(e.target.value)}
-                      placeholder="Describe your source focus..."
-                      required
-                    />
-                  </div>
-
-                  {/* Structure Alignment */}
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Structure Alignment <span className="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      value={customStructureAlignment}
-                      onChange={(e) => setCustomStructureAlignment(e.target.value)}
-                      placeholder="Describe how this methodology aligns with your paper structure..."
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Finalize Button */}
-              <div className="mt-3">
-                <button
-                  className="btn btn-primary"
-                  onClick={handleFinalizeMethodology}
-                  disabled={selectedMethodologyIndex === null && !isCustomMethodology}
-                >
-                  Save Methodology
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Finalized State */}
-          {finalized && (
-            <div className="mt-3">
-              <div className="alert alert-success">
-                <strong>Finalized Methodology:</strong>
-                {isCustomMethodology && <span className="badge bg-info ms-2">Custom</span>}
-                <div className="mt-2" style={{ whiteSpace: 'pre-wrap' }}>
-                  {customMethodology}
-                </div>
-                <div className="mt-3">
-                  <h6><strong>Methodology Details:</strong></h6>
-                  <div className="row">
-                    <div className="col-md-4">
-                      <small className="text-muted">
-                        <strong>Approach:</strong><br/>
-                        {customApproach}
-                      </small>
-                    </div>
-                    <div className="col-md-4">
-                      <small className="text-muted">
-                        <strong>Source Focus:</strong><br/>
-                        {customSourceFocus}
-                      </small>
-                    </div>
-                    <div className="col-md-4">
-                      <small className="text-muted">
-                        <strong>Structure Alignment:</strong><br/>
-                        {customStructureAlignment}
-                      </small>
-                    </div>
-                  </div>
-                </div>
-                {selectedMethodology && (
-                  <div className="mt-3">
-                    <small className="text-muted">
-                      <strong>Selected Methodology:</strong> {methodologyOptions.find(m => m.id === selectedMethodology)?.name || selectedMethodology}
-                      {/* selectedSubMethodology && (  // Removed from production, kept for future consideration
-                        <>
-                          <br />
-                          <strong>Sub-Methodology:</strong> {(() => {
-                            const mainMethod = methodologyOptions.find(m => m.id === selectedMethodology);
-                            const subMethod = mainMethod?.sub_methodologies?.find(sm => sm.id === selectedSubMethodology);
-                            return subMethod?.name || selectedSubMethodology;
-                          })()}
-                        </>
-                      ) */}
-                    </small>
-                  </div>
-                )}
-              </div>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleEditMethodology}
-                >
-                  Edit Methodology
-                </button>
-                {outlineActivated && outlineNeedsRerun && (
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => {
-                      if (proceedToOutline) {
-                        proceedToOutline();
-                        setOutlineNeedsRerun(false);
-                      }
-                    }}
-                  >
-                    Rerun Outline
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+                      {/* Removed generated-options + refinement UI: methodology is set and user can open the Paper Structure Preview */}
         </>
       )}
     </div>

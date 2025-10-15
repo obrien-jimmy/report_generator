@@ -55,9 +55,10 @@ const PaperStructurePreview = ({
     }
   }, [paperType?.id]);
 
-  // Trigger generation when methodology is completed
+  // Trigger generation when methodology is completed (but not if already generated)
   useEffect(() => {
-    if (methodologyComplete && finalThesis && sourceCategories && paperType?.id) {
+    if (methodologyComplete && finalThesis && sourceCategories && paperType?.id && !sectionsGenerated && !generatingSections) {
+      console.log('Auto-generating sections when methodology complete');
       generateSections();
     }
   }, [methodologyComplete, finalThesis, sourceCategories, paperType?.id]);
@@ -69,25 +70,25 @@ const PaperStructurePreview = ({
     }
   }, [structureData]);
 
-  // Load saved structure on component mount
-  useEffect(() => {
-    if (!paperType?.id || !methodology) return;
-    
-    const saveKey = `paper_structure_${paperType.id}_${methodology}`;
-    try {
-      const saved = localStorage.getItem(saveKey);
-      if (saved) {
-        const savedData = JSON.parse(saved);
-        if (savedData.structure && savedData.structure.length > 0) {
-          setEditableStructure(savedData.structure);
-          setLastSaved(new Date(savedData.timestamp));
-          console.log('Loaded saved paper structure:', saveKey);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading saved structure:', err);
-    }
-  }, [paperType?.id, methodology]);
+  // Load saved structure on component mount - DISABLED to start blank
+  // useEffect(() => {
+  //   if (!paperType?.id || !methodology) return;
+  //   
+  //   const saveKey = `paper_structure_${paperType.id}_${methodology}`;
+  //   try {
+  //     const saved = localStorage.getItem(saveKey);
+  //     if (saved) {
+  //       const savedData = JSON.parse(saved);
+  //       if (savedData.structure && savedData.structure.length > 0) {
+  //         setEditableStructure(savedData.structure);
+  //         setLastSaved(new Date(savedData.timestamp));
+  //         console.log('Loaded saved paper structure:', saveKey);
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error('Error loading saved structure:', err);
+  //   }
+  // }, [paperType?.id, methodology]);
 
   // Auto-save when structure changes (debounced)
   useEffect(() => {
@@ -612,7 +613,8 @@ End of Prompt`;
     );
   }
 
-  if (!structureData) {
+  // If we have neither fetched structureData nor any editable sections, don't render
+  if (!structureData && (!editableStructure || editableStructure.length === 0)) {
     return null;
   }
 
@@ -672,8 +674,8 @@ End of Prompt`;
           {/* Structure Info */}
           <div className="row mb-3">
             <div className="col-md-4">
-              <small className="text-muted">
-                <strong>Paper Type:</strong> {paperType?.name || structureData.paper_type}
+                <small className="text-muted">
+                <strong>Paper Type:</strong> {paperType?.name || structureData?.paper_type}
               </small>
             </div>
             <div className="col-md-4">
@@ -682,8 +684,8 @@ End of Prompt`;
               </small>
             </div>
             <div className="col-md-4">
-              <small className="text-muted">
-                <strong>Enhanced:</strong> {structureData.has_methodology_sections ? 'Yes' : 'No'}
+                <small className="text-muted">
+                <strong>Enhanced:</strong> {structureData?.has_methodology_sections ? 'Yes' : 'No'}
               </small>
             </div>
           </div>
@@ -695,11 +697,15 @@ End of Prompt`;
               Structure Sections
             </h6>
             
-            <div className="list-group">
-              {editableStructure.map((section, index) => (
+            {(!editableStructure || editableStructure.length === 0) ? (
+              <div className="alert alert-secondary">
+                No sections yet — click "Generate Sections" or "Add Section" to create the paper structure.
+              </div>
+            ) : (
+              <div className="list-group">
+                {editableStructure.map((section, index) => (
                 <div key={section.id} className="list-group-item">
                   {editingMode ? (
-                    // Edit Mode for All Sections
                     <div>
                       <div className="row align-items-center">
                       <div className="col-md-4">
@@ -750,7 +756,7 @@ End of Prompt`;
                       </div>
                     </div>
                     
-                    {/* Subsections editing in edit mode */}
+                    
                     {section.subsections && section.subsections.length > 0 && (
                       <div className="mt-3 ps-4 border-start border-2 border-primary">
                         <small className="text-primary fw-semibold d-block mb-2">Subsections:</small>
@@ -797,7 +803,6 @@ End of Prompt`;
                     )}
                     </div>
                   ) : (
-                    // View Mode
                     <div className="d-flex justify-content-between align-items-center">
                       <div className="d-flex align-items-center flex-grow-1">
                         <span className="badge bg-secondary me-2">{index + 1}</span>
@@ -849,30 +854,31 @@ End of Prompt`;
                   )}
                 </div>
               ))}
+              
+              {editingMode && (
+                <div className="mt-3 d-flex gap-2">
+                  <button
+                    className="btn btn-sm btn-success"
+                    onClick={() => setEditingMode(false)}
+                  >
+                    <FaSave className="me-1" />
+                    Save Changes
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setEditingMode(false)}
+                  >
+                    <FaTimes className="me-1" />
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
-            
-            {editingMode && (
-              <div className="mt-3 d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-success"
-                  onClick={() => setEditingMode(false)}
-                >
-                  <FaSave className="me-1" />
-                  Save Changes
-                </button>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => setEditingMode(false)}
-                >
-                  <FaTimes className="me-1" />
-                  Cancel
-                </button>
-              </div>
             )}
           </div>
 
           {/* Methodology Integration Notice */}
-          {structureData.has_methodology_sections && (
+          {structureData?.has_methodology_sections && (
             <div className="alert alert-success">
               <small>
                 <strong>Structure Enhanced:</strong> Your selected methodology has been integrated into the paper structure. 
@@ -888,8 +894,8 @@ End of Prompt`;
                 <small><strong>About this structure</strong></small>
               </summary>
               <small className="mt-2 d-block">
-                This structure is specifically designed for <strong>{paperType?.name || structureData.paper_type}</strong> papers
-                {structureData.has_methodology_sections && (
+                This structure is specifically designed for <strong>{paperType?.name || structureData?.paper_type}</strong> papers
+                {structureData?.has_methodology_sections && (
                   <span> with integrated <strong>{getMethodologyDisplay()}</strong> methodology sections</span>
                 )}. 
                 You can customize section titles, add context/focus areas, adjust percentage allocations, 
@@ -949,9 +955,9 @@ End of Prompt`;
             </div>
           </div>
 
-          {/* Add the Generate Sections and Generate Outline Framework buttons at the bottom */}
+          {/* Add the Generate Sections button at the bottom */}
           <div className="mt-4 d-flex gap-3">
-            <button 
+            <button
               className="btn btn-outline-primary"
               onClick={generateSections}
               disabled={generatingSections || !paperType?.id || !methodology}
@@ -970,26 +976,15 @@ End of Prompt`;
                 'Generate Sections'
               )}
             </button>
-            
-            <button 
-              className="btn btn-primary"
-              onClick={onGenerateOutline}
-              disabled={loading || hasGenerated}
-            >
-              {loading ? (
-                <>
-                  <FaSpinner className="fa-spin me-2" />
-                  Generating Framework...
-                </>
-              ) : hasGenerated ? (
-                <>
-                  <FaCheck className="me-2" />
-                  Framework Generated
-                </>
-              ) : (
-                'Generate Outline Framework'
-              )}
-            </button>
+
+            {sectionsGenerated && (
+              <button
+                className="btn btn-success"
+                onClick={onGenerateOutline}
+              >
+                Pass to Outline
+              </button>
+            )}
           </div>
         </div>
       )}

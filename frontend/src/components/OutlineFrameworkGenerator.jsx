@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FaEdit, FaQuestionCircle, FaBookOpen, FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa';
 import CitationViewer from './CitationViewer';
 import './CitationViewer.css';
-import PaperStructurePreview from './PaperStructurePreview';
+// PaperStructurePreview moved to App.jsx (rendered below Methodology)
 import RetryService from '../services/retryService';
 
 const OutlineGenerator = ({ 
@@ -16,6 +16,7 @@ const OutlineGenerator = ({
   savedOutlineData,
   refreshTrigger,
   methodologyComplete
+  , savedCustomStructure
 }) => {
   const [outline, setOutline] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -28,6 +29,20 @@ const OutlineGenerator = ({
 
   // Paper Structure States
   const [customStructure, setCustomStructure] = useState(null);
+
+  // Accept custom structure from parent (App) which now renders the PaperStructurePreview
+  useEffect(() => {
+    if (savedCustomStructure && Array.isArray(savedCustomStructure)) {
+      console.log('OutlineGenerator: Initializing customStructure from App provided preview structure');
+      setCustomStructure(savedCustomStructure);
+      // If outline was already generated, regenerate it with the new structure
+      if (hasGenerated) {
+        console.log('OutlineGenerator: Regenerating outline with updated structure');
+        setHasGenerated(false);
+        setFrameworkCompleteCalled(false);
+      }
+    }
+  }, [savedCustomStructure]);
 
   // Question and Citation States
   const [loadingQuestions, setLoadingQuestions] = useState({});
@@ -53,6 +68,14 @@ const OutlineGenerator = ({
     }
   }, [hasGenerated, outline, onFrameworkComplete, frameworkCompleteCalled]);
 
+  // Auto-generate outline when component first appears with required props
+  useEffect(() => {
+    if (methodologyComplete && finalThesis && sourceCategories && selectedPaperType?.id && customStructure && !hasGenerated && !loading) {
+      console.log('OutlineGenerator: Auto-generating outline on component mount');
+      generateOutline();
+    }
+  }, [methodologyComplete, finalThesis, sourceCategories, selectedPaperType?.id, customStructure]);
+
   const toggleCollapse = () => setCollapsed(prev => !prev);
   const [outlineFrameworkCollapsed, setOutlineFrameworkCollapsed] = useState(false);
 
@@ -71,197 +94,47 @@ const OutlineGenerator = ({
   const generateOutline = async (isRegeneration = false) => {
     setLoading(true);
     setError(null);
-    setGenerationProgress('Generating initial outline structure...');
-    
+    setGenerationProgress('Converting data structure to outline...');
+
     if (isRegeneration) {
       setOutline([]);
       setHasGenerated(false);
     }
-    
+
     try {
-      const safePaperLength = 15;  // Default to reasonable page length
-
-      const methodologyId = methodology?.methodologyType || methodology?.methodology_type;
-      // const subMethodologyId = methodology?.subMethodology || methodology?.sub_methodology;  // Removed from production, kept for future consideration
-
-      const structureToUse = customStructure ? 
-        customStructure.filter(s => !s.isAdmin).map(s => ({
-          section_title: s.title,
-          section_context: s.context || `Analysis and discussion of ${s.title}`,
-          pages_allocated: s.pages,
-          is_data_section: s.isData,
-          section_type: s.isData ? 'data' : (s.isMethodology ? 'methodology' : (s.isAnalysis ? 'analysis' : 'content')),
-          category: s.isData ? 'data_section' : 'content_section'
-        })) : null;
-
-      // Step 1: Generate initial outline structure
-      const res = await RetryService.withRetry(async () => {
-        return await axios.post('http://localhost:8000/generate_structured_outline', {
-          final_thesis: finalThesis,
-          paper_type: selectedPaperType?.id || 'research',
-          methodology,
-          paper_length_pages: safePaperLength,
-          source_categories: sourceCategories,
-          methodology_id: methodologyId,
-          // sub_methodology_id: subMethodologyId,  // Removed from production, kept for future consideration
-          custom_structure: structureToUse
-        });
-      }, 3, 3000);
-
-      let sections = res.data.outline.map(section => ({
-        section_title: section.section_title,
-        section_context: section.section_context,
-        subsections: [],
-        is_administrative: section.is_administrative || false,
-        pages_allocated: section.pages_allocated || 2,
-        // Preserve data section metadata from backend
-        is_data_section: section.is_data_section || false,
-        section_type: section.section_type || 'content',
-        category: section.category || 'content_section'
-      }));
-
-      console.log('OutlineGenerator: Initial structure generated:', sections);
-      setOutline(sections);
-      setHasGenerated(true); // Set this early so the outline becomes visible
-
-      // Step 2: Generate detailed subsections for content sections
-      const contentSections = sections.filter(sec => !sec.is_administrative);
-      
-      if (contentSections.length > 0) {
-        setGenerationProgress(`Generating detailed subsections for ${contentSections.length} sections...`);
-        
-        // Create operations for batch processing
-        const operations = contentSections.map(section => async () => {
-          const requestPayload = {
-            section_title: section.section_title,
-            section_context: section.section_context,
-            final_thesis: finalThesis,
-            methodology: methodology,
-            paper_length_pages: safePaperLength,
-            source_categories: sourceCategories,
-            pages_allocated: section.pages_allocated || 2
-          };
-
-          console.log(`OutlineGenerator: Generating subsections for: ${section.section_title}`);
-          const response = await axios.post('http://localhost:8000/generate_subsections', requestPayload);
-          return { 
-            section_title: section.section_title, 
-            data: response.data 
-          };
-        });
-
-        // Process in batches to avoid rate limits
-        const results = await RetryService.batchWithRetry(operations, 2, 3000);
-        
-        // Update sections with subsections
-        sections = sections.map(section => {
-          if (section.is_administrative) return section;
-          
-          const result = results.find(r => r && r.section_title === section.section_title);
-          if (result && result.data.subsections) {
-            return {
-              ...section,
-              subsections: result.data.subsections.map(sub => ({
-                ...sub
-              }))
-            };
-          }
-          return section;
-        });
-
-        console.log('OutlineGenerator: Subsections generated, now generating questions for Data sections...');
-        setOutline(sections); // Update UI to show subsections
-        setGenerationProgress('Generating questions for Data subsections...');
-
-        // Step 3: Generate questions ONLY for Data sections and subsections
-        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-          const section = sections[sectionIndex];
-          // Skip administrative sections AND non-data sections
-          if (section.is_administrative || !section.is_data_section) continue;
-
-          for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
-            const subsection = section.subsections[subsectionIndex];
-            
-            try {
-              const questionResponse = await axios.post('http://localhost:8000/generate_questions', {
-                final_thesis: finalThesis,
-                methodology: methodology,
-                section_title: section.section_title,
-                section_context: section.section_context,
-                subsection_title: subsection.subsection_title,
-                subsection_context: subsection.subsection_context
-              });
-
-              const questionObjects = (questionResponse.data.questions || []).map(questionText => ({
-                question: questionText,
-                citations: []
-              }));
-
-              sections[sectionIndex].subsections[subsectionIndex].questions = questionObjects;
-              setOutline([...sections]); // Update UI to show new questions
-              
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            } catch (err) {
-              console.error(`Error generating questions for ${section.section_title} - ${subsection.subsection_title}:`, err);
-            }
-          }
-        }
-
-        console.log('OutlineGenerator: Questions generated for Data sections, now generating citations...');
-        setGenerationProgress('Generating citations for Data section questions...');
-
-        // Step 4: Generate citations ONLY for Data sections (where questions exist)
-        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-          const section = sections[sectionIndex];
-          // Skip administrative sections AND non-data sections
-          if (section.is_administrative || !section.is_data_section) continue;
-
-          for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
-            const subsection = section.subsections[subsectionIndex];
-            
-            if (subsection.questions && subsection.questions.length > 0) {
-              for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
-                const questionObj = subsection.questions[questionIndex];
-                
-                try {
-                  // Fix: Use the correct endpoint and response field
-                  const citationResponse = await axios.post('http://localhost:8000/generate_question_citations', {
-                    final_thesis: finalThesis,
-                    methodology: methodology,
-                    source_categories: sourceCategories,
-                    question: questionObj.question,
-                    section_title: section.section_title,
-                    section_context: section.section_context,
-                    subsection_title: subsection.subsection_title,
-                    subsection_context: subsection.subsection_context,
-                    citation_count: 3
-                  });
-                  
-                  // Fix: Use the correct response field name
-                  sections[sectionIndex].subsections[subsectionIndex].questions[questionIndex].citations = citationResponse.data.recommended_sources || [];
-                  setOutline([...sections]); // Update UI to show new citations
-                  
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                } catch (err) {
-                  console.error(`Error generating citations for question ${questionIndex}:`, err);
-                }
-              }
-            }
-          }
-        }
+      // Use only the custom structure from data structure preview
+      if (!customStructure || !Array.isArray(customStructure) || customStructure.length === 0) {
+        throw new Error('No data structure available. Please generate sections first.');
       }
 
-      console.log('OutlineGenerator: Complete contextual outline generated with Data section questions/citations:', sections);
+      // Convert custom structure directly to outline format
+      const sections = customStructure
+        .filter(s => !s.isAdmin) // Exclude administrative sections
+        .map(section => ({
+          section_title: section.title,
+          section_context: section.context || `Analysis and discussion of ${section.title} to support the thesis`,
+          subsections: (section.subsections || []).map(sub => ({
+            subsection_title: sub.subsection_title,
+            subsection_context: sub.subsection_context || `Detailed examination of ${sub.subsection_title}`,
+            questions: []
+          })),
+          is_administrative: false,
+          pages_allocated: 2, // Default allocation
+          is_data_section: section.isData || false,
+          section_type: section.isData ? 'data' : (section.isMethodology ? 'methodology' : (section.isAnalysis ? 'analysis' : 'content')),
+          category: section.category || (section.isData ? 'data_section' : 'content_section')
+        }));
+
+      console.log('OutlineGenerator: Converted custom structure to outline:', sections);
       setOutline(sections);
-      setGenerationProgress('');
+      setHasGenerated(true);
+      setGenerationProgress('Outline generated successfully');
 
     } catch (err) {
-      console.error('Error generating detailed outline:', err);
-      setGenerationProgress('');
-      
-      if (err.response?.status === 429 || err.message?.includes('rate limit')) {
+      console.error('Outline generation error:', err);
+      if (err.response?.status === 429) {
         setError('Rate limit exceeded. The system will automatically retry in a few moments.');
-        
+
         setTimeout(() => {
           generateOutline(isRegeneration);
         }, 10000);
@@ -272,7 +145,92 @@ const OutlineGenerator = ({
     setLoading(false);
   };
 
-  // Update the generateQuestions function
+  // Update the generateCitations function (around line 307)
+  const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
+    const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+    setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
+
+    try {
+      const section = outline[sectionIndex];
+      const subsection = section.subsections[subsectionIndex];
+      const questionObj = subsection.questions[questionIndex];
+
+      console.log('Generating citations for:', {
+        section: section.section_title,
+        subsection: subsection.subsection_title,
+        question: questionObj.question
+      });
+
+      const res = await axios.post('http://localhost:8000/generate_question_citations', {
+        final_thesis: finalThesis,
+        methodology: methodology,
+        source_categories: sourceCategories,
+        question: questionObj.question,
+        section_title: section.section_title,
+        section_context: section.section_context,
+        subsection_title: subsection.subsection_title,
+        subsection_context: subsection.subsection_context,
+        citation_count: 3
+      });
+
+      console.log('Citations received:', res.data);
+
+      // Backend returns recommended_sources, not citations
+      const sources = res.data.recommended_sources || res.data.citations || [];
+      const citationObjects = sources.map(source => {
+        // If source is already an object with citation text
+        if (typeof source === 'object') {
+          return {
+            citation: source.citation || source.source || source.title || JSON.stringify(source),
+            source: source.source || '',
+            relevance: source.relevance || ''
+          };
+        }
+        // If source is just a string
+        return {
+          citation: source,
+          source: '',
+          relevance: ''
+        };
+      });
+
+      console.log('Parsed citation objects:', citationObjects);
+
+      setOutline(prevOutline => 
+        prevOutline.map((outlineSection, secIdx) => {
+          if (secIdx !== sectionIndex) return outlineSection;
+          return {
+            ...outlineSection,
+            subsections: outlineSection.subsections.map((sub, subIdx) => {
+              if (subIdx !== subsectionIndex) return sub;
+              return {
+                ...sub,
+                questions: sub.questions.map((q, qIdx) => {
+                  if (qIdx !== questionIndex) return q;
+                  return {
+                    ...q,
+                    citations: citationObjects
+                  };
+                })
+              };
+            })
+          };
+        })
+      );
+
+    } catch (err) {
+      console.error('Error generating citations:', err);
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      });
+      setError(err.response?.data?.detail || err.message || 'Failed to generate citations.');
+    } finally {
+      setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
+    }
+  };
+
   const generateQuestions = async (sectionIndex, subsectionIndex) => {
     const questionKey = `${sectionIndex}-${subsectionIndex}`;
     setLoadingQuestions(prev => ({ ...prev, [questionKey]: true }));
@@ -302,117 +260,38 @@ const OutlineGenerator = ({
             ...outlineSection,
             subsections: outlineSection.subsections.map((sub, subIdx) => {
               if (subIdx !== subsectionIndex) return sub;
-              return { ...sub, questions: questionObjects };
-            })
-          };
-        })
-      );
-    } catch (err) {
-      console.error('Error generating questions:', err);
-      setError('Failed to generate questions for this subsection.');
-    }
-
-    setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
-  };
-
-  // Update the generateCitations function (around line 307)
-  const generateCitations = async (sectionIndex, subsectionIndex, questionIndex) => {
-    const citationKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
-    setLoadingCitations(prev => ({ ...prev, [citationKey]: true }));
-
-    try {
-      const section = outline[sectionIndex];
-      const subsection = section.subsections[subsectionIndex];
-      const questionObj = subsection.questions[questionIndex];
-
-      // Fix: Use the correct endpoint from your backend
-      const res = await axios.post('http://localhost:8000/generate_question_citations', {
-        final_thesis: finalThesis,
-        methodology: methodology,
-        source_categories: sourceCategories,
-        question: questionObj.question,
-        section_title: section.section_title,
-        section_context: section.section_context,
-        subsection_title: subsection.subsection_title,
-        subsection_context: subsection.subsection_context,
-        citation_count: 3
-      });
-
-      setOutline(prevOutline => 
-        prevOutline.map((outlineSection, secIdx) => {
-          if (secIdx !== sectionIndex) return outlineSection;
-          return {
-            ...outlineSection,
-            subsections: outlineSection.subsections.map((sub, subIdx) => {
-              if (subIdx !== subsectionIndex) return sub;
               return {
                 ...sub,
-                questions: sub.questions.map((q, qIdx) => {
-                  if (qIdx !== questionIndex) return q;
-                  // Fix: Use the correct response field name
-                  return { ...q, citations: res.data.recommended_sources || [] };
-                })
+                questions: questionObjects
               };
             })
           };
         })
       );
-    } catch (err) {
-      console.error('Error generating citations:', err);
-    }
 
-    setLoadingCitations(prev => ({ ...prev, [citationKey]: false }));
+    } catch (err) {
+      console.error('Error generating questions:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to generate questions.');
+    }
+    
+    setLoadingQuestions(prev => ({ ...prev, [questionKey]: false }));
   };
 
-  // **Fixed** handleAddCitation
-  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex, newCitation) => {
-    if (!newCitation) return;
-
-    setOutline(prevOutline =>
-      prevOutline.map((outlineSection, secIdx) => {
-        if (secIdx !== sectionIndex) return outlineSection;
-        return {
-          ...outlineSection,
-          subsections: outlineSection.subsections.map((sub, subIdx) => {
-            if (subIdx !== subsectionIndex) return sub;
-            return {
-              ...sub,
-              questions: sub.questions.map((q, qIdx) => {
-                if (qIdx !== questionIndex) return q;
-                return {
-                  ...q,
-                  citations: [...(q.citations || []), newCitation],
-                };
-              }),
-            };
-          }),
-        };
-      })
+  const hasQuestionsToGenerate = () => {
+    return outline.some(section => 
+      section.subsections?.some(subsection => 
+        !subsection.questions || subsection.questions.length === 0
+      )
     );
   };
 
-  // **Fixed** handleRemoveCitation
-  const handleRemoveCitation = (sectionIndex, subsectionIndex, questionIndex, citationIndex) => {
-    setOutline(prevOutline =>
-      prevOutline.map((outlineSection, secIdx) => {
-        if (secIdx !== sectionIndex) return outlineSection;
-        return {
-          ...outlineSection,
-          subsections: outlineSection.subsections.map((sub, subIdx) => {
-            if (subIdx !== subsectionIndex) return sub;
-            return {
-              ...sub,
-              questions: sub.questions.map((q, qIdx) => {
-                if (qIdx !== questionIndex) return q;
-                return {
-                  ...q,
-                  citations: q.citations?.filter((_, idx) => idx !== citationIndex) || [],
-                };
-              }),
-            };
-          }),
-        };
-      })
+  const hasCitationsToGenerate = () => {
+    return outline.some(section => 
+      section.subsections?.some(subsection => 
+        subsection.questions?.some(question => 
+          !question.citations || question.citations.length === 0
+        )
+      )
     );
   };
 
@@ -421,11 +300,12 @@ const OutlineGenerator = ({
     
     for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
       const section = outline[sectionIndex];
-      if (section.is_administrative) continue;
       for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
         const subsection = section.subsections[subsectionIndex];
-        if (subsection.questions && subsection.questions.length > 0) continue;
-        await generateQuestions(sectionIndex, subsectionIndex);
+        if (!subsection.questions || subsection.questions.length === 0) {
+          await generateQuestions(sectionIndex, subsectionIndex);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+        }
       }
     }
     
@@ -433,39 +313,88 @@ const OutlineGenerator = ({
   };
 
   const generateAllCitations = async () => {
+    console.log('Starting batch citation generation...');
+    console.log('Current outline state:', outline);
     setBatchLoadingCitations(true);
     
-    for (let sectionIndex = 0; sectionIndex < outline.length; sectionIndex++) {
-      const section = outline[sectionIndex];
-      if (section.is_administrative) continue;
-      for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
-        const subsection = section.subsections[subsectionIndex];
-        if (!subsection.questions || subsection.questions.length === 0) continue;
-        for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
-          const questionObj = subsection.questions[questionIndex];
-          if (questionObj.citations && questionObj.citations.length > 0) continue;
-          await generateCitations(sectionIndex, subsectionIndex, questionIndex);
-        }
-      }
-    }
+    let citationsGenerated = 0;
     
-    setBatchLoadingCitations(false);
+    // Use a callback to get the latest outline state
+    setOutline(currentOutline => {
+      (async () => {
+        for (let sectionIndex = 0; sectionIndex < currentOutline.length; sectionIndex++) {
+          const section = currentOutline[sectionIndex];
+          if (!section.subsections) continue;
+          
+          for (let subsectionIndex = 0; subsectionIndex < section.subsections.length; subsectionIndex++) {
+            const subsection = section.subsections[subsectionIndex];
+            if (!subsection.questions) continue;
+            
+            for (let questionIndex = 0; questionIndex < subsection.questions.length; questionIndex++) {
+              const question = subsection.questions[questionIndex];
+              if (!question.citations || question.citations.length === 0) {
+                console.log(`Generating citations ${citationsGenerated + 1} for: ${question.question.substring(0, 50)}...`);
+                await generateCitations(sectionIndex, subsectionIndex, questionIndex);
+                citationsGenerated++;
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+              }
+            }
+          }
+        }
+        
+        console.log(`Batch citation generation complete. Generated ${citationsGenerated} citation sets.`);
+        setBatchLoadingCitations(false);
+      })();
+      
+      return currentOutline;
+    });
   };
 
-  const hasQuestionsToGenerate = () => {
-    return outline.some(section => 
-      !section.is_administrative && 
-      section.subsections.some(sub => !sub.questions || sub.questions.length === 0)
+  const handleAddCitation = (sectionIndex, subsectionIndex, questionIndex, newCitation) => {
+    setOutline(prevOutline => 
+      prevOutline.map((section, secIdx) => {
+        if (secIdx !== sectionIndex) return section;
+        return {
+          ...section,
+          subsections: section.subsections.map((sub, subIdx) => {
+            if (subIdx !== subsectionIndex) return sub;
+            return {
+              ...sub,
+              questions: sub.questions.map((q, qIdx) => {
+                if (qIdx !== questionIndex) return q;
+                return {
+                  ...q,
+                  citations: [...(q.citations || []), newCitation]
+                };
+              })
+            };
+          })
+        };
+      })
     );
   };
 
-  const hasCitationsToGenerate = () => {
-    return outline.some(section => 
-      !section.is_administrative && 
-      section.subsections.some(sub => 
-        sub.questions && sub.questions.length > 0 && 
-        sub.questions.some(questionObj => !questionObj.citations || questionObj.citations.length === 0)
-      )
+  const handleRemoveCitation = (sectionIndex, subsectionIndex, questionIndex, citationIndex) => {
+    setOutline(prevOutline => 
+      prevOutline.map((section, secIdx) => {
+        if (secIdx !== sectionIndex) return section;
+        return {
+          ...section,
+          subsections: section.subsections.map((sub, subIdx) => {
+            if (subIdx !== subsectionIndex) return sub;
+            return {
+              ...sub,
+              questions: sub.questions.map((q, qIdx) => {
+                if (qIdx !== questionIndex) return q;
+                return {
+                  ...q,
+                  citations: q.citations.filter((_, cIdx) => cIdx !== citationIndex)
+                };
+              })
+            };
+          })
+        };
+      })
     );
   };
 
@@ -491,19 +420,7 @@ const OutlineGenerator = ({
       
       {!collapsed && (
         <>
-          <PaperStructurePreview 
-            paperType={selectedPaperType}
-            methodology={methodology?.methodologyType || methodology?.methodology_type}
-            // subMethodology={methodology?.subMethodology || methodology?.sub_methodology}  // Removed from production, kept for future consideration
-            onStructureChange={handleStructureChange}
-            onGenerateOutline={() => generateOutline(false)}
-            loading={false}
-            hasGenerated={hasGenerated}
-            refreshTrigger={refreshTrigger}
-            finalThesis={finalThesis}
-            sourceCategories={sourceCategories}
-            methodologyComplete={methodologyComplete}
-          />
+          {/* PaperStructurePreview moved to App.jsx and is rendered under Methodology */}
 
           {customStructure && (
             <div className="card">
