@@ -432,13 +432,42 @@ const PaperStructurePreview = ({
           return section;
         });
 
-        // Reorder: ensure Data sections come before Analysis sections
-        const dataSections = newStructure.filter(s => s.isData && !s.isAdmin);
-        const analysisSections = newStructure.filter(s => s.isAnalysis && !s.isAdmin);
+        // Reorder using a canonical ordering so Intro appears early and Data sections precede Analysis
         const adminSections = newStructure.filter(s => s.isAdmin);
-        const otherSections = newStructure.filter(s => !s.isData && !s.isAnalysis && !s.isAdmin);
 
-        const reordered = [...adminSections, ...dataSections, ...analysisSections, ...otherSections];
+        // canonical order of section keywords (lowercased)
+        const canonicalOrder = [
+          'title page',
+          'abstract',
+          'introduction',
+          'background',
+          'data & observations',
+          'data',
+          'methodology and approach',
+          'methodology',
+          'analysis',
+          'impact',
+          'conclusion',
+          'references'
+        ];
+
+        const scored = newStructure
+          .filter(s => !s.isAdmin)
+          .map(s => {
+            const title = (s.title || '').toLowerCase();
+            let index = canonicalOrder.findIndex(k => title.includes(k) || (s.category && s.category.toLowerCase() === k));
+            if (index === -1) {
+              // give Data/Analysis flags priority
+              if (s.isData) index = canonicalOrder.indexOf('data & observations');
+              else if (s.isAnalysis) index = canonicalOrder.indexOf('analysis');
+              else index = canonicalOrder.length + 10; // place at end
+            }
+            return { section: s, index };
+          })
+          .sort((a, b) => a.index - b.index)
+          .map(x => x.section);
+
+        const reordered = [...adminSections, ...scored];
 
         setEditableStructure(reordered);
 
