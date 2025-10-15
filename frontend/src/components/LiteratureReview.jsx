@@ -39,7 +39,7 @@ const LiteratureReview = ({
   const [questionAnsweringComplete, setQuestionAnsweringComplete] = useState(false);
   const isPausedRef = useRef(false); // Use ref for immediate pause detection in async functions
   
-  // Step 3: Detailed Outline Builder
+  // Step 3: Fused Outline to Full Prose Builder
   const [detailedOutlineComplete, setDetailedOutlineComplete] = useState(false);
   const [masterOutlines, setMasterOutlines] = useState([]);
   const [expandedOutlines, setExpandedOutlines] = useState({});
@@ -49,6 +49,10 @@ const LiteratureReview = ({
   const [stepProgress, setStepProgress] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [citationReferenceMap, setCitationReferenceMap] = useState({}); // Global citation reference mapping
+  
+  // Manual save functionality
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
 
   // Safe stringify for methodology and thesis
   const safeMethodology = typeof methodology === "string" ? methodology : JSON.stringify(methodology);
@@ -76,15 +80,40 @@ const LiteratureReview = ({
       
       // Restore generated data - only if we have actual data
       if (literatureReviewData.contextMapData) setContextMapData(literatureReviewData.contextMapData);
+      
+      // Load questions - first try from saved questions, then extract from saved outline if needed
       if (literatureReviewData.questions && Object.keys(literatureReviewData.questions).length > 0) {
-        console.log('📝 Loading questions from literatureReviewData:', literatureReviewData.questions);
+        console.log('📝 Loading questions from literatureReviewData.questions:', literatureReviewData.questions);
         setQuestions(literatureReviewData.questions);
+      } else if (literatureReviewData.outline && literatureReviewData.outline.length > 0) {
+        console.log('📝 Extracting questions from saved outline in literatureReviewData:', literatureReviewData.outline);
+        const extractedQuestions = {};
+        
+        literatureReviewData.outline.forEach((section, sectionIndex) => {
+          if (section.subsections) {
+            section.subsections.forEach((subsection, subsectionIndex) => {
+              if (subsection.questions) {
+                subsection.questions.forEach((question, questionIndex) => {
+                  const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+                  extractedQuestions[questionKey] = question.question;
+                });
+              }
+            });
+          }
+        });
+        
+        console.log('📝 Extracted questions from saved outline:', extractedQuestions);
+        setQuestions(extractedQuestions);
       }
+      
       if (literatureReviewData.responses) {
         console.log('📄 Loading responses from literatureReviewData:', literatureReviewData.responses);
         setResponses(literatureReviewData.responses);
       }
-      if (literatureReviewData.masterOutlines) setMasterOutlines(literatureReviewData.masterOutlines);
+      if (literatureReviewData.masterOutlines) {
+        console.log('📚 Loading masterOutlines from saved data:', literatureReviewData.masterOutlines);
+        setMasterOutlines(literatureReviewData.masterOutlines);
+      }
       
       // Restore UI states
       if (literatureReviewData.showContextMap !== undefined) setShowContextMap(literatureReviewData.showContextMap);
@@ -104,10 +133,68 @@ const LiteratureReview = ({
       }
       
       console.log('✅ LiteratureReview: State restored from saved data');
+      
+      // Check question completion status after loading data
+      setTimeout(() => {
+        console.log('🔍 Checking question completion after data load...');
+        checkQuestionAnsweringComplete();
+      }, 100);
     } else if (literatureReviewData === null || literatureReviewData === undefined || Object.keys(literatureReviewData || {}).length === 0) {
       console.log('⚠️ LiteratureReview: Received null/empty literatureReviewData, keeping existing state');
     }
   }, [literatureReviewData]);
+
+  // Initialize questions from outlineData when it loads (only if we don't already have questions)
+  useEffect(() => {
+    console.log('🔍 Questions extraction useEffect triggered');
+    console.log('🔍 outlineData:', outlineData);
+    console.log('🔍 questions:', questions);
+    console.log('🔍 Object.keys(questions).length:', Object.keys(questions || {}).length);
+    
+    // Only extract questions if we have outline data but no questions yet
+    if (outlineData && outlineData.length > 0 && (!questions || Object.keys(questions).length === 0)) {
+      console.log('🔍 Initializing questions from outlineData...');
+      const extractedQuestions = {};
+      
+      outlineData.forEach((section, sectionIndex) => {
+        console.log(`🔍 Processing section ${sectionIndex}:`, section.section_title);
+        if (section.subsections) {
+          section.subsections.forEach((subsection, subsectionIndex) => {
+            console.log(`🔍 Processing subsection ${sectionIndex}-${subsectionIndex}:`, subsection.subsection_title);
+            if (subsection.questions) {
+              subsection.questions.forEach((question, questionIndex) => {
+                const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+                extractedQuestions[questionKey] = question.question;
+                console.log(`🔍 Extracted question ${questionKey}:`, question.question);
+              });
+            }
+          });
+        }
+      });
+      
+      console.log('📝 Extracted questions from outline:', extractedQuestions);
+      setQuestions(extractedQuestions);
+      
+      // After setting questions, check completion
+      setTimeout(() => {
+        console.log('🔍 Checking completion after question extraction...');
+        checkQuestionAnsweringComplete();
+      }, 200);
+    } else {
+      console.log('🔍 Skipping question extraction - conditions not met');
+      console.log('🔍 outlineData exists:', !!outlineData);
+      console.log('🔍 outlineData length:', outlineData?.length);
+      console.log('🔍 questions is empty:', !questions || Object.keys(questions).length === 0);
+    }
+  }, [outlineData]); // Removed questions dependency to prevent resetting
+
+  // Check question completion when questions or responses change
+  useEffect(() => {
+    if (questions && Object.keys(questions).length > 0 && responses && Object.keys(responses).length > 0) {
+      console.log('🔍 Questions or responses changed, checking completion...');
+      setTimeout(() => checkQuestionAnsweringComplete(), 200);
+    }
+  }, [questions, responses]);
 
   // Build citation reference map using simple running numbers
   const buildCitationReferenceMap = () => {
@@ -275,6 +362,21 @@ const LiteratureReview = ({
     return total;
   };
 
+  // Manual save function
+  const handleManualSave = () => {
+    setSaving(true);
+    try {
+      if (onAutoSaveDraft) {
+        onAutoSaveDraft(drafts);
+        setLastSaved(new Date().toLocaleTimeString());
+      }
+    } catch (error) {
+      console.error('Manual save failed:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Step 2: Answer Questions (enhanced existing functionality)
   const startStep2AnswerQuestions = () => {
     console.log('📝 Starting Step 2: Answer Questions');
@@ -294,9 +396,18 @@ const LiteratureReview = ({
       responses[key] && responses[key].length > 0
     ).length;
     
+    console.log('🔍 checkQuestionAnsweringComplete - totalQuestions:', totalQuestions);
+    console.log('🔍 checkQuestionAnsweringComplete - answeredQuestions:', answeredQuestions);
+    console.log('🔍 checkQuestionAnsweringComplete - responses keys:', Object.keys(responses));
+    console.log('🔍 checkQuestionAnsweringComplete - questions keys:', Object.keys(questions));
+    
     const isComplete = totalQuestions > 0 && answeredQuestions === totalQuestions;
     
+    console.log('🔍 checkQuestionAnsweringComplete - isComplete:', isComplete);
+    console.log('🔍 checkQuestionAnsweringComplete - questionAnsweringComplete:', questionAnsweringComplete);
+    
     if (isComplete && !questionAnsweringComplete) {
+      console.log('✅ Setting question answering complete!');
       setQuestionAnsweringComplete(true);
       setStepStatus(prev => ({ ...prev, 2: 'complete', 3: 'ready' }));
       setCurrentStep(3);
@@ -316,54 +427,248 @@ const LiteratureReview = ({
     return isComplete;
   };
 
-  // Step 3: Detailed Outline Builder
-  const startStep3DetailedOutlineBuilder = () => {
-    console.log('🏗️ Starting Step 3: Detailed Outline Builder');
+  // Step 3: Fused Outline to Full Prose Builder
+  const startStep3ProseBuilder = async () => {
+    console.log('📝 Starting Step 3: Fused Outline to Full Prose Builder');
     setCurrentStep(3);
     setStepStatus(prev => ({ ...prev, 3: 'processing' }));
     setErrorMessage('');
-    setStepProgress('Generating detailed hierarchical outlines from fused responses...');
+    setStepProgress('Converting fused outlines to academic prose...');
     
     try {
-      // Generate master outlines from the fused responses
-      const generatedOutlines = generateMasterOutlinesFromResponses();
-      setMasterOutlines(generatedOutlines);
+      // Generate prose from the fused responses for each section/subsection
+      const generatedProse = await generateProseFromResponses();
+      console.log('🔍 Generated prose data:', generatedProse);
+      setMasterOutlines(generatedProse); // Reusing state but now contains prose
+      console.log('🔍 Set masterOutlines to:', generatedProse);
       setDetailedOutlineComplete(true);
       setStepStatus(prev => ({ ...prev, 3: 'complete' }));
-      setStepProgress('');
       
-      console.log('✅ Step 3: Detailed Outline Builder complete');
+      // Force a small delay to ensure UI update
+      setTimeout(() => {
+        console.log('🔍 After timeout - masterOutlines should be updated');
+      }, 500);
       
-      // Auto-save progress
+      setStepProgress('Step 3: Prose generation completed! Check results below ⬇️');
+      
+      console.log('✅ Step 3: Prose Builder complete');
+      
+      // Auto-save progress with complete state
       if (autoSave && onAutoSaveDraft) {
-        onAutoSaveDraft({
+        const completeState = {
           currentStep: 3,
           stepStatus: { 1: 'complete', 2: 'complete', 3: 'complete' },
+          contextAnalysisComplete: true,
+          questionAnsweringComplete: true,
           detailedOutlineComplete: true,
           questions: questions,
-          masterOutlines: generatedOutlines,
-          responses: responses
-        });
+          responses: responses,
+          masterOutlines: generatedProse, // This contains the prose data
+          contextMapData: contextMapData,
+          showContextMap: showContextMap,
+          showStep2Interface: showStep2Interface,
+          showStep3Interface: true
+        };
+        console.log('💾 Auto-saving complete literature review state:', completeState);
+        onAutoSaveDraft(completeState);
       }
       
       // Notify parent component of completion
       if (onLiteratureReviewComplete) {
         onLiteratureReviewComplete({
           responses: responses,
-          masterOutlines: generatedOutlines,
+          masterOutlines: generatedProse,
           contextMapData: contextMapData,
           completionStatus: 'complete'
         });
       }
     } catch (error) {
       console.error('❌ Error in Step 3:', error);
-      setErrorMessage(`Failed to generate detailed outlines: ${error.message}`);
+      setErrorMessage(`Failed to generate prose: ${error.message}`);
       setStepStatus(prev => ({ ...prev, 3: 'pending' }));
       setStepProgress('');
     }
   };
 
-  // Generate master outlines from fused responses using hierarchical structure
+  // Generate prose from fused responses using AI - Only for Data sections
+  const generateProseFromResponses = async () => {
+    const proseResults = [];
+    
+    // Filter to only process Data sections (sections with questions/responses)
+    const dataSections = outlineData.filter(section => 
+      section.subsections && section.subsections.some(sub => 
+        sub.questions && sub.questions.length > 0
+      )
+    );
+    
+    console.log(`📚 Processing ${dataSections.length} data sections for prose generation`);
+    setStepProgress(`Identified ${dataSections.length} data sections for prose generation...`);
+    
+    for (const [dataIndex, section] of dataSections.entries()) {
+      const sectionIndex = outlineData.findIndex(s => s.section_title === section.section_title);
+      
+      setStepProgress(`Building prose for Section ${dataIndex + 1}/${dataSections.length}: "${section.section_title}"`);
+      console.log(`🏗️ Processing section: ${section.section_title}`);
+      
+      const sectionProse = {
+        section_title: section.section_title,
+        section_context: section.section_context,
+        prose_subsections: [],
+        section_index: sectionIndex,
+        is_data_section: true
+      };
+      
+      if (section.subsections) {
+        const dataSubsections = section.subsections.filter(sub => 
+          sub.questions && sub.questions.length > 0
+        );
+        
+        console.log(`  📝 Found ${dataSubsections.length} subsections with questions`);
+        
+        for (const [subIndex, subsection] of dataSubsections.entries()) {
+          const subsectionIndex = section.subsections.findIndex(s => s.subsection_title === subsection.subsection_title);
+          
+          setStepProgress(`Building prose for "${subsection.subsection_title}" (${subIndex + 1}/${dataSubsections.length} subsections)`);
+          console.log(`    📄 Processing subsection: ${subsection.subsection_title}`);
+          
+          const proseParagraphs = await generateSubsectionProse(
+            subsection, 
+            section, 
+            sectionIndex, 
+            subsectionIndex
+          );
+          sectionProse.prose_subsections.push(proseParagraphs);
+          console.log(`    ✅ Added subsection prose for: ${subsection.subsection_title}`);
+        }
+      }
+      
+      proseResults.push(sectionProse);
+      console.log(`✅ Completed section: ${section.section_title} (${sectionProse.prose_subsections.length} subsections)`);
+    }
+    
+    setStepProgress(`Completed prose generation for all ${dataSections.length} data sections`);
+    console.log('🔍 Final proseResults:', proseResults);
+    return proseResults;
+  };
+
+  // Generate prose for a specific subsection from its fused responses
+  const generateSubsectionProse = async (subsection, section, sectionIndex, subsectionIndex) => {
+    const subsectionProse = {
+      subsection_title: subsection.subsection_title,
+      subsection_context: subsection.subsection_context,
+      prose_content: '',
+      question_count: subsection.questions?.length || 0,
+      citation_count: subsection.questions?.reduce((acc, q) => acc + (q.citations?.length || 0), 0) || 0,
+      reference_path: `Section ${section.section_title} → Subsection ${subsection.subsection_title}`
+    };
+
+    // Only generate prose if there are answered questions
+    if (!subsection.questions || subsection.questions.length === 0) {
+      subsectionProse.prose_content = `<p><em>No questions available for this subsection.</em></p>`;
+      return subsectionProse;
+    }
+
+    // Check if any questions have responses
+    const answeredQuestions = subsection.questions.filter((question, questionIndex) => {
+      const questionKey = `${sectionIndex}-${subsectionIndex}-${questionIndex}`;
+      return responses[questionKey] && responses[questionKey].length > 0;
+    });
+
+    if (answeredQuestions.length === 0) {
+      subsectionProse.prose_content = `<p><em>No responses available for questions in this subsection.</em></p>`;
+      return subsectionProse;
+    }
+
+    try {
+      // For each answered question, generate prose from its fused response
+      let combinedProse = '';
+      
+      for (const [questionIndex, question] of answeredQuestions.entries()) {
+        const originalQuestionIndex = subsection.questions.indexOf(question);
+        const questionKey = `${sectionIndex}-${subsectionIndex}-${originalQuestionIndex}`;
+        const questionResponses = responses[questionKey];
+        
+        if (questionResponses && questionResponses.length > 0) {
+          // Use the latest (fused) response
+          const fusedResponse = questionResponses[questionResponses.length - 1];
+          
+          // Prepare citation references
+          const citationReferences = question.citations?.map((citation, index) => ({
+            reference_id: `${questionIndex + 1}_${index + 1}`,
+            citation: {
+              apa: citation.apa || citation.source || citation.title,
+              title: citation.title,
+              source: citation.source
+            }
+          })) || [];
+
+          // Call the new prose generation endpoint with timeout
+          console.log(`      🔄 Generating prose for question: ${question.question.substring(0, 50)}...`);
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+          
+          try {
+            const proseResponse = await fetch('http://localhost:8000/generate_prose_from_outline', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                thesis: finalThesis || '',
+                methodology: safeMethodology || '',
+                section_context: section.section_context || '',
+                subsection_context: subsection.subsection_context || '',
+                question: question.question,
+                citation_responses: [fusedResponse],
+                citations: question.citations || [],
+                question_number: originalQuestionIndex + 1,
+                citation_references: citationReferences
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+
+            if (!proseResponse.ok) {
+              throw new Error(`HTTP error! status: ${proseResponse.status}`);
+            }
+
+            const proseData = await proseResponse.json();
+            console.log(`      🔍 Prose response for question ${originalQuestionIndex + 1}:`, proseData);
+            
+            if (proseData && proseData.response) {
+              combinedProse += proseData.response + '\n\n';
+              console.log(`      ✅ Prose generated for question ${originalQuestionIndex + 1}`);
+            } else {
+              console.error(`      ❌ No prose response for question ${originalQuestionIndex + 1}:`, proseData);
+              combinedProse += `<p><em>Error: No prose generated for this question.</em></p>\n\n`;
+            }
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+              console.error(`      ⏱️ Timeout generating prose for question ${originalQuestionIndex + 1}`);
+              combinedProse += `<p><em>Timeout: Prose generation took too long for this question.</em></p>\n\n`;
+            } else {
+              console.error(`      ❌ Fetch error for question ${originalQuestionIndex + 1}:`, fetchError);
+              combinedProse += `<p><em>Error: ${fetchError.message}</em></p>\n\n`;
+            }
+          }
+        }
+      }
+
+      subsectionProse.prose_content = combinedProse.trim();
+      console.log(`    🔍 Final prose content for "${subsection.subsection_title}":`, subsectionProse.prose_content);
+      
+    } catch (error) {
+      console.error('❌ Error generating prose for subsection:', subsection.subsection_title, error);
+      subsectionProse.prose_content = `<p><em>Error generating prose: ${error.message}</em></p>`;
+    }
+
+    return subsectionProse;
+  };
+
+  // Generate master outlines from fused responses using hierarchical structure (legacy function - keep for compatibility)
   const generateMasterOutlinesFromResponses = () => {
     const masterOutlines = [];
     
@@ -1116,7 +1421,11 @@ const LiteratureReview = ({
   };
 
   // Completion tracking
-  const getCompletedQuestions = () => Object.keys(responses).length;
+  const getCompletedQuestions = () => {
+    return Object.keys(responses).filter(key => 
+      responses[key] && responses[key].length > 0
+    ).length;
+  };
 
   if (!outlineData || outlineData.length === 0) {
     return (
@@ -1136,6 +1445,21 @@ const LiteratureReview = ({
           <span className="badge bg-info">
             {getCompletedQuestions()} / {getTotalQuestions()} Questions Answered
           </span>
+          <div className="ms-auto d-flex gap-2">
+            <button
+              className="btn btn-outline-primary btn-sm"
+              onClick={handleManualSave}
+              disabled={saving || !onAutoSaveDraft}
+              title="Save current progress manually"
+            >
+              {saving ? 'Saving...' : 'Save Progress'}
+            </button>
+            {lastSaved && (
+              <small className="text-muted align-self-center">
+                Last saved: {lastSaved}
+              </small>
+            )}
+          </div>
         </div>
         
         {/* Step Progress Indicators */}
@@ -1252,7 +1576,7 @@ const LiteratureReview = ({
             onClick={toggleStep3Interface}
             disabled={currentStep < 1 || !outlineData || outlineData.length === 0}
           >
-            Step 3 Outline
+            Step 3 Prose
           </button>
           {detailedOutlineComplete && (
             <button
@@ -1328,8 +1652,8 @@ const LiteratureReview = ({
           {stepStatus[3] === 'ready' && (
             <button
               className="btn btn-outline-success btn-sm"
-              onClick={startStep3DetailedOutlineBuilder}
-              title="Start Step 3 - Generate detailed outlines"
+              onClick={startStep3ProseBuilder}
+              title="Start Step 3 - Convert outlines to academic prose"
             >
               <FaPlay className="me-1" />
               Start Step 3
@@ -1529,8 +1853,8 @@ const LiteratureReview = ({
             <p className="small mb-0 text-muted">Answer questions through the lens of their specific context</p>
           </div>
           <div className="col-md-4">
-            <strong>Step 3:</strong> Detailed Outline Builder
-            <p className="small mb-0 text-muted">Generate hierarchical outlines from fused responses</p>
+            <strong>Step 3:</strong> Prose Builder
+            <p className="small mb-0 text-muted">Convert fused outlines to research-quality prose</p>
           </div>
         </div>
       </div>
@@ -1610,16 +1934,7 @@ const LiteratureReview = ({
       )}
 
       {/* Contextual Analysis Results - Show when Step 1 is complete but Step 2 interface is not active */}
-      {(() => {
-        console.log('🔍 Contextual Analysis Results Check:', { 
-          contextAnalysisComplete, 
-          showStep2Interface, 
-          questions, 
-          questionsKeys: questions ? Object.keys(questions) : 'no questions' 
-        });
-        // Show contextual analysis results only when context map is visible/selected
-        return contextAnalysisComplete && showContextMap && questions && Object.keys(questions).length > 0;
-      })() && (
+      {contextAnalysisComplete && showContextMap && questions && Object.keys(questions).length > 0 && (
         <div className="card mb-4">
           <div className="card-header">
             <h5 className="mb-0">
@@ -1904,14 +2219,14 @@ const LiteratureReview = ({
         </div>
       ))}
 
-      {/* Step 3: Detailed Outline Builder Interface */}
+      {/* Step 3: Fused Outline to Full Prose Builder Interface */}
       {showStep3Interface && (
         <div className="step-3-interface mb-4">
           <div className="card" style={{ backgroundColor: masterOutlines.length > 0 ? '#f0fff0' : '#f8f9fa', border: masterOutlines.length > 0 ? '2px solid #28a745' : '2px solid #6c757d' }}>
             <div className="card-header" style={{ backgroundColor: masterOutlines.length > 0 ? '#d4edda' : '#e9ecef' }}>
               <div className="d-flex justify-content-between align-items-center">
                 <h5 className={`mb-0 ${masterOutlines.length > 0 ? 'text-success' : 'text-secondary'}`}>
-                  {masterOutlines.length > 0 ? 'Step 3: Detailed Outline Builder - Complete' : 'Step 3: Detailed Outline Builder'}
+                  {masterOutlines.length > 0 ? 'Step 3: Prose Builder - Complete' : 'Step 3: Fused Outline to Full Prose Builder'}
                 </h5>
                 <span className={`badge ${masterOutlines.length > 0 ? 'bg-success' : 'bg-secondary'}`}>
                   {masterOutlines.length} Sections
@@ -1921,18 +2236,35 @@ const LiteratureReview = ({
             <div className="card-body">
               {masterOutlines.length > 0 ? (
                 <div className="alert alert-success">
-                  <strong>✅ Hierarchical Outlines Generated!</strong> 
-                  Your literature review has been converted into detailed, editable outlines following academic structure 
-                  (I, A, 1, a, i format). Each outline point is derived from your fused research responses.
+                  <strong>✅ Academic Prose Generated!</strong> 
+                  Your data sections have been converted into research-paper-quality prose with proper citations and academic flow. 
+                  Each subsection maintains contextual coherence while integrating all your research responses.
+                  <div className="mt-2">
+                    <strong>Generated:</strong> {masterOutlines.length} data sections with prose content
+                  </div>
+                </div>
+              ) : stepStatus[3] === 'processing' ? (
+                <div className="alert alert-warning">
+                  <strong>🔄 Building Academic Prose...</strong>
+                  <p className="mb-2">Converting fused outlines to publication-ready prose for data sections only.</p>
+                  {stepProgress && (
+                    <div className="mt-2">
+                      <div className="small text-muted">Current Progress:</div>
+                      <div className="fw-bold">{stepProgress}</div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
                   <div className="alert alert-info">
-                    <strong>📋 Step 3: Outline Builder Ready</strong>
+                    <strong>� Step 3: Prose Builder Ready</strong>
                     <p className="mb-1">
-                      This section displays the hierarchical outline structure from your Outline Framework. 
-                      Complete Step 2 and run Step 3 to populate with detailed content.
+                      Convert your fused outlines into research-paper-quality prose with proper citations and academic flow. 
+                      This will process <strong>only data sections</strong> that have answered questions and generate full academic paragraphs.
                     </p>
+                    <div className="small text-muted mt-2">
+                      <strong>Process:</strong> Identify data sections → Build prose for each subsection → Display formatted results
+                    </div>
                   </div>
                   
                   {/* Show section/subsection structure from outline data */}
@@ -1999,7 +2331,7 @@ const LiteratureReview = ({
                       <span className="me-3 text-primary fw-bold" style={{ fontSize: '1.5rem', minWidth: '40px' }}>
                         {romanNumeral}.
                       </span>
-                      <h5 className="mb-0 text-primary">{section.section_title}</h5>
+                      <h4 className="mb-0 text-primary">{section.section_title}</h4>
                       <button
                         className="btn btn-sm btn-outline-secondary ms-auto"
                         onClick={() => toggleOutlineExpansion(sectionIndex, 'all')}
@@ -2008,152 +2340,101 @@ const LiteratureReview = ({
                       </button>
                     </div>
                     
-                    {section.master_subsections.map((subsection, subIndex) => {
-                      const letter = String.fromCharCode(65 + subIndex);
-                      const isExpanded = expandedOutlines[`${sectionIndex}-${subIndex}`];
-                      
-                      return (
-                        <div key={subIndex} className="ms-4 mb-3">
-                          <div className="d-flex align-items-center mb-2">
-                            <span className="me-3 text-secondary fw-bold" style={{ fontSize: '1.2rem', minWidth: '30px' }}>
-                              {letter}.
-                            </span>
-                            <h6 className="mb-0 text-secondary">{subsection.subsection_title}</h6>
-                            <button
-                              className="btn btn-sm btn-outline-secondary ms-auto"
-                              onClick={() => toggleOutlineExpansion(sectionIndex, subIndex)}
-                            >
-                              {isExpanded ? <FaMinus /> : <FaPlus />}
-                            </button>
-                          </div>
-                          
-                          {isExpanded && (
-                            <div className="ms-4">
-                              <div className="small text-muted mb-3">
-                                {subsection.question_count} questions • {subsection.citation_count} citations • 
-                                {subsection.thematic_basis}
-                              </div>
-                              
-                              {subsection.master_outline.map((mainPoint, pointIndex) => (
-                                <div key={pointIndex} className="mb-3">
-                                  {/* Main Point (1, 2, 3...) */}
-                                  <div className="d-flex align-items-start mb-2">
-                                    <span className="me-2 fw-bold text-dark" style={{ minWidth: '25px' }}>
-                                      {mainPoint.level}.
-                                    </span>
-                                    <div className="flex-grow-1">
-                                      <textarea
-                                        className="form-control form-control-sm mb-1"
-                                        rows="2"
-                                        value={mainPoint.content}
-                                        onChange={(e) => {
-                                          // Handle outline editing
-                                          const newOutlines = [...masterOutlines];
-                                          newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].content = e.target.value;
-                                          setMasterOutlines(newOutlines);
-                                        }}
-                                      />
-                                      {mainPoint.citations && mainPoint.citations.length > 0 && (
-                                        <div className="small text-muted">
-                                          Citations: {mainPoint.citations.map(c => `[${c}]`).join(' ')}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Level 4: Sub Points (a), b), c)...) */}
-                                  {mainPoint.subPoints && mainPoint.subPoints.map((subPoint, subPointIndex) => (
-                                    <div key={subPointIndex} className="ms-4 mb-2">
-                                      <div className="d-flex align-items-start">
-                                        <span className="me-2 fw-bold text-secondary" style={{ minWidth: '30px', fontSize: '0.9rem' }}>
-                                          {subPoint.level})
-                                        </span>
-                                        <div className="flex-grow-1">
-                                          <textarea
-                                            className="form-control form-control-sm mb-1"
-                                            rows="2"
-                                            value={subPoint.content}
-                                            onChange={(e) => {
-                                              // Handle sub-point editing
-                                              const newOutlines = [...masterOutlines];
-                                              newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].content = e.target.value;
-                                              setMasterOutlines(newOutlines);
-                                            }}
-                                          />
-                                          {subPoint.citations && subPoint.citations.length > 0 && (
-                                            <div className="small text-muted">
-                                              Citations: {subPoint.citations.map(c => `[${c}]`).join(' ')}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Level 5: Deeper Points (i), ii), iii)...) */}
-                                      {subPoint.deeperPoints && subPoint.deeperPoints.map((deeperPoint, deeperIndex) => (
-                                        <div key={deeperIndex} className="ms-4 mb-1">
-                                          <div className="d-flex align-items-start">
-                                            <span className="me-2 text-muted fw-bold" style={{ minWidth: '30px', fontSize: '0.85rem' }}>
-                                              {deeperPoint.level})
-                                            </span>
-                                            <div className="flex-grow-1">
-                                              <textarea
-                                                className="form-control form-control-sm mb-1"
-                                                rows="1"
-                                                value={deeperPoint.content}
-                                                onChange={(e) => {
-                                                  // Handle deeper point editing
-                                                  const newOutlines = [...masterOutlines];
-                                                  newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].deeperPoints[deeperIndex].content = e.target.value;
-                                                  setMasterOutlines(newOutlines);
-                                                }}
-                                              />
-                                              {deeperPoint.citations && deeperPoint.citations.length > 0 && (
-                                                <div className="small text-muted">
-                                                  Citations: {deeperPoint.citations.map(c => `[${c}]`).join(' ')}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                          
-                                          {/* Level 6: Finest Details (1), (2), (3)...) */}
-                                          {deeperPoint.level6Points && deeperPoint.level6Points.map((level6Point, level6Index) => (
-                                            <div key={level6Index} className="ms-4 mb-1">
-                                              <div className="d-flex align-items-start">
-                                                <span className="me-2 text-muted" style={{ minWidth: '35px', fontSize: '0.8rem' }}>
-                                                  {level6Point.level}
-                                                </span>
-                                                <div className="flex-grow-1">
-                                                  <textarea
-                                                    className="form-control form-control-sm"
-                                                    rows="1"
-                                                    value={level6Point.content}
-                                                    onChange={(e) => {
-                                                      // Handle level 6 point editing
-                                                      const newOutlines = [...masterOutlines];
-                                                      newOutlines[sectionIndex].master_subsections[subIndex].master_outline[pointIndex].subPoints[subPointIndex].deeperPoints[deeperIndex].level6Points[level6Index].content = e.target.value;
-                                                      setMasterOutlines(newOutlines);
-                                                    }}
-                                                  />
-                                                  {level6Point.citations && level6Point.citations.length > 0 && (
-                                                    <div className="small text-muted">
-                                                      Citations: {level6Point.citations.map(c => `[${c}]`).join(' ')}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
+                    {/* Check if this is the new prose format or old outline format */}
+                    {section.prose_subsections ? (
+                      // New prose format
+                      section.prose_subsections.map((subsection, subIndex) => {
+                        const letter = String.fromCharCode(65 + subIndex);
+                        const isExpanded = expandedOutlines[`${sectionIndex}-${subIndex}`];
+                        
+                        return (
+                          <div key={subIndex} className="ms-4 mb-4">
+                            <div className="d-flex align-items-center mb-3">
+                              <span className="me-3 text-secondary fw-bold" style={{ fontSize: '1.2rem', minWidth: '30px' }}>
+                                {letter}.
+                              </span>
+                              <h5 className="mb-0 text-secondary">{subsection.subsection_title}</h5>
+                              <button
+                                className="btn btn-sm btn-outline-secondary ms-auto"
+                                onClick={() => toggleOutlineExpansion(sectionIndex, subIndex)}
+                              >
+                                {isExpanded ? <FaMinus /> : <FaPlus />}
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            
+                            {isExpanded && (
+                              <div className="ms-4">
+                                <div className="small text-muted mb-3">
+                                  {subsection.question_count} questions • {subsection.citation_count} citations • 
+                                  {subsection.reference_path}
+                                </div>
+                                
+                                <div className="prose-content border rounded p-4" style={{ backgroundColor: '#f8f9fa' }}>
+                                  <div 
+                                    dangerouslySetInnerHTML={{ __html: subsection.prose_content }}
+                                    style={{ 
+                                      lineHeight: '1.8',
+                                      fontSize: '1rem'
+                                    }}
+                                  />
+                                </div>
+                                
+                                <div className="mt-3">
+                                  <button 
+                                    className="btn btn-sm btn-outline-primary me-2"
+                                    onClick={() => {
+                                      // Copy prose to clipboard
+                                      navigator.clipboard.writeText(subsection.prose_content.replace(/<[^>]*>/g, ''));
+                                    }}
+                                  >
+                                    📋 Copy Text
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm btn-outline-secondary"
+                                    onClick={() => {
+                                      // Regenerate prose for this subsection
+                                      console.log('Regenerate prose for:', subsection.subsection_title);
+                                    }}
+                                  >
+                                    🔄 Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      // Legacy outline format (fallback)
+                      section.master_subsections?.map((subsection, subIndex) => {
+                        const letter = String.fromCharCode(65 + subIndex);
+                        const isExpanded = expandedOutlines[`${sectionIndex}-${subIndex}`];
+                        
+                        return (
+                          <div key={subIndex} className="ms-4 mb-3">
+                            <div className="d-flex align-items-center mb-2">
+                              <span className="me-3 text-secondary fw-bold" style={{ fontSize: '1.2rem', minWidth: '30px' }}>
+                                {letter}.
+                              </span>
+                              <h6 className="mb-0 text-secondary">{subsection.subsection_title}</h6>
+                              <button
+                                className="btn btn-sm btn-outline-secondary ms-auto"
+                                onClick={() => toggleOutlineExpansion(sectionIndex, subIndex)}
+                              >
+                                {isExpanded ? <FaMinus /> : <FaPlus />}
+                              </button>
+                            </div>
+                            
+                            {isExpanded && (
+                              <div className="ms-4 alert alert-warning">
+                                <strong>Legacy Outline Format:</strong> This section uses the old outline format. 
+                                Please regenerate with Step 3 to convert to prose format.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 );
               })}
@@ -2188,6 +2469,183 @@ const LiteratureReview = ({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prose Generation Status & Results */}
+      {stepStatus[3] === 'processing' && (
+        <div className="prose-status-section mt-4">
+          <div className="alert alert-info">
+            <div className="d-flex align-items-center">
+              <FaSpinner className="fa-spin me-2" />
+              <strong>Generating Academic Prose...</strong>
+            </div>
+            <p className="mb-0 mt-1 small">{stepProgress}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Generated Prose Results - Display outside Step 3 box */}
+      {masterOutlines && masterOutlines.length > 0 && (
+        <div className="prose-results-section mt-4">
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h3 className="text-primary mb-0">📚 Generated Academic Prose</h3>
+              <div className="d-flex gap-2">
+                <button 
+                  className="btn btn-outline-success btn-sm"
+                  onClick={() => {
+                    if (onAutoSaveDraft) {
+                      const currentState = {
+                        currentStep: currentStep,
+                        stepStatus: stepStatus,
+                        contextAnalysisComplete,
+                        questionAnsweringComplete,
+                        detailedOutlineComplete,
+                        questions,
+                        responses,
+                        masterOutlines,
+                        contextMapData,
+                        showContextMap,
+                        showStep2Interface,
+                        showStep3Interface
+                      };
+                      onAutoSaveDraft(currentState);
+                      alert('Prose results saved successfully!');
+                    }
+                  }}
+                  title="Manually save current prose results"
+                >
+                  💾 Save Prose Results
+                </button>
+                <button 
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => {
+                    const allProseText = masterOutlines.map(section => {
+                      let text = `${section.section_title}\n${'='.repeat(section.section_title.length)}\n\n`;
+                      if (section.prose_subsections) {
+                        section.prose_subsections.forEach(subsection => {
+                          text += `${subsection.subsection_title}\n${'-'.repeat(subsection.subsection_title.length)}\n`;
+                          text += subsection.prose_content.replace(/<[^>]*>/g, '') + '\n\n';
+                        });
+                      }
+                      return text;
+                    }).join('\n\n');
+                    
+                    navigator.clipboard.writeText(allProseText);
+                    alert('All prose content copied to clipboard!');
+                  }}
+                  title="Copy all prose content to clipboard"
+                >
+                  📋 Copy All Prose
+                </button>
+              </div>
+            </div>
+            <div className="alert alert-info">
+              <strong>Publication-Ready Content:</strong> The following sections have been converted from your research responses into academic prose suitable for research papers.
+            </div>
+          </div>
+
+          {masterOutlines.map((section, sectionIndex) => {
+            const romanNumeral = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][sectionIndex] || `${sectionIndex + 1}`;
+            
+            return (
+              <div key={sectionIndex} className="prose-section mb-5">
+                <div className="section-header mb-4 p-3 bg-light border-start border-primary border-4">
+                  <h4 className="text-primary mb-2">
+                    <span className="me-3">{romanNumeral}.</span>
+                    {section.section_title}
+                  </h4>
+                  <p className="text-muted mb-0 small">
+                    <strong>Context:</strong> {section.section_context}
+                  </p>
+                </div>
+
+                {/* Check if this is the new prose format or old outline format */}
+                {section.prose_subsections && section.prose_subsections.length > 0 ? (
+                  // New prose format
+                  section.prose_subsections.map((subsection, subIndex) => {
+                    const letter = String.fromCharCode(65 + subIndex);
+                    
+                    return (
+                      <div key={subIndex} className="prose-subsection mb-4 ms-4">
+                        <div className="subsection-header mb-3 p-2 bg-light border rounded">
+                          <h5 className="text-secondary mb-1">
+                            <span className="me-2">{letter}.</span>
+                            {subsection.subsection_title}
+                          </h5>
+                          <div className="small text-muted">
+                            {subsection.question_count} questions • {subsection.citation_count} citations
+                          </div>
+                        </div>
+                        
+                        <div className="prose-content border rounded p-4 bg-white shadow-sm">
+                          {subsection.prose_content ? (
+                            <div 
+                              dangerouslySetInnerHTML={{ __html: subsection.prose_content }}
+                              style={{ 
+                                lineHeight: '1.8',
+                                fontSize: '1rem',
+                                fontFamily: 'Georgia, serif'
+                              }}
+                            />
+                          ) : (
+                            <div className="text-muted fst-italic">
+                              <p>No prose content generated for this subsection.</p>
+                              <p className="small">Subsection data: {JSON.stringify(subsection, null, 2)}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="prose-actions mt-2 d-flex gap-2">
+                          <button 
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => {
+                              navigator.clipboard.writeText(subsection.prose_content.replace(/<[^>]*>/g, ''));
+                            }}
+                            title="Copy prose text to clipboard"
+                          >
+                            📋 Copy Text
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => {
+                              console.log('Regenerate prose for:', subsection.subsection_title);
+                              // TODO: Implement regeneration
+                            }}
+                            title="Regenerate prose for this subsection"
+                          >
+                            🔄 Regenerate
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Legacy outline format or missing prose data
+                  <div className="alert alert-warning ms-4">
+                    <strong>No Prose Content:</strong> This section doesn't have prose content yet. 
+                    {section.master_subsections ? 'Uses old outline format - ' : ''}Please run Step 3 to generate prose format.
+                    <div className="mt-2 small text-muted">
+                      Section structure: {JSON.stringify(Object.keys(section), null, 2)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          
+          {/* Debug Section - Show raw data structure (remove in production) */}
+          <div className="mt-4">
+            <details className="mb-3">
+              <summary className="btn btn-outline-secondary btn-sm">🔍 Debug: View Raw Prose Data</summary>
+              <div className="mt-2 p-3 bg-light border rounded">
+                <pre className="small text-muted mb-0" style={{ maxHeight: '300px', overflow: 'auto' }}>
+                  {JSON.stringify(masterOutlines, null, 2)}
+                </pre>
+              </div>
+            </details>
           </div>
         </div>
       )}

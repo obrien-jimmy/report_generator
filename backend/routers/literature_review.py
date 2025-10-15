@@ -127,3 +127,73 @@ Master Outline:
         return LLMResponse(response=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating fused response: {str(e)}")
+
+@router.post("/generate_prose_from_outline", response_model=LLMResponse)
+async def generate_prose_from_outline(request: FusedResponseRequest):
+    """Generate full academic prose from fused outline with responses"""
+    
+    # Build citation references mapping
+    citation_refs = {}
+    for ref in (request.citation_references or []):
+        citation_refs[ref.reference_id] = ref.citation
+    
+    # Build citations list with reference numbers
+    citations_list = "\n".join([
+        f"[{ref.reference_id}]: {ref.citation.apa or ref.citation.title or ref.citation.source}" 
+        for ref in (request.citation_references or [])
+    ])
+    
+    # Build responses list - assuming these are the fused outline responses
+    responses_content = "\n\n".join([
+        f"Response {i+1}:\n{resp}" 
+        for i, resp in enumerate(request.citation_responses)
+    ])
+    
+    prompt = f"""You are an academic synthesis and writing engine.
+Your task is to convert the fused outline—which contains section/subsection structure, contextual analysis, and question responses—into research-paper-quality prose.
+
+PRIMARY OBJECTIVE:
+Transform the completed section/subsection content into full, coherent paragraphs that:
+- Clearly express the larger point or argument implied by the section's context statement
+- Integrate and elaborate upon the data and responses from the fused outline
+- Maintain academic flow, logical structure, and narrative cohesion
+
+WRITING REQUIREMENTS:
+- Write at a formal academic level, suitable for publication or graduate-level research
+- Each subsection should produce 2–4 well-developed paragraphs unless otherwise directed by data density
+- Maintain strong coherence using transitions that reinforce the section's relationship to the broader argument
+- Use context statement: "{request.section_context or request.subsection_context}"
+
+CITATION FORMAT:
+- Use blue-linked citations for in-app pop-up functionality
+- Format: <span style="color:blue;" data-cite="[Reference]">[Reference]</span>
+- Example: According to the analysis <span style="color:blue;" data-cite="[1]">[1]</span>
+- Multiple sources: <span style="color:blue;" data-cite="[1,2]">[1, 2]</span>
+
+STYLE REQUIREMENTS:
+- Objective, analytical tone
+- Smooth transitions between evidence and interpretation  
+- Avoid repetition of citation phrases or excessive quotation; paraphrase appropriately
+- Begin with the intent and purpose described in the contextual analysis
+- Every paragraph should stay aligned with why this section exists and how it supports the thesis
+
+THESIS CONTEXT: {request.thesis}
+METHODOLOGY: {request.methodology}
+SECTION CONTEXT: {request.section_context}
+SUBSECTION CONTEXT: {request.subsection_context}
+
+QUESTION BEING ADDRESSED: {request.question}
+
+AVAILABLE CITATIONS:
+{citations_list}
+
+FUSED OUTLINE CONTENT TO CONVERT TO PROSE:
+{responses_content}
+
+Generate full academic prose that converts the outline structure into flowing paragraphs while maintaining all citations and arguments. Do not use bullet points or outline formatting - write complete paragraphs only."""
+
+    try:
+        response = invoke_bedrock(prompt)
+        return LLMResponse(response=response)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating prose from outline: {str(e)}")
