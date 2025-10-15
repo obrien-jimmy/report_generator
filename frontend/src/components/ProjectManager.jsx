@@ -11,6 +11,7 @@ const ProjectManager = forwardRef(({
   methodology,
   selectedPaperType,
   outlineData,
+  dataObservationData,
   literatureReviewData,
   thesisFinalized,
   categoriesFinalized,
@@ -69,7 +70,7 @@ const ProjectManager = forwardRef(({
       description: projectDescription,
       createdAt: (isNewSave || !currentProject) ? new Date().toISOString() : currentProject.createdAt,
       updatedAt: new Date().toISOString(),
-      data: {
+  data: {
         // User inputs
         finalThesis,
         sourceCategories,
@@ -86,7 +87,7 @@ const ProjectManager = forwardRef(({
         
         // Generated outputs - this should include full outline with contexts
         outlineData, // This already contains section_context and subsection_context
-        literatureReviewData
+        dataObservationData: literatureReviewData || null
       }
     };
 
@@ -157,8 +158,8 @@ const ProjectManager = forwardRef(({
             readyForOutline,
             frameworkComplete,
             activeTab,
-            outlineData,
-            literatureReviewData
+    outlineData,
+    dataObservationData: literatureReviewData || null
           }
         };
 
@@ -189,8 +190,8 @@ const ProjectManager = forwardRef(({
         readyForOutline,
         frameworkComplete,
         activeTab,
-        outlineData,
-        literatureReviewData
+    outlineData,
+    dataObservationData: literatureReviewData || null
       }
     };
 

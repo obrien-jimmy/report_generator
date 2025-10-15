@@ -7,7 +7,7 @@ import SourceCategories from './components/SourceCategories';
 import MethodologyGenerator from './components/MethodologyGenerator';
 import OutlineGenerator from './components/OutlineFrameworkGenerator';
 import PaperTypeSelector from './components/PaperTypeSelector';
-import LiteratureReview from './components/LiteratureReview';
+import DataObservationBuilder from './components/DataObservationBuilder';
 import ProjectManager from './components/ProjectManager';
 
 function App() {
@@ -34,7 +34,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('framework');
   const [frameworkComplete, setFrameworkComplete] = useState(false);
   const [outlineData, setOutlineData] = useState(null);
-  const [literatureReviewData, setLiteratureReviewData] = useState(null);
+  const [dataObservationData, setDataObservationData] = useState(null);
 
   // Project management
   const [currentProject, setCurrentProject] = useState(null);
@@ -156,19 +156,19 @@ function App() {
     }
   };
 
-  const handleTransferToLiteratureReview = () => {
-    console.log('App.jsx: Transferring to literature review');
+  const handleTransferToDataObservation = () => {
+    console.log('App.jsx: Transferring to data observation');
     setActiveTab('outline');
     triggerAutoSave();
   };
 
-  const handleLiteratureReviewComplete = (literatureReviewData) => {
-    setLiteratureReviewData(literatureReviewData);
+  const handleDataObservationComplete = (dataObs) => {
+    setDataObservationData(dataObs);
     triggerAutoSave();
   };
 
-  const handleAutoSaveLiteratureReview = (literatureReview) => {
-    setLiteratureReviewData(literatureReview);
+  const handleAutoSaveDataObservation = (dataObs) => {
+    setDataObservationData(dataObs);
     triggerAutoSave(); // Debounced save for frequent draft updates
   };
 
@@ -192,8 +192,8 @@ function App() {
     setMethodology(data.methodology || '');
     setSelectedPaperType(data.selectedPaperType || null);
     setOutlineData(data.outlineData || null);
-    console.log('🔍 Loading literatureReviewData:', data.literatureReviewData);
-    setLiteratureReviewData(data.literatureReviewData || null);
+  console.log('🔍 Loading dataObservationData (from project):', data.dataObservationData || data.literatureReviewData);
+  setDataObservationData(data.dataObservationData || data.literatureReviewData || null);
     
     // Restore state flags
     setThesisFinalized(data.thesisFinalized || false);
@@ -268,7 +268,7 @@ function App() {
             methodology={methodology}
             selectedPaperType={selectedPaperType}
             outlineData={outlineData}
-            literatureReviewData={literatureReviewData}
+            dataObservationData={dataObservationData}
             thesisFinalized={thesisFinalized}
             categoriesFinalized={categoriesFinalized}
             sourceCategoriesActivated={sourceCategoriesActivated}
@@ -303,7 +303,7 @@ function App() {
                 role="tab"
                 disabled={!frameworkComplete}
               >
-                Literature Review
+                Data & Observations
               </button>
             </li>
           </ul>
@@ -369,7 +369,7 @@ function App() {
                     sourceCategories={sourceCategories}
                     selectedPaperType={selectedPaperType}
                     onFrameworkComplete={handleFrameworkComplete}
-                    onTransferToLiteratureReview={handleTransferToLiteratureReview}
+                    onTransferToLiteratureReview={handleTransferToDataObservation}
                     savedOutlineData={outlineData}
                     refreshTrigger={structureRefreshTrigger}
                   />
@@ -378,17 +378,17 @@ function App() {
             </div>
           )}
 
-          {/* Literature Review Tab */}
+          {/* Data & Observations Tab */}
           {activeTab === 'outline' && (
             <div className="tab-pane fade show active">
-              <LiteratureReview
+              <DataObservationBuilder
                 outlineData={outlineData}
                 finalThesis={finalThesis}
                 methodology={methodology}
-                onLiteratureReviewComplete={handleLiteratureReviewComplete}
+                onLiteratureReviewComplete={handleDataObservationComplete}
                 autoSave={autoSave}
-                onAutoSaveDraft={handleAutoSaveLiteratureReview}
-                literatureReviewData={literatureReviewData}
+                onAutoSaveDraft={handleAutoSaveDataObservation}
+                dataObservationData={dataObservationData}
               />
             </div>
           )}
