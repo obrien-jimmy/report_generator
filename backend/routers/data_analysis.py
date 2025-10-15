@@ -335,10 +335,16 @@ def analyze_inclusion_exclusion_criteria(request: InclusionExclusionRequest):
     try:
         logger.info(f"Starting inclusion/exclusion analysis")
         
-        # Extract draft content for analysis
+        # Extract draft content for analysis. Prefer new dataObservationData, fall back to legacy literatureReviewData
         draft_content = ""
-        if request.literatureReviewData and "outline" in request.literatureReviewData:
-            for section in request.literatureReviewData["outline"]:
+        draft_source = None
+        if getattr(request, 'dataObservationData', None):
+            draft_source = request.dataObservationData
+        elif getattr(request, 'literatureReviewData', None):
+            draft_source = request.literatureReviewData
+
+        if draft_source and "outline" in draft_source:
+            for section in draft_source["outline"]:
                 draft_content += f"SECTION: {section.get('section_title', '')}\n"
                 draft_content += f"CONTEXT: {section.get('section_context', '')}\n"
                 for subsection in section.get('subsections', []):

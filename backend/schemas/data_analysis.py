@@ -39,7 +39,9 @@ class GeneratedOutline(BaseModel):
 
 # Inclusion/Exclusion Analysis Schemas
 class InclusionExclusionRequest(BaseModel):
-    literatureReviewData: Dict[str, Any] = Field(..., description="Literature review data to analyze")
+    # Accept either the new dataObservationData key or the legacy literatureReviewData
+    dataObservationData: Optional[Dict[str, Any]] = Field(None, description="Data & Observations payload (preferred)")
+    literatureReviewData: Optional[Dict[str, Any]] = Field(None, description="Legacy literature review data to analyze (fallback)")
     thesis: str = Field(..., description="Main thesis statement")
 
 class ContentItem(BaseModel):
